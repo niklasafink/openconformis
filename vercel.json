@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "regions": ["fra1"],
+  "fluid": true,
+  "functions": {
+    "src/app/api/chat/stream/route.ts": {
+      "maxDuration": 120,
+      "supportsCancellation": true,
+      "regions": ["fra1"]
+    }
+  }
+}

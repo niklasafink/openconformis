@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software in noncommercial research, cite it as below."
+title: "Conformis regulatory gap analysis"
+type: software
+version: 0.1.0
+date-released: 2026-08-22
+authors:
+  - name: "Neura Labs UG (haftungsbeschränkt)"
+license: other
+repository-code: "https://github.com/Neura-Labs/conformis"
+abstract: "Evidence-backed comparison of internal policies with versioned regulatory requirements."

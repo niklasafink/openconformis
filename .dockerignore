@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.git
+.next
+.pnpm-store
+node_modules
+tsconfig.tsbuildinfo
+coverage
+assets
+drizzle
+docs
+enterprise-wireframe

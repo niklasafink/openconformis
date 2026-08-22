@@ -1,0 +1,90 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: "Immutable release tag, for example v0.1.0"
+        required: true
+        type: string
+      production_url:
+        description: "Canonical production origin, without a trailing slash"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Migrate, deploy worker, stage and promote web
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.release_ref }}
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 9.12.0
+          run_install: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply forward-only migrations
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: pnpm db:migrate
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+      - name: Deploy the durable worker in Frankfurt
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_APP: ${{ vars.FLY_WORKER_APP }}
+        run: |
+          flyctl secrets set APP_BUILD_ID="${{ inputs.release_ref }}" --stage
+          flyctl deploy --remote-only --config fly.worker.toml
+      - name: Pull production Vercel configuration
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: pnpm dlx vercel@59.4.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Validate production web configuration
+        run: >-
+          node --env-file=.vercel/.env.production.local --import tsx
+          scripts/check-production-config.ts --target=web
+      - name: Build and stage the production deployment
+        id: vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: |
+          pnpm dlx vercel@59.4.0 build --prod --token="$VERCEL_TOKEN" --build-env APP_BUILD_ID="${{ inputs.release_ref }}"
+          deployment_url=$(pnpm dlx vercel@59.4.0 deploy --prebuilt --prod --skip-domain --token="$VERCEL_TOKEN" --env APP_BUILD_ID="${{ inputs.release_ref }}")
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+      - name: Check staged readiness
+        env:
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if curl --fail --silent --show-error --header "x-vercel-protection-bypass: $BYPASS" "${{ steps.vercel.outputs.url }}/api/health"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+      - name: Promote staged deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@59.4.0 promote "${{ steps.vercel.outputs.url }}" --yes --token="$VERCEL_TOKEN"
+      - name: Check canonical production readiness
+        run: curl --fail --silent --show-error "${{ inputs.production_url }}/api/health"
