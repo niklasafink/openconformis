@@ -239,6 +239,27 @@
       "when": 1787417179454,
       "tag": "0033_cynical_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787435230014,
+      "tag": "0034_thin_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1787435273157,
+      "tag": "0035_sleepy_stick",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1787435758595,
+      "tag": "0036_sharp_stephen_strange",
+      "breakpoints": true
     }
   ]
 }

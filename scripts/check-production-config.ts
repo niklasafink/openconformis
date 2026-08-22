@@ -6,8 +6,8 @@ import {
 const targetArgument = process.argv.find((argument) => argument.startsWith("--target="));
 const target = (targetArgument?.split("=")[1] ?? "all") as ProductionRuntimeTarget;
 
-if (!(["web", "worker", "all"] as const).includes(target)) {
-  process.stderr.write("Unknown target. Use --target=web, --target=worker or --target=all.\n");
+if (!(["web", "all"] as const).includes(target)) {
+  process.stderr.write("Unknown target. Use --target=web or --target=all.\n");
   process.exit(2);
 }
 

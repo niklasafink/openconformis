@@ -1,5 +1,6 @@
 import createNextIntlPlugin from "next-intl/plugin";
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -10,7 +11,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data:",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  "connect-src 'self' https://*.blob.vercel-storage.com",
   "frame-src https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'self'",
@@ -20,8 +21,31 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["@napi-rs/canvas", "tesseract.js"],
   outputFileTracingIncludes: {
-    "/*": ["./assets/samples/**/*"],
+    "/*": [
+      "./assets/samples/**/*",
+      "./node_modules/@tesseract.js-data/deu/4.0.0/**/*",
+      "./node_modules/@tesseract.js-data/eng/4.0.0/**/*",
+    ],
+  },
+  outputFileTracingExcludes: {
+    "/*": [
+      "**/@napi-rs+canvas-android-*/**",
+      "**/@napi-rs+canvas-darwin-*/**",
+      "**/@napi-rs+canvas-linux-arm-*/**",
+      "**/@napi-rs+canvas-linux-arm64-*/**",
+      "**/@napi-rs+canvas-linux-riscv64-*/**",
+      "**/@napi-rs+canvas-linux-x64-musl@*/**",
+      "**/@napi-rs+canvas-win32-*/**",
+      "**/@napi-rs/canvas-android-*/**",
+      "**/@napi-rs/canvas-darwin-*/**",
+      "**/@napi-rs/canvas-linux-arm-*/**",
+      "**/@napi-rs/canvas-linux-arm64-*/**",
+      "**/@napi-rs/canvas-linux-riscv64-*/**",
+      "**/@napi-rs/canvas-linux-x64-musl/**",
+      "**/@napi-rs/canvas-win32-*/**",
+    ],
   },
   poweredByHeader: false,
   reactStrictMode: true,
@@ -53,4 +77,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default withWorkflow(withNextIntl(nextConfig));

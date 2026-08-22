@@ -1,0 +1,2 @@
+ALTER TABLE "policy_versions" ADD COLUMN "ingestion_workflow_run_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "policy_versions_ingestion_workflow_run_uidx" ON "policy_versions" USING btree ("ingestion_workflow_run_id") WHERE "policy_versions"."ingestion_workflow_run_id" is not null;

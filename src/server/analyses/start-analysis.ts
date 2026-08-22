@@ -27,9 +27,8 @@ import {
   policyUploadIntents,
   policyVersions,
 } from "@/server/db/schema/documents";
-import { jobOutbox } from "@/server/db/schema/jobs";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
-import { analysisExecutionQueue } from "@/server/jobs/boss";
+import { launchAnalysisWorkflow } from "@/server/workflows/launch";
 
 const sponsoredReservationMilliseconds = 60 * 60 * 1000;
 
@@ -175,7 +174,7 @@ async function startAnalysis(input: {
   const release = await getPublishedFrameworkRelease(boundDraft.frameworkSlug);
   if (!release) throw new AnalysisStartError("FRAMEWORK_RELEASE_NOT_FOUND");
 
-  return db.transaction(async (transaction) => {
+  const result = await db.transaction(async (transaction) => {
     await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`);
 
     const [existing] = await transaction
@@ -500,11 +499,6 @@ async function startAnalysis(input: {
         contentHash: createCatalogueItemHash(requirement),
       })),
     );
-    await transaction.insert(jobOutbox).values({
-      queueName: analysisExecutionQueue,
-      deduplicationKey: `${analysisExecutionQueue}:${analysis.id}`,
-      payload: { kind: "analysis_execution", analysisId: analysis.id },
-    });
     await appendAuditEvent(transaction, {
       organizationId: membership.organizationId,
       actorUserId: user.id,
@@ -523,4 +517,9 @@ async function startAnalysis(input: {
 
     return { analysisId: analysis.id, status: analysis.status, reused: false };
   });
+
+  if (result.status === "queued" || result.status === "running") {
+    await launchAnalysisWorkflow(result.analysisId);
+  }
+  return result;
 }

@@ -20,18 +20,11 @@ export async function GET() {
   try {
     await db.execute(sql`select 1`);
     const operations = await getOperationalReadiness();
-    const workerRequired = process.env.WORKER_REQUIRED === "true";
-    if (workerRequired && !operations.workerFresh) {
-      return NextResponse.json(
-        { status: "degraded", database: "reachable", worker: "stale" },
-        { status: 503, headers: { "cache-control": "no-store" } },
-      );
-    }
 
     return NextResponse.json({
       status: "ok",
       database: "reachable",
-      worker: operations.workerFresh ? "ready" : "not_required",
+      workflow: operations.workflowReady ? "ready" : "unavailable",
     });
   } catch {
     return NextResponse.json(

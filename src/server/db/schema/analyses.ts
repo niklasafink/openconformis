@@ -138,6 +138,7 @@ export const analyses = pgTable(
     institutionSize: institutionSize("institution_size").notNull(),
     organizationContext: text("organization_context").default("").notNull(),
     locale: text("locale").notNull(),
+    workflowRunId: text("workflow_run_id"),
     status: analysisStatus("status").default("queued").notNull(),
     stage: analysisStage("stage").default("queued").notNull(),
     progressPercent: integer("progress_percent").default(0).notNull(),
@@ -188,6 +189,9 @@ export const analyses = pgTable(
     uniqueIndex("analyses_ai_credential_uidx")
       .on(table.aiCredentialId)
       .where(sql`${table.aiCredentialId} IS NOT NULL`),
+    uniqueIndex("analyses_workflow_run_uidx")
+      .on(table.workflowRunId)
+      .where(sql`${table.workflowRunId} IS NOT NULL`),
   ],
 );
 

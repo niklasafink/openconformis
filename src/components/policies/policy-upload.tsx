@@ -2,6 +2,7 @@
 
 import { FileText, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 import { docxMimeType, maximumPolicyBytes, pdfMimeType } from "@/domain/policies/upload";
 
@@ -25,9 +26,8 @@ type UploadResponse = {
   intentId: string;
   policyVersionId: string;
   upload: {
-    url: string;
-    method: "PUT";
-    requiredHeaders: Record<string, string>;
+    pathname: string;
+    handleUploadUrl: string;
   };
 };
 
@@ -85,12 +85,13 @@ export function PolicyUpload({ draftId, labels }: PolicyUploadProps) {
       if (!intentResponse.ok) throw new Error("intent");
 
       const intent = (await intentResponse.json()) as UploadResponse;
-      const objectResponse = await fetch(intent.upload.url, {
-        method: intent.upload.method,
-        headers: intent.upload.requiredHeaders,
-        body: file,
+      await upload(intent.upload.pathname, file, {
+        access: "private",
+        contentType: mimeType,
+        handleUploadUrl: intent.upload.handleUploadUrl,
+        clientPayload: JSON.stringify({ intentId: intent.intentId, draftId }),
+        multipart: true,
       });
-      if (!objectResponse.ok) throw new Error("object");
 
       const completeResponse = await fetch(`/api/uploads/policy/${intent.intentId}/complete`, {
         method: "POST",

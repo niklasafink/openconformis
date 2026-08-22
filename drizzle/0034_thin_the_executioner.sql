@@ -1,0 +1,2 @@
+ALTER TABLE "analyses" ADD COLUMN "workflow_run_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "analyses_workflow_run_uidx" ON "analyses" USING btree ("workflow_run_id") WHERE "analyses"."workflow_run_id" IS NOT NULL;

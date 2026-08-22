@@ -2,14 +2,13 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { maximumPolicyBytes } from "@/domain/policies/upload";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db } from "@/server/db/client";
 import { policyVersions } from "@/server/db/schema/documents";
-import { jobOutbox } from "@/server/db/schema/jobs";
-import { createS3PrivateObjectStore } from "@/server/storage/s3-private-object-store";
+import { createPrivateObjectStore } from "@/server/storage/object-store";
 
 import { parsePolicyDocument } from "./document-parser";
 import { persistParsedPolicy } from "./persist-parsed-policy";
@@ -23,12 +22,37 @@ function safeErrorCode(error: unknown) {
   return message.replace(/[^A-Z0-9_-]/giu, "_").slice(0, 100);
 }
 
-export async function ingestPolicyVersion(job: DocumentIngestionJob) {
+async function claimIngestionWorkflow(policyVersionId: string, workflowRunId?: string) {
+  if (!workflowRunId) return true;
+  const [claimed] = await db
+    .update(policyVersions)
+    .set({ ingestionWorkflowRunId: workflowRunId })
+    .where(
+      and(
+        eq(policyVersions.id, policyVersionId),
+        or(
+          isNull(policyVersions.ingestionWorkflowRunId),
+          eq(policyVersions.ingestionWorkflowRunId, workflowRunId),
+          eq(policyVersions.parseStatus, "failed"),
+        ),
+      ),
+    )
+    .returning({ id: policyVersions.id });
+  return Boolean(claimed);
+}
+
+export async function ingestPolicyVersion(job: DocumentIngestionJob, workflowRunId?: string) {
+  if (!(await claimIngestionWorkflow(job.policyVersionId, workflowRunId))) {
+    return { status: "already-claimed" as const };
+  }
   const [version] = await db
     .update(policyVersions)
     .set({ parseStatus: "validating", parseErrorCode: null })
     .where(
-      and(eq(policyVersions.id, job.policyVersionId), eq(policyVersions.parseStatus, "uploaded")),
+      and(
+        eq(policyVersions.id, job.policyVersionId),
+        inArray(policyVersions.parseStatus, ["uploaded", "failed"]),
+      ),
     )
     .returning({
       id: policyVersions.id,
@@ -37,14 +61,25 @@ export async function ingestPolicyVersion(job: DocumentIngestionJob) {
       objectKey: policyVersions.objectKey,
     });
 
-  if (!version) return { status: "already-claimed" as const };
+  if (!version) {
+    const [existing] = await db
+      .select({ status: policyVersions.parseStatus })
+      .from(policyVersions)
+      .where(eq(policyVersions.id, job.policyVersionId))
+      .limit(1);
+    if (existing?.status === "ready") return { status: "ready" as const };
+    if (existing?.status === "needs_ocr" || existing?.status === "ocr_processing") {
+      return { status: "needs-ocr" as const };
+    }
+    return { status: "already-claimed" as const };
+  }
   if (!version.anonymousDraftId || !version.declaredMimeType) {
     throw new Error("POLICY_VERSION_METADATA_MISSING");
   }
   const anonymousDraftId = version.anonymousDraftId;
 
   try {
-    const objectStore = createS3PrivateObjectStore();
+    const objectStore = createPrivateObjectStore();
     const bytes = await objectStore.getObjectBytes(version.objectKey, maximumPolicyBytes);
     const sha256 = createHash("sha256").update(bytes).digest("hex");
 
@@ -65,14 +100,6 @@ export async function ingestPolicyVersion(job: DocumentIngestionJob) {
             pageCount: parsed.pageCount,
           })
           .where(eq(policyVersions.id, version.id));
-        await transaction
-          .insert(jobOutbox)
-          .values({
-            queueName: "document-ocr",
-            deduplicationKey: `document-ocr:${version.id}`,
-            payload: { kind: "document_ocr", policyVersionId: version.id },
-          })
-          .onConflictDoNothing({ target: jobOutbox.deduplicationKey });
         await appendAuditEvent(transaction, {
           anonymousDraftId,
           action: "document.ocr_required",

@@ -5,6 +5,12 @@
   "buildCommand": "pnpm build",
   "regions": ["fra1"],
   "fluid": true,
+  "crons": [
+    {
+      "path": "/api/cron/maintenance",
+      "schedule": "17 2 * * *"
+    }
+  ],
   "functions": {
     "src/app/api/chat/stream/route.ts": {
       "maxDuration": 120,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 
 import {
   GroundingValidationError,
@@ -160,6 +160,22 @@ async function loadAnalysisItems(analysisId: string) {
     )
     .where(eq(analysisScopeItems.analysisId, analysisId))
     .orderBy(asc(analysisScopeItems.displayOrder));
+}
+
+async function loadAnalysisItem(analysisId: string, scopeItemId: string) {
+  const [item] = await db
+    .select({ scope: analysisScopeItems, packet: analysisRetrievalPackets })
+    .from(analysisScopeItems)
+    .innerJoin(
+      analysisRetrievalPackets,
+      eq(analysisRetrievalPackets.scopeItemId, analysisScopeItems.id),
+    )
+    .where(
+      and(eq(analysisScopeItems.analysisId, analysisId), eq(analysisScopeItems.id, scopeItemId)),
+    )
+    .limit(1);
+  if (!item) throw new Error("ANALYSIS_SCOPE_ITEM_NOT_FOUND");
+  return item;
 }
 
 async function loadCandidates(analysis: NonNullable<AnalysisRecord>, item: ScopeRecord) {
@@ -662,7 +678,27 @@ async function persistItemResult(input: {
   });
 }
 
-export async function executeAnalysis(job: AnalysisExecutionJob) {
+async function claimAnalysisWorkflow(analysisId: string, workflowRunId?: string) {
+  if (!workflowRunId) return true;
+
+  const [claimed] = await db
+    .update(analyses)
+    .set({ workflowRunId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(analyses.id, analysisId),
+        or(isNull(analyses.workflowRunId), eq(analyses.workflowRunId, workflowRunId)),
+      ),
+    )
+    .returning({ id: analyses.id });
+  return Boolean(claimed);
+}
+
+export async function prepareAnalysisExecution(job: AnalysisExecutionJob, workflowRunId?: string) {
+  const claimed = await claimAnalysisWorkflow(job.analysisId, workflowRunId);
+  if (!claimed) {
+    return { analysisId: job.analysisId, status: "duplicate" as const, scopeItemIds: [] };
+  }
   const analysis = await loadAnalysis(job.analysisId);
   if (analysis.status === "completed") {
     if (analysis.fundingMode === "byok") {
@@ -672,7 +708,7 @@ export async function executeAnalysis(job: AnalysisExecutionJob) {
         ownerUserId: analysis.ownerUserId,
       });
     }
-    return { analysisId: analysis.id, status: "completed" as const };
+    return { analysisId: analysis.id, status: "completed" as const, scopeItemIds: [] };
   }
   if (analysis.status !== "queued" && analysis.status !== "running") {
     throw new Error("ANALYSIS_NOT_EXECUTABLE");
@@ -686,42 +722,63 @@ export async function executeAnalysis(job: AnalysisExecutionJob) {
     .set({ stage: "assessment", progressPercent: 35, updatedAt: new Date() })
     .where(and(eq(analyses.id, analysis.id), eq(analyses.status, "running")));
 
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (!item) continue;
-    const [existing] = await db
-      .select({ id: analysisRequirementResults.id })
-      .from(analysisRequirementResults)
-      .where(eq(analysisRequirementResults.scopeItemId, item.scope.id))
-      .limit(1);
-    if (!existing) {
-      const candidates = await loadCandidates(analysis, item);
-      const proposed = await assessItem(analysis, item, candidates);
-      const reasons = proposed.deterministicFallback
-        ? []
-        : verificationReasons(analysis.id, item.scope.requirementExternalKey, proposed.assessment);
-      const verification =
-        reasons.length > 0
-          ? await verifyItem(analysis, item, candidates, proposed.assessment)
-          : undefined;
-      await persistItemResult({
-        analysis,
-        item,
-        proposed,
-        verification,
-        selectionReasons: reasons,
-      });
-    }
+  return {
+    analysisId: analysis.id,
+    status: "running" as const,
+    scopeItemIds: items.map(({ scope }) => scope.id),
+  };
+}
 
-    await db
-      .update(analyses)
-      .set({
-        stage: "verification",
-        progressPercent: 35 + Math.round(((index + 1) / items.length) * 55),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(analyses.id, analysis.id), eq(analyses.status, "running")));
+export async function executeAnalysisScopeItem(input: {
+  analysisId: string;
+  scopeItemId: string;
+  index: number;
+  total: number;
+}) {
+  const analysis = await loadAnalysis(input.analysisId);
+  if (analysis.status === "completed") return { status: "completed" as const };
+  if (analysis.status !== "running") throw new Error("ANALYSIS_NOT_RUNNING");
+  const item = await loadAnalysisItem(analysis.id, input.scopeItemId);
+
+  const [existing] = await db
+    .select({ id: analysisRequirementResults.id })
+    .from(analysisRequirementResults)
+    .where(eq(analysisRequirementResults.scopeItemId, item.scope.id))
+    .limit(1);
+  if (!existing) {
+    const candidates = await loadCandidates(analysis, item);
+    const proposed = await assessItem(analysis, item, candidates);
+    const reasons = proposed.deterministicFallback
+      ? []
+      : verificationReasons(analysis.id, item.scope.requirementExternalKey, proposed.assessment);
+    const verification =
+      reasons.length > 0
+        ? await verifyItem(analysis, item, candidates, proposed.assessment)
+        : undefined;
+    await persistItemResult({
+      analysis,
+      item,
+      proposed,
+      verification,
+      selectionReasons: reasons,
+    });
   }
+
+  await db
+    .update(analyses)
+    .set({
+      stage: "verification",
+      progressPercent: 35 + Math.round(((input.index + 1) / input.total) * 55),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(analyses.id, analysis.id), eq(analyses.status, "running")));
+  return { status: "processed" as const, scopeItemId: item.scope.id };
+}
+
+export async function finalizeAnalysisExecution(analysisId: string) {
+  const analysis = await loadAnalysis(analysisId);
+  if (analysis.status === "completed") return { analysisId, status: "completed" as const };
+  if (analysis.status !== "running") throw new Error("ANALYSIS_NOT_RUNNING");
 
   await db.transaction(async (transaction) => {
     const [resultCount] = await transaction
@@ -788,4 +845,20 @@ export async function executeAnalysis(job: AnalysisExecutionJob) {
   }
 
   return { analysisId: analysis.id, status: "completed" as const };
+}
+
+export async function executeAnalysis(job: AnalysisExecutionJob) {
+  const prepared = await prepareAnalysisExecution(job);
+  if (prepared.status === "completed") return prepared;
+  for (let index = 0; index < prepared.scopeItemIds.length; index += 1) {
+    const scopeItemId = prepared.scopeItemIds[index];
+    if (!scopeItemId) continue;
+    await executeAnalysisScopeItem({
+      analysisId: prepared.analysisId,
+      scopeItemId,
+      index,
+      total: prepared.scopeItemIds.length,
+    });
+  }
+  return finalizeAnalysisExecution(prepared.analysisId);
 }

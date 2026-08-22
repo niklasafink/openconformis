@@ -98,6 +98,7 @@ export const policyVersions = pgTable(
     storageDriver: text("storage_driver").notNull(),
     objectKey: text("object_key").notNull(),
     objectEtag: text("object_etag"),
+    ingestionWorkflowRunId: text("ingestion_workflow_run_id"),
     processedObjectKey: text("processed_object_key"),
     processedSha256: text("processed_sha256"),
     ocrEngineVersion: text("ocr_engine_version"),
@@ -128,6 +129,9 @@ export const policyVersions = pgTable(
     uniqueIndex("policy_versions_processed_object_key_uidx")
       .on(table.processedObjectKey)
       .where(sql`${table.processedObjectKey} is not null`),
+    uniqueIndex("policy_versions_ingestion_workflow_run_uidx")
+      .on(table.ingestionWorkflowRunId)
+      .where(sql`${table.ingestionWorkflowRunId} is not null`),
     uniqueIndex("policy_versions_org_hash_parser_uidx")
       .on(table.organizationId, table.sha256, table.parserVersion)
       .where(

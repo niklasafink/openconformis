@@ -13,9 +13,9 @@ import {
 import { appendAuditEvent } from "@/server/audit/event";
 import { db, isDatabaseConfigured } from "@/server/db/client";
 import { policies, policyUploadIntents, policyVersions } from "@/server/db/schema/documents";
-import { jobOutbox } from "@/server/db/schema/jobs";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
-import { createS3PrivateObjectStore } from "@/server/storage/s3-private-object-store";
+import { createPrivateObjectStore } from "@/server/storage/object-store";
+import { launchDocumentIngestionWorkflow } from "@/server/workflows/launch";
 
 const hour = 60 * 60 * 1000;
 const day = 24 * hour;
@@ -44,16 +44,8 @@ export async function createPolicyUploadIntent(untrustedInput: unknown) {
   const policyVersionId = randomUUID();
   const intentId = randomUUID();
   const objectKey = `anonymous/${draft.id}/policies/${policyVersionId}/original${extension}`;
-  const ttlSeconds = Math.min(900, positiveIntegerEnvironment("S3_UPLOAD_URL_TTL_SECONDS", 300));
-  const objectStore = createS3PrivateObjectStore();
-  const upload = await objectStore.createUploadTarget({
-    objectKey,
-    contentType: input.mimeType,
-    contentLength: input.byteSize,
-    intentId,
-    expiresInSeconds: ttlSeconds,
-  });
   const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
   const originalDeleteAfter = new Date(
     now.getTime() + positiveIntegerEnvironment("ANONYMOUS_UPLOAD_RETENTION_HOURS", 24) * hour,
   );
@@ -75,7 +67,7 @@ export async function createPolicyUploadIntent(untrustedInput: unknown) {
       source: "upload",
       originalFilename: filename,
       declaredMimeType: input.mimeType,
-      storageDriver: process.env.STORAGE_DRIVER ?? "s3",
+      storageDriver: process.env.STORAGE_DRIVER ?? "vercel-blob",
       objectKey,
       parseStatus: "awaiting_upload",
       originalDeleteAfter,
@@ -89,7 +81,7 @@ export async function createPolicyUploadIntent(untrustedInput: unknown) {
       declaredFilename: filename,
       declaredMimeType: input.mimeType,
       declaredByteSize: input.byteSize,
-      expiresAt: upload.expiresAt,
+      expiresAt,
     });
     await appendAuditEvent(transaction, {
       anonymousDraftId: draft.id,
@@ -104,10 +96,9 @@ export async function createPolicyUploadIntent(untrustedInput: unknown) {
     intentId,
     policyVersionId,
     upload: {
-      url: upload.url,
-      method: upload.method,
-      requiredHeaders: upload.requiredHeaders,
-      expiresAt: upload.expiresAt.toISOString(),
+      pathname: objectKey,
+      handleUploadUrl: "/api/uploads/policy/blob",
+      expiresAt: expiresAt.toISOString(),
     },
   };
 }
@@ -124,7 +115,7 @@ type UploadIntentRecord = {
 };
 
 async function rejectUploadedObject(record: UploadIntentRecord, reasonCode: string) {
-  const objectStore = createS3PrivateObjectStore();
+  const objectStore = createPrivateObjectStore();
   await objectStore.deleteObject(record.objectKey).catch(() => undefined);
   const now = new Date();
 
@@ -147,14 +138,9 @@ async function rejectUploadedObject(record: UploadIntentRecord, reasonCode: stri
   });
 }
 
-export async function completePolicyUploadIntent(intentId: string, expectedDraftId: string) {
-  if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
-
-  const parsed = policyUploadRequestSchema.shape.draftId.safeParse(intentId);
-  if (!parsed.success) throw new Error("INVALID_INTENT");
-
-  const draft = await getBoundActiveDraft(expectedDraftId);
-  if (!draft) throw new Error("DRAFT_NOT_FOUND");
+async function loadUploadIntent(intentId: string, expectedDraftId?: string) {
+  const draft = expectedDraftId ? await getBoundActiveDraft(expectedDraftId) : undefined;
+  if (expectedDraftId && !draft) throw new Error("DRAFT_NOT_FOUND");
 
   const [record] = await db
     .select({
@@ -169,16 +155,27 @@ export async function completePolicyUploadIntent(intentId: string, expectedDraft
     })
     .from(policyUploadIntents)
     .where(
-      and(eq(policyUploadIntents.id, intentId), eq(policyUploadIntents.anonymousDraftId, draft.id)),
+      expectedDraftId
+        ? and(
+            eq(policyUploadIntents.id, intentId),
+            eq(policyUploadIntents.anonymousDraftId, expectedDraftId),
+          )
+        : eq(policyUploadIntents.id, intentId),
     )
     .limit(1);
 
   if (!record) throw new Error("UPLOAD_NOT_FOUND");
-  if (record.status === "uploaded") {
-    return { policyVersionId: record.policyVersionId, status: "uploaded" as const };
-  }
-  if (record.status !== "issued") throw new Error("UPLOAD_NOT_ACTIVE");
+  return record;
+}
 
+export async function authorizePolicyBlobUpload(input: {
+  intentId: string;
+  draftId: string;
+  pathname: string;
+}) {
+  if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
+  const record = await loadUploadIntent(input.intentId, input.draftId);
+  if (record.status !== "issued") throw new Error("UPLOAD_NOT_ACTIVE");
   if (record.expiresAt <= new Date()) {
     await db
       .update(policyUploadIntents)
@@ -186,15 +183,39 @@ export async function completePolicyUploadIntent(intentId: string, expectedDraft
       .where(eq(policyUploadIntents.id, record.id));
     throw new Error("UPLOAD_EXPIRED");
   }
+  if (record.objectKey !== input.pathname) throw new Error("UPLOAD_PATH_MISMATCH");
 
-  const objectStore = createS3PrivateObjectStore();
+  return {
+    intentId: record.id,
+    pathname: record.objectKey,
+    contentType: record.declaredMimeType,
+    maximumSizeInBytes: record.declaredByteSize,
+    validUntil: record.expiresAt,
+  };
+}
+
+async function completePolicyUpload(intentId: string, expectedDraftId?: string) {
+  if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
+  const record = await loadUploadIntent(intentId, expectedDraftId);
+  if (record.status !== "issued" && record.status !== "uploaded") {
+    throw new Error("UPLOAD_NOT_ACTIVE");
+  }
+  if (record.status === "issued" && record.expiresAt <= new Date()) {
+    await db
+      .update(policyUploadIntents)
+      .set({ status: "expired" })
+      .where(eq(policyUploadIntents.id, record.id));
+    throw new Error("UPLOAD_EXPIRED");
+  }
+
+  const objectStore = createPrivateObjectStore();
   const object = await objectStore.headObject(record.objectKey);
   if (!object) throw new Error("OBJECT_NOT_FOUND");
 
   if (
     object.contentLength !== record.declaredByteSize ||
     object.contentType !== record.declaredMimeType ||
-    object.intentId !== record.id
+    (object.intentId !== undefined && object.intentId !== record.id)
   ) {
     await rejectUploadedObject(record, "UPLOAD_METADATA_MISMATCH");
     throw new Error("UPLOAD_METADATA_MISMATCH");
@@ -214,19 +235,8 @@ export async function completePolicyUploadIntent(intentId: string, expectedDraft
       .update(policyVersions)
       .set({ parseStatus: "uploaded", objectEtag: object.etag, uploadedAt: now })
       .where(eq(policyVersions.id, record.policyVersionId));
-    await transaction
-      .insert(jobOutbox)
-      .values({
-        queueName: "document-ingestion",
-        deduplicationKey: `document-ingestion:${record.policyVersionId}`,
-        payload: {
-          kind: "document_ingestion",
-          policyVersionId: record.policyVersionId,
-        },
-      })
-      .onConflictDoNothing({ target: jobOutbox.deduplicationKey });
     await appendAuditEvent(transaction, {
-      anonymousDraftId: draft.id,
+      anonymousDraftId: record.anonymousDraftId,
       action: "upload.received",
       targetType: "upload_intent",
       targetId: record.id,
@@ -234,7 +244,15 @@ export async function completePolicyUploadIntent(intentId: string, expectedDraft
     });
   });
 
+  await launchDocumentIngestionWorkflow(record.policyVersionId);
+
   return { policyVersionId: record.policyVersionId, status: "uploaded" as const };
+}
+
+export async function completePolicyUploadIntent(intentId: string, expectedDraftId: string) {
+  const parsed = policyUploadRequestSchema.shape.draftId.safeParse(intentId);
+  if (!parsed.success) throw new Error("INVALID_INTENT");
+  return completePolicyUpload(intentId, expectedDraftId);
 }
 
 export function parsePolicyUploadRequest(input: unknown): PolicyUploadRequest {

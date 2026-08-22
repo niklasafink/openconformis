@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Migrate, deploy worker, stage and promote web
+    name: Migrate, stage and promote Vercel
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -43,14 +43,6 @@ jobs:
           DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
           DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
         run: pnpm db:migrate
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
-      - name: Deploy the durable worker in Frankfurt
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          FLY_APP: ${{ vars.FLY_WORKER_APP }}
-        run: |
-          flyctl secrets set APP_BUILD_ID="${{ inputs.release_ref }}" --stage
-          flyctl deploy --remote-only --config fly.worker.toml
       - name: Pull production Vercel configuration
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

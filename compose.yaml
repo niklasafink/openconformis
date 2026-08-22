@@ -45,46 +45,6 @@ services:
         mc alias set local http://minio:9000 conformis conformis-local-only &&
         mc mb --ignore-existing local/conformis-local
 
-  worker:
-    profiles: ["worker"]
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://conformis:conformis@postgres:5432/conformis
-      WORKER_DATABASE_URL: postgresql://conformis:conformis@postgres:5432/conformis
-      STORAGE_DRIVER: minio
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: auto
-      S3_BUCKET: conformis-local
-      S3_ACCESS_KEY_ID: conformis
-      S3_SECRET_ACCESS_KEY: conformis-local-only
-      OCR_COMMAND: ocrmypdf
-      OCR_LANGUAGES: deu+eng
-      OCR_JOBS: "2"
-      OCR_PAGE_TIMEOUT_SECONDS: "120"
-      OCR_TIMEOUT_MILLISECONDS: "600000"
-      SPONSORED_RUNS_ENABLED: ${SPONSORED_RUNS_ENABLED:-false}
-      SPONSORED_OPENROUTER_API_KEY: ${SPONSORED_OPENROUTER_API_KEY:-}
-      SPONSORED_OPENROUTER_BASE_URL: ${SPONSORED_OPENROUTER_BASE_URL:-https://eu.openrouter.ai/api/v1}
-      SPONSORED_OPENROUTER_PROVIDER_ONLY: ${SPONSORED_OPENROUTER_PROVIDER_ONLY:-}
-      SPONSORED_ANALYSIS_MODEL: ${SPONSORED_ANALYSIS_MODEL:-}
-      SPONSORED_VERIFIER_MODEL: ${SPONSORED_VERIFIER_MODEL:-}
-      SPONSORED_VERIFIER_PROVIDER_ONLY: ${SPONSORED_VERIFIER_PROVIDER_ONLY:-}
-      SPONSORED_MAX_OUTPUT_TOKENS: ${SPONSORED_MAX_OUTPUT_TOKENS:-4000}
-    read_only: true
-    tmpfs:
-      - /tmp:size=256m,mode=1777
-    mem_limit: 1g
-    cpus: 2
-    restart: unless-stopped
-
 volumes:
   conformis_postgres_data:
   conformis_minio_data:

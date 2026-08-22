@@ -1,5 +1,7 @@
 # Database and authentication foundation
 
+> Current runtime: Vercel Functions and Workflow steps use the pooled Neon URL. `DATABASE_URL_UNPOOLED` is reserved for migrations; no persistent worker database role is required.
+
 ## Hosted database decision
 
 The official hosted deployment uses **Neon PostgreSQL in AWS Frankfurt

@@ -39,7 +39,6 @@ export default defineConfig({
           NEXT_PUBLIC_APP_URL: baseURL,
           DATABASE_URL: databaseUrl,
           DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED ?? databaseUrl,
-          WORKER_REQUIRED: "false",
           TURNSTILE_ENFORCED: "false",
           ABUSE_HASH_SECRET: "e2e-only-abuse-hash-secret-at-least-thirty-two-characters",
         },

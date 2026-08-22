@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   verify:
@@ -66,33 +65,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" release-artifacts/* --verify-tag --generate-notes
-
-  worker-image:
-    name: Publish worker image
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Resolve image name
-        id: image
-        shell: bash
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/worker" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: .
-          file: Dockerfile.worker
-          push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ github.ref_name }}
-            ${{ steps.image.outputs.name }}:latest
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.ref_name }}

@@ -7,5 +7,10 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
   prettier,
-  globalIgnores([".next/**", "coverage/**", "enterprise-wireframe/**"]),
+  globalIgnores([
+    ".next/**",
+    "coverage/**",
+    "enterprise-wireframe/**",
+    "src/app/.well-known/workflow/**",
+  ]),
 ]);

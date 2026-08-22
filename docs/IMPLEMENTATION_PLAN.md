@@ -1,5 +1,7 @@
 # Implementation plan
 
+> Historical plan: the shipped runtime uses Vercel Workflow and private Vercel Blob instead of pg-boss, a Docker worker and R2. See `docs/ARCHITECTURE.md` for the current design.
+
 Status: owner decisions incorporated; no application code has been scaffolded  
 Last updated: 2026-08-22
 

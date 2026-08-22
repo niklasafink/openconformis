@@ -8,9 +8,8 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import type { PrivateObjectStore, PrivateUploadTarget } from "./private-object-store";
+import type { PrivateObjectStore } from "./private-object-store";
 
 type StorageConfig = {
   driver: "r2" | "minio" | "s3";
@@ -60,31 +59,6 @@ export function createS3PrivateObjectStore(config = getStorageConfig()): Private
   });
 
   return {
-    async createUploadTarget(input): Promise<PrivateUploadTarget> {
-      const requiredHeaders = {
-        "content-type": input.contentType,
-        "x-amz-meta-upload-intent": input.intentId,
-      };
-      const command = new PutObjectCommand({
-        Bucket: config.bucket,
-        Key: input.objectKey,
-        ContentType: input.contentType,
-        ContentLength: input.contentLength,
-        Metadata: { "upload-intent": input.intentId },
-      });
-
-      return {
-        url: await getSignedUrl(client, command, {
-          expiresIn: input.expiresInSeconds,
-          signableHeaders: new Set(["content-type"]),
-          unhoistableHeaders: new Set(["x-amz-meta-upload-intent"]),
-        }),
-        method: "PUT",
-        requiredHeaders,
-        expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000),
-      };
-    },
-
     async headObject(objectKey) {
       try {
         const result = await client.send(

@@ -5,13 +5,13 @@ import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { documentBlocks, policies, policyVersions } from "@/server/db/schema/documents";
 import { rateLimitWindows } from "@/server/db/schema/jobs";
-import { createS3PrivateObjectStore } from "@/server/storage/s3-private-object-store";
+import { createPrivateObjectStore } from "@/server/storage/object-store";
 
 const cleanupBatchSize = 25;
 
 export async function purgeExpiredPolicyData() {
   const now = new Date();
-  const store = createS3PrivateObjectStore();
+  const store = createPrivateObjectStore();
   const originals = await db
     .select({
       id: policyVersions.id,

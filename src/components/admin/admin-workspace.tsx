@@ -358,14 +358,11 @@ export function AdminWorkspace({
 }
 
 type OperationsSnapshot = {
-  workers: Array<{
-    workerId: string;
+  execution: {
+    provider: string;
     buildId: string;
-    safeStatus: string;
-    fresh: boolean;
-    lastSeenAt: string;
-  }>;
-  queueCounts: Array<{ status: string; count: number }>;
+    status: string;
+  };
   analysisCounts: Array<{ status: string; count: number }>;
   oldestPendingAt: string | null;
   generatedAt: string;
@@ -373,22 +370,21 @@ type OperationsSnapshot = {
 
 function OperationsWorkspace({ snapshot }: { snapshot: OperationsSnapshot }) {
   const t = useTranslations("Administration");
-  const queue = new Map(snapshot.queueCounts.map((item) => [item.status, item.count]));
   const analysis = new Map(snapshot.analysisCounts.map((item) => [item.status, item.count]));
   return (
     <section className="admin-operations">
       <div className="operations-metrics">
         <div>
           <span>{t("workers")}</span>
-          <strong>{snapshot.workers.filter((item) => item.fresh).length}</strong>
+          <strong>{t("managed")}</strong>
         </div>
         <div>
           <span>{t("pendingJobs")}</span>
-          <strong>{queue.get("pending") ?? 0}</strong>
+          <strong>{analysis.get("queued") ?? 0}</strong>
         </div>
         <div>
           <span>{t("deadJobs")}</span>
-          <strong>{queue.get("dead") ?? 0}</strong>
+          <strong>{analysis.get("failed") ?? 0}</strong>
         </div>
         <div>
           <span>{t("runningAnalyses")}</span>
@@ -406,16 +402,12 @@ function OperationsWorkspace({ snapshot }: { snapshot: OperationsSnapshot }) {
           <span>{t("lastHeartbeat")}</span>
           <span>{t("status")}</span>
         </header>
-        {snapshot.workers.map((worker) => (
-          <div key={worker.workerId}>
-            <code>{worker.workerId.slice(0, 12)}</code>
-            <code>{worker.buildId.slice(0, 12)}</code>
-            <span>{new Date(worker.lastSeenAt).toLocaleString()}</span>
-            <strong data-status={worker.fresh ? "published" : "archived"}>
-              {worker.fresh ? t("ready") : t("stale")}
-            </strong>
-          </div>
-        ))}
+        <div>
+          <code>{snapshot.execution.provider}</code>
+          <code>{snapshot.execution.buildId.slice(0, 12)}</code>
+          <span>{new Date(snapshot.generatedAt).toLocaleString()}</span>
+          <strong data-status="published">{t("managed")}</strong>
+        </div>
       </div>
     </section>
   );

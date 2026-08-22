@@ -1,5 +1,7 @@
 # Decisions before coding
 
+> Current runtime decision (2026-08-22): Vercel Workflow plus private Vercel Blob in Frankfurt replaces the earlier pg-boss/Fly.io/R2 worker design. Earlier entries remain as decision history and are superseded where they conflict with `docs/ARCHITECTURE.md`.
+
 Status: owner decisions complete; legal review and implementation remain  
 Last updated: 2026-08-22
 

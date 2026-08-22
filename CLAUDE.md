@@ -107,8 +107,8 @@ Die Sidebar führt durch vier Schritte, der Inhaltsbereich tauscht:
 
 Zwischen 3 und 4 liegt vor Registrierung eine klar als Vorschau bezeichnete,
 simulierte Animation ohne KI-Aufruf. Der Ergebnis-Screen bleibt unscharf. Nach
-Registrierung startet der echte pg-boss-Worker und zeigt ausschließlich persistierte
-Fortschrittsdaten. Beides ist **kein eigener Sidebar-Schritt**.
+Registrierung startet den echten, dauerhaften Vercel-Workflow und zeigt ausschließlich
+persistierte Fortschrittsdaten. Beides ist **kein eigener Sidebar-Schritt**.
 
 ## Das Belegstellen-Modell
 

@@ -1,5 +1,7 @@
 # Granular feature delivery plan
 
+> Historical plan: durable execution and OCR were migrated to Vercel Workflow, and private documents to Vercel Blob. References to pg-boss, Fly.io, a Docker worker or R2 are superseded by `docs/ARCHITECTURE.md`.
+
 Status: owner-approved execution baseline before scaffolding  
 Last updated: 2026-08-22
 

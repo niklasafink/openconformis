@@ -1,5 +1,7 @@
 # Product specification
 
+> Runtime note: “worker” in current operation means the durable Vercel Workflow graph. The product behavior is unchanged; pg-boss/Fly.io references are superseded by `docs/ARCHITECTURE.md`.
+
 Status: planning baseline before the Next.js implementation  
 Last updated: 2026-08-22
 

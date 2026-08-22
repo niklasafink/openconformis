@@ -1,4 +1,4 @@
-export type ProductionRuntimeTarget = "web" | "worker" | "all";
+export type ProductionRuntimeTarget = "web" | "all";
 
 export type ProductionConfigIssue = Readonly<{
   variable: string;
@@ -96,11 +96,9 @@ export function checkProductionConfig(
 ): ProductionConfigIssue[] {
   const issues: ProductionConfigIssue[] = [];
   const includesWeb = target === "web" || target === "all";
-  const includesWorker = target === "worker" || target === "all";
 
   requireExact(issues, environment, "APP_ENV", "production");
   requireExact(issues, environment, "CATALOGUE_DRIVER", "database");
-  requireValue(issues, environment, "APP_BUILD_ID");
 
   if (includesWeb) requireValue(issues, environment, "DATABASE_URL");
   if (target === "all") requireValue(issues, environment, "DATABASE_URL_UNPOOLED");
@@ -110,20 +108,9 @@ export function checkProductionConfig(
     requireHttpsUrl(issues, environment, "NEON_AUTH_BASE_URL");
     requireMinimumLength(issues, environment, "NEON_AUTH_COOKIE_SECRET", 32);
     requireMinimumLength(issues, environment, "ABUSE_HASH_SECRET", 32);
-    requireExact(issues, environment, "STORAGE_DRIVER", "r2");
-    requireExact(issues, environment, "R2_JURISDICTION", "eu");
-    for (const name of [
-      "S3_ENDPOINT",
-      "S3_BUCKET",
-      "S3_ACCESS_KEY_ID",
-      "S3_SECRET_ACCESS_KEY",
-      "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
-      "TURNSTILE_SITEVERIFY_WORKER_URL",
-    ]) {
-      requireValue(issues, environment, name);
-    }
-    requireExact(issues, environment, "TURNSTILE_ENFORCED", "true");
-    requireExact(issues, environment, "WORKER_REQUIRED", "true");
+    requireExact(issues, environment, "STORAGE_DRIVER", "vercel-blob");
+    requireValue(issues, environment, "BLOB_READ_WRITE_TOKEN");
+    requireMinimumLength(issues, environment, "CRON_SECRET", 32);
     validateByokKey(issues, environment);
     if (
       value(environment, "NEON_AUTH_COOKIE_SECRET") &&
@@ -137,13 +124,16 @@ export function checkProductionConfig(
     }
   }
 
-  if (includesWorker) {
-    requireValue(issues, environment, "WORKER_DATABASE_URL");
-    requireValue(issues, environment, "WORKER_ID");
-    requireExact(issues, environment, "STORAGE_DRIVER", "r2");
-    for (const name of ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"]) {
-      requireValue(issues, environment, name);
-    }
+  if (value(environment, "TURNSTILE_ENFORCED") === "true") {
+    requireValue(issues, environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY");
+    requireHttpsUrl(issues, environment, "TURNSTILE_SITEVERIFY_WORKER_URL");
+  } else {
+    issues.push({
+      variable: "TURNSTILE_ENFORCED",
+      message:
+        "is disabled; database rate limits remain active but automated abuse protection is reduced",
+      severity: "warning",
+    });
   }
 
   if (value(environment, "SPONSORED_RUNS_ENABLED") === "true") {

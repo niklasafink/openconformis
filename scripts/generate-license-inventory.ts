@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 type DependencyNode = {
@@ -27,6 +27,10 @@ const rawTree = execFileSync("pnpm", ["list", "--prod", "--json", "--depth", "In
 
 const roots = JSON.parse(rawTree) as Array<{ dependencies?: Record<string, DependencyNode> }>;
 const inventory = new Map<string, Record<string, unknown>>();
+const repositoryLicenseOverrides: Record<string, string> = {
+  // The published package omits its license field; its declared Vercel monorepo is Apache-2.0.
+  "@vercel/cli-auth": "Apache-2.0",
+};
 
 function serialize(value: unknown) {
   if (typeof value === "string") return value;
@@ -37,9 +41,12 @@ function serialize(value: unknown) {
 function visit(dependencies: Record<string, DependencyNode> | undefined) {
   for (const [dependencyName, dependency] of Object.entries(dependencies ?? {})) {
     if (dependency.path) {
-      const manifest = JSON.parse(
-        readFileSync(join(dependency.path, "package.json"), "utf8"),
-      ) as PackageManifest;
+      const manifestPath = join(dependency.path, "package.json");
+      if (!existsSync(manifestPath)) {
+        visit(dependency.dependencies);
+        continue;
+      }
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as PackageManifest;
       const name = manifest.name ?? dependencyName;
       const version = manifest.version ?? dependency.version ?? "unknown";
       const key = `${name}@${version}`;
@@ -47,7 +54,9 @@ function visit(dependencies: Record<string, DependencyNode> | undefined) {
       inventory.set(key, {
         name,
         version,
-        license: serialize(manifest.license ?? manifest.licenses ?? "UNKNOWN"),
+        license: serialize(
+          manifest.license ?? manifest.licenses ?? repositoryLicenseOverrides[name] ?? "UNKNOWN",
+        ),
         repository: serialize(manifest.repository),
         homepage: manifest.homepage ?? null,
         resolved: dependency.resolved ?? null,

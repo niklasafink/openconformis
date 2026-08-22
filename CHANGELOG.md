@@ -7,10 +7,10 @@ All notable changes are documented in this file.
 - Added the complete four-step DORA demonstration workflow, registration-gated
   analysis, evidence review, Excel export and cited framework chat.
 - Added provider-neutral temporary BYOK, sponsored-run controls, model evaluations,
-  validated caching and a durable PostgreSQL/pg-boss worker.
+  validated caching and durable Vercel Workflows with idempotent database state.
 - Added versioned regulatory administration, retention, deletion, abuse protection,
   operational readiness and security headers.
-- Added deterministic Chromium E2E coverage, release CI, Vercel/Fly deployment
+- Added deterministic Chromium E2E coverage, release CI, a Vercel-only deployment
   configuration and the noncommercial source-available licence package.
 
 This beta processes only synthetic, test or explicitly non-confidential documents.

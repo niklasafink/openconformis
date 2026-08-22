@@ -1,5 +1,7 @@
 # Source-available, sponsored run and BYOK
 
+> Runtime note: Vercel Workflow now executes durable jobs and private Vercel Blob stores documents. References to pg-boss, Fly.io and R2 below describe the superseded implementation plan; the BYOK security and product rules remain authoritative.
+
 Status: repository licence package implemented; legal review pending  
 Last updated: 2026-08-22
 
