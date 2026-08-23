@@ -4,6 +4,11 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed registration reporting "sign-in could not be completed" when an account
+  already existed for the address. The provider names the reason, the form threw
+  it away. Known provider failures now say what happened, and an existing account
+  switches the form to sign-in.
+
 - Fixed a signed-in user without a personal workspace being locked out of chat.
   The workspace was created only when an analysis started, so anyone who signed
   in and went to chat first had no organization and no access.

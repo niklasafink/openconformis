@@ -72,7 +72,11 @@ test.describe("anonymous analysis setup", () => {
     await page.getByLabel("E-Mail-Adresse").fill("origin-check-nobody@example.invalid");
     await page.getByLabel("Passwort", { exact: true }).fill("not-a-real-password-123");
     await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-    await expect(page.getByText("Die Anmeldung konnte nicht abgeschlossen werden.")).toBeVisible();
+    // Auf die Fehlerfläche prüfen, nicht auf den Wortlaut: der hängt davon ab, ob
+    // die Authentifizierung konfiguriert ist. In CI antwortet sie 503 und damit
+    // generisch, lokal 401 und damit „E-Mail-Adresse oder Passwort ist falsch".
+    // Die Absicht des Tests ist, dass der Fehlschlag sichtbar und ohne Absturz endet.
+    await expect(page.locator("p.auth-error")).toBeVisible();
     expect(pageErrors).toEqual([]);
     await page.getByRole("button", { name: "Dialog schließen" }).click();
     await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toHaveCount(0);

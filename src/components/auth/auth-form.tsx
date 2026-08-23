@@ -18,6 +18,10 @@ export type AuthFormLabels = {
   switchToSignIn: string;
   switchToSignUp: string;
   authFailed: string;
+  accountExists: string;
+  invalidCredentials: string;
+  passwordTooShort: string;
+  tooManyAttempts: string;
   google: string;
   microsoft: string;
   or: string;
@@ -30,19 +34,55 @@ export type AuthFormProps = {
   labels: AuthFormLabels;
 };
 
+type AuthFailure =
+  "generic" | "accountExists" | "invalidCredentials" | "passwordTooShort" | "tooManyAttempts";
+
 /**
- * Gemeinsame Anmeldeform für die eigenständige Anmeldeseite und den Dialog im
- * Ergebnis-Vorschauscreen. Beide Flächen müssen dasselbe Verhalten zeigen —
- * getrennte Implementierungen sind genau die Art von Abweichung, die dazu führt,
- * dass ein Pfad repariert wird und der andere still kaputt bleibt.
+ * Übersetzt den Fehler des Anbieters in einen Fall, den der Nutzer selbst
+ * auflösen kann. Ohne diese Zuordnung sah jemand, der sich mit einer bereits
+ * registrierten Adresse anmelden wollte, nur „Die Anmeldung konnte nicht
+ * abgeschlossen werden." — ohne den einen Hinweis, der weitergeholfen hätte.
+ *
+ * Der Client wirft `AuthApiError` und führt dort nur einen groben `code`
+ * ("validation_failed"); der genaue Grund steht ausschließlich in der Meldung.
+ * Deshalb wird beides ausgewertet. Die Meldungen sind englische Anbietertexte —
+ * `classifyAuthFailure` ist exportiert, damit diese Abhängigkeit getestet ist und
+ * ein Formulierungswechsel beim Anbieter nicht still zur Sackgasse zurückführt.
  */
+export function classifyAuthFailure(error: unknown): AuthFailure {
+  const shape = (error ?? {}) as { code?: unknown; message?: unknown; status?: unknown };
+  const code = typeof shape.code === "string" ? shape.code.toUpperCase() : "";
+  const message = typeof shape.message === "string" ? shape.message.toLowerCase() : "";
+  const status = typeof shape.status === "number" ? shape.status : undefined;
+
+  if (code.includes("USER_ALREADY_EXISTS") || message.includes("already exists")) {
+    return "accountExists";
+  }
+  if (
+    code.includes("INVALID_EMAIL_OR_PASSWORD") ||
+    message.includes("invalid email or password") ||
+    message.includes("invalid password")
+  ) {
+    return "invalidCredentials";
+  }
+  if (
+    message.includes("password") &&
+    (message.includes("too short") || message.includes("at least") || message.includes("too long"))
+  ) {
+    return "passwordTooShort";
+  }
+  if (status === 429 || message.includes("too many")) return "tooManyAttempts";
+  if (status === 401) return "invalidCredentials";
+  return "generic";
+}
+
 export function AuthForm({ callbackUrl, initialError = false, labels }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [mode, setMode] = useState<"magic-link" | "password">("magic-link");
   const [passwordAction, setPasswordAction] = useState<"sign-in" | "sign-up">("sign-in");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(initialError);
+  const [failure, setFailure] = useState<AuthFailure | null>(initialError ? "generic" : null);
   const [pending, setPending] = useState(false);
 
   function absoluteCallbackUrl() {
@@ -55,16 +95,16 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
   async function sendMagicLink(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    setError(false);
+    setFailure(null);
     try {
       const result = await authClient.signIn.magicLink({
         email,
         callbackURL: absoluteCallbackUrl(),
       });
-      if (result.error) setError(true);
+      if (result.error) setFailure(classifyAuthFailure(result.error));
       else setEmailSent(true);
-    } catch {
-      setError(true);
+    } catch (thrown) {
+      setFailure(classifyAuthFailure(thrown));
     } finally {
       setPending(false);
     }
@@ -73,7 +113,7 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
   async function submitPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    setError(false);
+    setFailure(null);
     try {
       const callbackURL = absoluteCallbackUrl();
       const result =
@@ -86,7 +126,11 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
               callbackURL,
             });
       if (result.error) {
-        setError(true);
+        const classified = classifyAuthFailure(result.error);
+        setFailure(classified);
+        // Wer bereits ein Konto hat, will sich anmelden, nicht registrieren.
+        // Den Umschalter selbst zu finden ist eine unnötige Hürde.
+        if (classified === "accountExists") setPasswordAction("sign-in");
         return;
       }
 
@@ -94,8 +138,10 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
       // HttpOnly-Session muss serverseitig autoritativ sein, bevor die
       // geschützte Zielseite gerendert wird.
       window.location.assign(callbackURL);
-    } catch {
-      setError(true);
+    } catch (thrown) {
+      const classified = classifyAuthFailure(thrown);
+      setFailure(classified);
+      if (classified === "accountExists") setPasswordAction("sign-in");
     } finally {
       setPending(false);
       setPassword("");
@@ -103,15 +149,15 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
   }
 
   async function signInSocial(provider: "google" | "microsoft") {
-    setError(false);
+    setFailure(null);
     try {
       const result = await authClient.signIn.social({
         provider,
         callbackURL: absoluteCallbackUrl(),
       });
-      if (result.error) setError(true);
-    } catch {
-      setError(true);
+      if (result.error) setFailure(classifyAuthFailure(result.error));
+    } catch (thrown) {
+      setFailure(classifyAuthFailure(thrown));
     }
   }
 
@@ -136,9 +182,17 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
         </button>
       </div>
 
-      {error ? (
+      {failure ? (
         <p className="auth-error" role="alert">
-          {labels.authFailed}
+          {failure === "accountExists"
+            ? labels.accountExists
+            : failure === "invalidCredentials"
+              ? labels.invalidCredentials
+              : failure === "passwordTooShort"
+                ? labels.passwordTooShort
+                : failure === "tooManyAttempts"
+                  ? labels.tooManyAttempts
+                  : labels.authFailed}
         </p>
       ) : null}
 

@@ -200,7 +200,11 @@
     "startFailedGeneric": "Please try again. If the error persists, connect your own API key.",
     "retry": "Try again",
     "goToSignIn": "Go to sign-in",
-    "magicLinkResend": "Send the link again"
+    "magicLinkResend": "Send the link again",
+    "accountExists": "An account already exists for this email address. Sign in instead.",
+    "invalidCredentials": "The email address or password is incorrect.",
+    "passwordTooShort": "The password must be at least 8 characters long.",
+    "tooManyAttempts": "Too many attempts. Please wait a moment and try again."
   },
   "AnalysisRun": {
     "title": "Analysis of your policy",
@@ -291,6 +295,10 @@
     "authFailed": "Sign-in could not be completed.",
     "google": "Continue with Google",
     "microsoft": "Continue with Microsoft",
-    "or": "or"
+    "or": "or",
+    "accountExists": "An account already exists for this email address. Sign in instead.",
+    "invalidCredentials": "The email address or password is incorrect.",
+    "passwordTooShort": "The password must be at least 8 characters long.",
+    "tooManyAttempts": "Too many attempts. Please wait a moment and try again."
   }
 }
