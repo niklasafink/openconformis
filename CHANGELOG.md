@@ -4,6 +4,10 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Added `pnpm dev:https` and `pnpm dev:certs` so local sign-in works in Safari
+  and Firefox, which discard the `__Secure-` prefixed Neon Auth cookies over
+  plain http. `pnpm dev` is unchanged.
+
 - Fixed every sign-in link being rejected before it was ever verified. The proxy
   required an OAuth challenge cookie that a sign-in link never sets, so each
   callback was refused with the false claim that it had been opened in another

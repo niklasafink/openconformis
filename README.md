@@ -35,16 +35,26 @@ a secure origin. Over plain `http://localhost` this splits by browser:
   redirect happens, but no session exists and the next page sends you back to
   sign-in.
 
-To sign in locally with those browsers, serve development over HTTPS:
+To sign in locally with those browsers, serve development over HTTPS. Next.js
+downloads `mkcert` on the first `--experimental-https` run; trusting its
+certificate authority writes to the login keychain and therefore needs your
+password, which is the one step that cannot be scripted:
 
 ```bash
-mkcert -install   # once per machine, asks for your password
-pnpm dev:https
+"$HOME/Library/Caches/mkcert/mkcert-v1.4.4-darwin-arm64" -install   # once, asks for your password
+pnpm dev:certs                                                      # once, or when the certificate expires
+pnpm dev:https                                                      # https://localhost:3000
 ```
 
-Then set `NEXT_PUBLIC_APP_URL=https://localhost:3000` in `.env.local`. In
-production the application is served over HTTPS, where every browser accepts the
-cookies and no workaround is needed.
+`dev:https` sets `NEXT_PUBLIC_APP_URL` itself, so `.env.local` keeps pointing at
+`http://localhost:3000` and plain `pnpm dev` continues to work unchanged.
+Certificates land in `certificates/` and are ignored by git.
+
+Without the `-install` step the server still runs, but the browser shows a
+certificate warning that has to be accepted once per session.
+
+In production the application is served over HTTPS, where every browser accepts
+the cookies and none of this applies.
 
 Useful checks:
 
