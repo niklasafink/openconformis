@@ -31,6 +31,41 @@ function signInRedirect(request: NextRequest, authError: string, next?: string) 
   return NextResponse.redirect(signIn);
 }
 
+/**
+ * Hält die Entwicklungsumgebung auf einem kanonischen Origin, damit host-gebundene
+ * Session-Cookies nicht zwischen `localhost` und `127.0.0.1` verloren gehen.
+ *
+ * Der Vergleich läuft über den tatsächlichen `Host`-Header, nicht über
+ * `request.nextUrl.origin`: Next.js normalisiert `nextUrl` im Dev-Modus auf
+ * `localhost`, sodass eine auf `127.0.0.1` konfigurierte App-URL nie übereinstimmt
+ * und die Weiterleitung auf dieselbe Adresse zeigt — eine Endlosschleife, die
+ * jeden Request der Anwendung trifft.
+ */
+function canonicalDevelopmentOriginRedirect(request: NextRequest) {
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.NODE_ENV === "production" || !configuredAppUrl) return null;
+
+  let configuredOrigin: URL;
+  try {
+    configuredOrigin = new URL(configuredAppUrl);
+  } catch {
+    return null;
+  }
+
+  const requestHost = request.headers.get("host");
+  if (!requestHost || requestHost === configuredOrigin.host) return null;
+
+  const target = request.nextUrl.clone();
+  target.protocol = configuredOrigin.protocol;
+  target.host = configuredOrigin.host;
+
+  // Letzte Sicherung gegen eine Schleife: eine Weiterleitung auf die angefragte
+  // Adresse selbst bringt nichts und wiederholt sich endlos.
+  if (target.toString() === request.nextUrl.toString()) return null;
+
+  return NextResponse.redirect(target);
+}
+
 function copySetCookies(source: Response, target: NextResponse) {
   for (const cookie of source.headers.getSetCookie()) {
     target.headers.append("set-cookie", cookie);
@@ -70,16 +105,8 @@ async function completeAuthCallback(request: NextRequest) {
 }
 
 export default async function proxy(request: NextRequest) {
-  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.NODE_ENV !== "production" && configuredAppUrl) {
-    const configuredOrigin = new URL(configuredAppUrl);
-    if (request.nextUrl.origin !== configuredOrigin.origin) {
-      const target = request.nextUrl.clone();
-      target.protocol = configuredOrigin.protocol;
-      target.host = configuredOrigin.host;
-      return NextResponse.redirect(target);
-    }
-  }
+  const canonicalRedirect = canonicalDevelopmentOriginRedirect(request);
+  if (canonicalRedirect) return canonicalRedirect;
 
   if (request.nextUrl.searchParams.has(verifierParameter)) {
     const hasChallenge =
