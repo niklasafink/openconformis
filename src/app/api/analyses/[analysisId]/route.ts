@@ -3,7 +3,10 @@ import { z } from "zod";
 
 import { getOwnedAnalysisStatus } from "@/server/analyses/read-analysis";
 import { requestAnalysisDeletion } from "@/server/analyses/delete-analysis";
-import { AuthenticationRequiredError } from "@/server/auth/session-principal";
+import {
+  AuthenticationRequiredError,
+  MembershipRequiredError,
+} from "@/server/auth/session-principal";
 import {
   requireAuthenticatedSessionUser,
   VerifiedEmailRequiredError,
@@ -68,6 +71,8 @@ export async function DELETE(
       return NextResponse.json({ code: "INVALID_ANALYSIS_ID" }, { status: 400 });
     if (error instanceof AuthenticationRequiredError)
       return NextResponse.json({ code: "AUTHENTICATION_REQUIRED" }, { status: 401 });
+    if (error instanceof MembershipRequiredError)
+      return NextResponse.json({ code: "MEMBERSHIP_REQUIRED" }, { status: 403 });
     if (error instanceof Error && error.message === "ANALYSIS_NOT_FOUND")
       return NextResponse.json({ code: "ANALYSIS_NOT_FOUND" }, { status: 404 });
     return NextResponse.json({ code: "ANALYSIS_DELETION_FAILED" }, { status: 500 });

@@ -1,6 +1,6 @@
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AnalysisRunLive } from "@/components/results/analysis-run-live";
 import { AnalysisResultsWorkspace } from "@/components/results/analysis-results-workspace";
@@ -30,7 +30,12 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     requireAuthenticatedSessionUser().catch(() => null),
     requireSessionPrincipal().catch(() => null),
   ]);
-  if (!user) notFound();
+  // Eine abgelaufene Sitzung ist kein „nicht gefunden". Der Nutzer soll sich
+  // anmelden können und danach wieder hier landen, statt auf einer 404-Seite zu
+  // stehen und den Analyse-Link zu verlieren.
+  if (!user) {
+    redirect(`/${locale}/sign-in?next=${encodeURIComponent(`/${locale}/analyses/${analysisId}`)}`);
+  }
 
   const analysis = await getOwnedAnalysisStatus({ analysisId, ownerUserId: user.id });
   if (!analysis) notFound();

@@ -4,6 +4,7 @@ import { Check, LoaderCircle, LockKeyhole, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AuthForm, type AuthFormLabels } from "@/components/auth/auth-form";
 import { authClient } from "@/lib/auth-client";
 import type { AiRouteProvider } from "@/domain/ai/provider";
 import {
@@ -12,6 +13,8 @@ import {
   type DocumentBlock,
   type ResultItem,
 } from "@/components/results/analysis-results-workspace";
+
+type StartFailure = "authentication" | "verification" | "generic";
 
 type PreviewGateProps = {
   callbackUrl: string;
@@ -31,30 +34,21 @@ type PreviewGateProps = {
     credentialHelpUrl: string;
     privacyAttestationRequired: boolean;
   };
-  labels: {
+  labels: AuthFormLabels & {
     preparing: string;
     parsing: string;
     mapping: string;
     checking: string;
     complete: string;
+    starting: string;
     startFailed: string;
+    startFailedAuthentication: string;
+    startFailedVerification: string;
+    startFailedGeneric: string;
+    retry: string;
+    goToSignIn: string;
     lockedTitle: string;
     lockedBody: string;
-    email: string;
-    magicLink: string;
-    emailSent: string;
-    magicLinkBrowserHint: string;
-    magicLinkMode: string;
-    passwordMode: string;
-    password: string;
-    signIn: string;
-    signUp: string;
-    switchToSignIn: string;
-    switchToSignUp: string;
-    authFailed: string;
-    google: string;
-    microsoft: string;
-    or: string;
     byokTitle: string;
     byokBody: string;
     selectedModel: string;
@@ -87,15 +81,8 @@ export function PreviewGate({
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const [step, setStep] = useState(0);
-  const [email, setEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
-  const [authMode, setAuthMode] = useState<"magic-link" | "password">("magic-link");
-  const [passwordAction, setPasswordAction] = useState<"sign-in" | "sign-up">("sign-in");
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState(Boolean(authCallbackError));
   const [authDialogOpen, setAuthDialogOpen] = useState(Boolean(authCallbackError));
-  const [pending, setPending] = useState(false);
-  const [startError, setStartError] = useState(false);
+  const [startFailure, setStartFailure] = useState<StartFailure | null>(null);
   const [byokRequired, setByokRequired] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [credentialPending, setCredentialPending] = useState(false);
@@ -103,13 +90,6 @@ export function PreviewGate({
   const [privacyAttestationAccepted, setPrivacyAttestationAccepted] = useState(false);
   const startRequested = useRef(false);
   const steps = [labels.parsing, labels.mapping, labels.checking];
-
-  function absoluteCallbackUrl() {
-    return new URL(
-      callbackUrl,
-      process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin,
-    ).toString();
-  }
 
   useEffect(() => {
     if (step >= steps.length) return;
@@ -132,82 +112,35 @@ export function PreviewGate({
     })
       .then(async (response) => {
         const payload = (await response.json()) as { analysisId?: string; code?: string };
-        const requiresOwnKey =
+
+        // Fehlendes Sponsoring ist kein Fehler, sondern der reguläre Weg in den
+        // eigenen Modellzugang.
+        if (
           response.status === 402 ||
           payload.code === "SPONSORED_RUNS_DISABLED" ||
           payload.code === "SPONSORED_ROUTE_NOT_CONFIGURED" ||
-          payload.code === "SPONSORED_MODEL_NOT_ALLOWED";
-        if (requiresOwnKey) {
+          payload.code === "SPONSORED_MODEL_NOT_ALLOWED"
+        ) {
           setByokRequired(true);
           return;
         }
+
+        // Diese Fälle sind für den Nutzer auflösbar — er muss aber erfahren, was
+        // fehlt, statt eine generische Fehlermeldung zu sehen.
+        if (response.status === 401 || payload.code === "AUTHENTICATION_REQUIRED") {
+          setStartFailure("authentication");
+          return;
+        }
+        if (response.status === 403 || payload.code === "VERIFIED_EMAIL_REQUIRED") {
+          setStartFailure("verification");
+          return;
+        }
+
         if (!response.ok || !payload.analysisId) throw new Error("ANALYSIS_START_FAILED");
         router.replace(`/${locale}/analyses/${payload.analysisId}`);
       })
-      .catch(() => setStartError(true));
+      .catch(() => setStartFailure("generic"));
   }, [draftId, locale, router, session, step, steps.length]);
-
-  async function sendMagicLink(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setAuthError(false);
-    try {
-      const result = await authClient.signIn.magicLink({
-        email,
-        callbackURL: absoluteCallbackUrl(),
-      });
-      if (!result.error) setEmailSent(true);
-      else setAuthError(true);
-    } catch {
-      setAuthError(true);
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function submitPassword(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setAuthError(false);
-    try {
-      const callbackURL = absoluteCallbackUrl();
-      const result =
-        passwordAction === "sign-in"
-          ? await authClient.signIn.email({ email, password, callbackURL })
-          : await authClient.signUp.email({
-              email,
-              password,
-              name: email.split("@")[0] || email,
-              callbackURL,
-            });
-      if (result.error) {
-        setAuthError(true);
-        return;
-      }
-
-      // Make the newly issued HttpOnly session cookie authoritative before
-      // the protected analysis is claimed by this account.
-      window.location.assign(callbackURL);
-    } catch {
-      setAuthError(true);
-    } finally {
-      setPending(false);
-      setPassword("");
-    }
-  }
-
-  async function signInSocial(provider: "google" | "microsoft") {
-    setAuthError(false);
-    try {
-      const result = await authClient.signIn.social({
-        provider,
-        callbackURL: absoluteCallbackUrl(),
-      });
-      if (result.error) setAuthError(true);
-    } catch {
-      setAuthError(true);
-    }
-  }
 
   async function connectCredentialAndStart(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -250,6 +183,12 @@ export function PreviewGate({
     }
   }
 
+  function retryStart() {
+    startRequested.current = false;
+    setStartFailure(null);
+    router.refresh();
+  }
+
   if (step < steps.length) {
     return (
       <div className="preview-progress" role="status" aria-live="polite">
@@ -267,6 +206,102 @@ export function PreviewGate({
             </li>
           ))}
         </ol>
+      </div>
+    );
+  }
+
+  // Nach der Anmeldung wird die Vorschau nicht freigeschaltet, sondern ersetzt.
+  // Die Vorschauwerte sind Demo-Stati ohne echte Bewertung — sie unverschwommen
+  // zu zeigen, ließe erfundene Ergebnisse wie geprüfte aussehen.
+  if (session) {
+    return (
+      <div className="preview-result-layout">
+        {byokRequired ? (
+          <div className="preview-auth-backdrop">
+            <section
+              className="preview-auth-card preview-byok-card"
+              role="dialog"
+              aria-modal="true"
+            >
+              <h1>{labels.byokTitle}</h1>
+              <p>{labels.byokBody}</p>
+              <dl className="preview-byok-model">
+                <div>
+                  <dt>{labels.selectedModel}</dt>
+                  <dd>{selectedModel.providerModelId}</dd>
+                </div>
+              </dl>
+              <form onSubmit={connectCredentialAndStart}>
+                <label htmlFor="preview-api-key">{selectedModel.routeProviderLabel} API-Key</label>
+                <input
+                  id="preview-api-key"
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={20_000}
+                  autoComplete="off"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                />
+                {credentialError ? <p className="preview-key-error">{labels.keyFailed}</p> : null}
+                {selectedModel.privacyAttestationRequired ? (
+                  <label className="preview-privacy-attestation">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={privacyAttestationAccepted}
+                      onChange={(event) => setPrivacyAttestationAccepted(event.target.checked)}
+                    />
+                    <span>{labels.privacyAttestation}</span>
+                  </label>
+                ) : null}
+                <div className="preview-key-actions">
+                  <a href={selectedModel.credentialHelpUrl} target="_blank" rel="noreferrer">
+                    {labels.keyLink}
+                  </a>
+                  <button
+                    className="button button-primary"
+                    type="submit"
+                    disabled={credentialPending}
+                  >
+                    {credentialPending ? labels.connecting : labels.connect}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : startFailure ? (
+          <section className="preview-start-state preview-start-failed" role="alert">
+            <h1>{labels.startFailed}</h1>
+            <p>
+              {startFailure === "authentication"
+                ? labels.startFailedAuthentication
+                : startFailure === "verification"
+                  ? labels.startFailedVerification
+                  : labels.startFailedGeneric}
+            </p>
+            <div className="preview-start-actions">
+              {startFailure === "authentication" ? (
+                <a
+                  className="button button-primary"
+                  href={`/${locale}/sign-in?next=${encodeURIComponent(callbackUrl)}`}
+                >
+                  {labels.goToSignIn}
+                </a>
+              ) : (
+                <button className="button button-primary" type="button" onClick={retryStart}>
+                  {labels.retry}
+                </button>
+              )}
+            </div>
+          </section>
+        ) : (
+          <section className="preview-start-state" role="status" aria-live="polite">
+            <LoaderCircle className="preview-spinner" size={24} aria-hidden="true" />
+            <h1>{labels.starting}</h1>
+            <p>{labels.complete}</p>
+          </section>
+        )}
       </div>
     );
   }
@@ -289,12 +324,12 @@ export function PreviewGate({
         }}
       />
 
-      {!session && authDialogOpen ? (
+      {authDialogOpen ? (
         <div
           className="preview-auth-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !pending) setAuthDialogOpen(false);
+            if (event.target === event.currentTarget) setAuthDialogOpen(false);
           }}
         >
           <section
@@ -316,146 +351,12 @@ export function PreviewGate({
             </span>
             <h1 id="preview-auth-title">{labels.lockedTitle}</h1>
             <p>{labels.lockedBody}</p>
-            <div className="preview-auth-modes" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={authMode === "magic-link"}
-                onClick={() => setAuthMode("magic-link")}
-              >
-                {labels.magicLinkMode}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={authMode === "password"}
-                onClick={() => setAuthMode("password")}
-              >
-                {labels.passwordMode}
-              </button>
-            </div>
-            {authError ? <p className="preview-key-error">{labels.authFailed}</p> : null}
-            {emailSent && authMode === "magic-link" ? (
-              <div className="preview-email-sent">
-                {labels.emailSent}
-                <small>{labels.magicLinkBrowserHint}</small>
-              </div>
-            ) : authMode === "magic-link" ? (
-              <form onSubmit={sendMagicLink}>
-                <label htmlFor="preview-email">{labels.email}</label>
-                <input
-                  id="preview-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-                <button className="button button-primary" type="submit" disabled={pending}>
-                  {labels.magicLink}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={submitPassword}>
-                <label htmlFor="preview-password-email">{labels.email}</label>
-                <input
-                  id="preview-password-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-                <label htmlFor="preview-password">{labels.password}</label>
-                <input
-                  id="preview-password"
-                  type="password"
-                  required
-                  minLength={8}
-                  autoComplete={passwordAction === "sign-in" ? "current-password" : "new-password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-                <button className="button button-primary" type="submit" disabled={pending}>
-                  {passwordAction === "sign-in" ? labels.signIn : labels.signUp}
-                </button>
-                <button
-                  className="preview-auth-switch"
-                  type="button"
-                  onClick={() =>
-                    setPasswordAction((current) => (current === "sign-in" ? "sign-up" : "sign-in"))
-                  }
-                >
-                  {passwordAction === "sign-in" ? labels.switchToSignUp : labels.switchToSignIn}
-                </button>
-              </form>
-            )}
-            <div className="preview-auth-divider">
-              <span>{labels.or}</span>
-            </div>
-            <div className="preview-social-actions">
-              <button type="button" onClick={() => void signInSocial("google")}>
-                {labels.google}
-              </button>
-              <button type="button" onClick={() => void signInSocial("microsoft")}>
-                {labels.microsoft}
-              </button>
-            </div>
+            <AuthForm
+              callbackUrl={callbackUrl}
+              initialError={Boolean(authCallbackError)}
+              labels={labels}
+            />
           </section>
-        </div>
-      ) : byokRequired ? (
-        <div className="preview-auth-backdrop">
-          <section className="preview-auth-card preview-byok-card" role="dialog" aria-modal="true">
-            <h1>{labels.byokTitle}</h1>
-            <p>{labels.byokBody}</p>
-            <dl className="preview-byok-model">
-              <div>
-                <dt>{labels.selectedModel}</dt>
-                <dd>{selectedModel.providerModelId}</dd>
-              </div>
-            </dl>
-            <form onSubmit={connectCredentialAndStart}>
-              <label htmlFor="preview-api-key">{selectedModel.routeProviderLabel} API-Key</label>
-              <input
-                id="preview-api-key"
-                type="password"
-                required
-                minLength={8}
-                maxLength={20_000}
-                autoComplete="off"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-              />
-              {credentialError ? <p className="preview-key-error">{labels.keyFailed}</p> : null}
-              {selectedModel.privacyAttestationRequired ? (
-                <label className="preview-privacy-attestation">
-                  <input
-                    type="checkbox"
-                    required
-                    checked={privacyAttestationAccepted}
-                    onChange={(event) => setPrivacyAttestationAccepted(event.target.checked)}
-                  />
-                  <span>{labels.privacyAttestation}</span>
-                </label>
-              ) : null}
-              <div className="preview-key-actions">
-                <a href={selectedModel.credentialHelpUrl} target="_blank" rel="noreferrer">
-                  {labels.keyLink}
-                </a>
-                <button
-                  className="button button-primary"
-                  type="submit"
-                  disabled={credentialPending}
-                >
-                  {credentialPending ? labels.connecting : labels.connect}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
-      ) : session ? (
-        <div className="preview-authenticated-notice" role="status">
-          {startError ? labels.startFailed : labels.complete}
         </div>
       ) : null}
     </div>

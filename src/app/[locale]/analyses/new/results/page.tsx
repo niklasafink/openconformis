@@ -1,6 +1,6 @@
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PreviewGate } from "@/components/results/preview-gate";
 import type { ResultItem, ResultStatus } from "@/components/results/analysis-results-workspace";
@@ -9,6 +9,8 @@ import { LanguageMenu } from "@/components/shell/language-menu";
 import { aiProviderPublicDetails } from "@/domain/ai/provider";
 import { doraDemoRelease } from "@/domain/frameworks/dora-demo-release";
 import { routing } from "@/i18n/routing";
+import { findOwnedAnalysisIdForDraft } from "@/server/analyses/read-analysis";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { getDraftScopeSelection } from "@/server/drafts/scope-selection";
 import { getCurrentPolicyPreview } from "@/server/policies/sample-service";
@@ -24,6 +26,20 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
+  const user = await requireAuthenticatedSessionUser().catch(() => null);
+
+  // Der Claim setzt den Draft auf `claimed`; danach findet ihn getBoundActiveDraft
+  // nicht mehr. Wer angemeldet ist und bereits eine Analyse zu diesem Draft
+  // besitzt, gehört auf deren Seite — nicht in einen 404 bei Reload oder beim
+  // zweiten Klick auf den Anmeldelink.
+  if (user && draft) {
+    const startedAnalysisId = await findOwnedAnalysisIdForDraft({
+      draftId: draft,
+      ownerUserId: user.id,
+    });
+    if (startedAnalysisId) redirect(`/${locale}/analyses/${startedAnalysisId}`);
+  }
+
   const [navigation, t, resultsT, boundDraft, scope, policyPreview] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("ResultsPreview"),
@@ -32,8 +48,17 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     getDraftScopeSelection(draft),
     getCurrentPolicyPreview(draft),
   ]);
+
   if (!boundDraft || !scope?.modelSelection || !policyPreview) {
-    notFound();
+    // Ohne Draft-Bindung lässt sich die Vorschau nicht rekonstruieren — der
+    // Bindungs-Cookie ist der Eigentumsnachweis am anonymen Draft. Angemeldete
+    // Nutzer beginnen neu, nicht angemeldete gehen auf die Anmeldefläche, die
+    // ohne Cookie funktioniert und den Fehler erklären kann.
+    redirect(
+      user
+        ? `/${locale}/analyses/new/framework`
+        : `/${locale}/sign-in${authCallbackError ? `?auth_error=${encodeURIComponent(authCallbackError)}` : ""}`,
+    );
   }
   const callbackUrl = `/${locale}/analyses/new/results?draft=${encodeURIComponent(boundDraft.id)}`;
   const previewStatuses: ResultStatus[] = [
@@ -173,11 +198,18 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           mapping: t("mapping"),
           checking: t("checking"),
           complete: t("complete"),
+          starting: t("starting"),
           startFailed: t("startFailed"),
+          startFailedAuthentication: t("startFailedAuthentication"),
+          startFailedVerification: t("startFailedVerification"),
+          startFailedGeneric: t("startFailedGeneric"),
+          retry: t("retry"),
+          goToSignIn: t("goToSignIn"),
           lockedTitle: t("lockedTitle"),
           lockedBody: t("lockedBody"),
           email: t("email"),
           magicLink: t("magicLink"),
+          magicLinkResend: t("magicLinkResend"),
           emailSent: t("emailSent"),
           magicLinkBrowserHint: t("magicLinkBrowserHint"),
           magicLinkMode: t("magicLinkMode"),

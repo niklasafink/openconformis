@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { AuthenticationRequiredError } from "@/server/auth/session-principal";
+import {
+  AuthenticationRequiredError,
+  MembershipRequiredError,
+} from "@/server/auth/session-principal";
 import { ChatServiceError, getChatThreadMessages } from "@/server/chat/service";
 
 export const runtime = "nodejs";
@@ -17,6 +20,9 @@ export async function GET(_request: Request, context: { params: Promise<{ thread
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) {
       return NextResponse.json({ code: "AUTHENTICATION_REQUIRED" }, { status: 401 });
+    }
+    if (error instanceof MembershipRequiredError) {
+      return NextResponse.json({ code: "MEMBERSHIP_REQUIRED" }, { status: 403 });
     }
     if (error instanceof ChatServiceError) {
       return NextResponse.json({ code: error.code }, { status: 404 });

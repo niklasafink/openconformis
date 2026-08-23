@@ -14,6 +14,27 @@ import {
 import { documentBlocks, policies, policyVersions } from "@/server/db/schema/documents";
 import type { AnalysisExportData } from "@/server/exports/analysis-xlsx";
 
+/**
+ * Findet die Analyse, die aus einem bereits übernommenen Draft entstanden ist.
+ * Der Vorschauscreen invalidiert sich beim Claim selbst — der Draft wechselt von
+ * `active` auf `claimed`. Ohne diesen Rücksprung enden Reload, Zurück-Button und
+ * ein zweiter Klick auf den Anmeldelink im 404.
+ */
+export async function findOwnedAnalysisIdForDraft(input: {
+  draftId: string;
+  ownerUserId: string;
+}): Promise<string | null> {
+  const [analysis] = await db
+    .select({ id: analyses.id })
+    .from(analyses)
+    .where(
+      and(eq(analyses.sourceDraftId, input.draftId), eq(analyses.ownerUserId, input.ownerUserId)),
+    )
+    .limit(1);
+
+  return analysis?.id ?? null;
+}
+
 export async function getOwnedAnalysisStatus(input: { analysisId: string; ownerUserId: string }) {
   const [analysis] = await db
     .select({

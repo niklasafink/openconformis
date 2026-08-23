@@ -166,7 +166,7 @@
     "mapping": "Mapping requirements",
     "checking": "Validating evidence",
     "complete": "Account recognized. The real analysis is now starting.",
-    "startFailed": "The analysis could not be started. Reload the page or provide your own API key.",
+    "startFailed": "The analysis could not be started",
     "lockedTitle": "Unlock result",
     "lockedBody": "Register for free. The real analysis only starts afterwards; the preview does not consume any AI allowance.",
     "email": "Email address",
@@ -193,7 +193,14 @@
     "keyFailed": "The key or model access could not be confirmed.",
     "privacyAttestation": "I confirm that Zero Data Retention is enabled for this provider project and the selected model route is processed exclusively in the EU.",
     "unlockResult": "Register to view result",
-    "close": "Close dialog"
+    "close": "Close dialog",
+    "starting": "Starting the analysis",
+    "startFailedAuthentication": "Your session has expired. Sign in again to start the analysis.",
+    "startFailedVerification": "Your email address is not confirmed yet. Open the confirmation link from the email and try again.",
+    "startFailedGeneric": "Please try again. If the error persists, connect your own API key.",
+    "retry": "Try again",
+    "goToSignIn": "Go to sign-in",
+    "magicLinkResend": "Send the link again"
   },
   "AnalysisRun": {
     "title": "Analysis of your policy",
@@ -263,5 +270,27 @@
       "finalizing": "Preparing result",
       "completed": "Completed"
     }
+  },
+  "Auth": {
+    "title": "Sign in or create an account",
+    "body": "Sign in to start an analysis and view results. Registration is free.",
+    "browserMismatch": "The sign-in link was opened in a different browser than the one that requested it. Request a new link here and open it in the same browser profile.",
+    "linkInvalid": "The sign-in link has expired or was already used. Request a new link.",
+    "email": "Email address",
+    "magicLink": "Send sign-in link",
+    "magicLinkResend": "Send the link again",
+    "emailSent": "The sign-in link has been sent.",
+    "magicLinkBrowserHint": "Keep this tab open and open the link in the same browser profile.",
+    "magicLinkMode": "Sign-in link",
+    "passwordMode": "Password",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "switchToSignIn": "Already registered? Sign in",
+    "switchToSignUp": "No account yet? Register",
+    "authFailed": "Sign-in could not be completed.",
+    "google": "Continue with Google",
+    "microsoft": "Continue with Microsoft",
+    "or": "or"
   }
 }

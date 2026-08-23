@@ -1759,46 +1759,52 @@ a {
   color: var(--selection);
 }
 
-.preview-auth-card h1 {
+.preview-auth-card h1,
+.auth-card h1 {
   margin: 16px 0 7px;
   font-size: 22px;
 }
 
-.preview-auth-card > p {
+.preview-auth-card > p,
+.auth-card > p {
   margin: 0 0 20px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
-.preview-auth-card form {
+.preview-auth-card form,
+.auth-card form {
   display: grid;
   gap: 8px;
 }
 
-.preview-auth-card label {
+.preview-auth-card label,
+.auth-card label {
   font-size: 13px;
   font-weight: 600;
 }
 
-.preview-auth-card input {
+.preview-auth-card input,
+.auth-card input {
   height: 38px;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0 10px;
 }
 
-.preview-auth-card form .button {
+.preview-auth-card form .button,
+.auth-card form .button {
   margin-top: 4px;
 }
 
-.preview-auth-modes {
+.auth-modes {
   display: grid;
   grid-template-columns: 1fr 1fr;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
 
-.preview-auth-modes button {
+.auth-modes button {
   border: 0;
   border-bottom: 2px solid transparent;
   padding: 8px 10px;
@@ -1809,12 +1815,12 @@ a {
   font-weight: 600;
 }
 
-.preview-auth-modes button[aria-selected="true"] {
+.auth-modes button[aria-selected="true"] {
   border-bottom-color: var(--selection);
   color: var(--selection);
 }
 
-.preview-auth-card .preview-auth-switch {
+.auth-switch {
   border: 0;
   padding: 6px;
   background: transparent;
@@ -1897,7 +1903,7 @@ a {
   font-weight: 600;
 }
 
-.preview-auth-divider {
+.auth-divider {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -1907,28 +1913,27 @@ a {
   font-size: 12px;
 }
 
-.preview-auth-divider::before,
-.preview-auth-divider::after {
+.auth-divider::before,
+.auth-divider::after {
   height: 1px;
   background: var(--border);
   content: "";
 }
 
-.preview-social-actions {
+.auth-social-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.preview-social-actions button {
+.auth-social-actions button {
   min-height: 38px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
 }
 
-.preview-email-sent,
-.preview-authenticated-notice {
+.auth-email-sent {
   border: 1px solid #bddfce;
   border-radius: 7px;
   background: #eef8f3;
@@ -1936,19 +1941,12 @@ a {
   color: #176844;
 }
 
-.preview-email-sent small {
+.auth-email-sent small {
   display: block;
   margin-top: 5px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
-}
-
-.preview-authenticated-notice {
-  position: absolute;
-  top: 32px;
-  left: 50%;
-  transform: translateX(-50%);
 }
 
 .setup-footer {
@@ -3503,4 +3501,85 @@ i[data-result-status="no_assessment_possible"] {
   .result-column-scroll {
     max-height: none;
   }
+}
+
+/* ── Anmeldefläche ──────────────────────────────────────────────────────── */
+.auth-page {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 48px 24px;
+}
+
+.auth-card {
+  width: min(440px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 28px;
+}
+
+.auth-lock {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--selection-soft);
+  color: var(--selection);
+}
+
+.auth-notice {
+  margin: 0 0 18px;
+  border: 1px solid #f0d8a8;
+  border-radius: 7px;
+  background: #fdf6e8;
+  padding: 12px;
+  color: #7a5510;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth-error {
+  margin: 0 0 14px;
+  border: 1px solid #f2c9c9;
+  border-radius: 7px;
+  background: #fdeeee;
+  padding: 10px 12px;
+  color: #a32222;
+  font-size: 13px;
+}
+
+.auth-secondary {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.auth-email-sent .auth-switch {
+  display: block;
+  margin-top: 8px;
+  padding-left: 0;
+}
+
+/* Zustand nach der Anmeldung: die Vorschau wird ersetzt, nicht freigeschaltet. */
+.preview-start-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 72px 24px;
+  text-align: center;
+}
+
+.preview-start-state h1 {
+  font-size: 20px;
+}
+
+.preview-start-state p {
+  max-width: 46ch;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.preview-start-actions {
+  margin-top: 8px;
 }

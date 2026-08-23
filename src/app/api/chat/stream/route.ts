@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { ChatModelError } from "@/server/ai/chat-stream";
 import { TemporaryCredentialError } from "@/server/ai/temporary-credential-service";
-import { AuthenticationRequiredError } from "@/server/auth/session-principal";
+import {
+  AuthenticationRequiredError,
+  MembershipRequiredError,
+} from "@/server/auth/session-principal";
 import { VerifiedEmailRequiredError } from "@/server/auth/session-user";
 import { ChatServiceError, executeChatTurn } from "@/server/chat/service";
 import { hasTrustedApplicationOrigin } from "@/server/security/trusted-origin";
@@ -24,6 +27,7 @@ function event(name: string, payload: unknown) {
 
 function safeCode(error: unknown) {
   if (error instanceof AuthenticationRequiredError) return "AUTHENTICATION_REQUIRED";
+  if (error instanceof MembershipRequiredError) return "MEMBERSHIP_REQUIRED";
   if (error instanceof VerifiedEmailRequiredError) return "VERIFIED_EMAIL_REQUIRED";
   if (error instanceof ChatServiceError) return error.code;
   if (error instanceof ChatModelError) return error.code;

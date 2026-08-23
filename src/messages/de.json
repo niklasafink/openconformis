@@ -166,7 +166,7 @@
     "mapping": "Anforderungen zuordnen",
     "checking": "Belegstellen validieren",
     "complete": "Konto erkannt. Die echte Analyse wird jetzt gestartet.",
-    "startFailed": "Die Analyse konnte nicht gestartet werden. Laden Sie die Seite erneut oder hinterlegen Sie einen eigenen API-Schlüssel.",
+    "startFailed": "Die Analyse konnte nicht gestartet werden",
     "lockedTitle": "Ergebnis freischalten",
     "lockedBody": "Registrieren Sie sich kostenlos. Erst danach startet die echte Analyse; der Vorschaulauf verbraucht kein KI-Kontingent.",
     "email": "E-Mail-Adresse",
@@ -193,7 +193,14 @@
     "keyFailed": "Der Schlüssel oder Modellzugriff konnte nicht bestätigt werden.",
     "privacyAttestation": "Ich bestätige, dass für dieses Providerprojekt Zero Data Retention aktiviert ist und die gewählte Modellroute ausschließlich in der EU verarbeitet.",
     "unlockResult": "Für Ergebnis registrieren",
-    "close": "Dialog schließen"
+    "close": "Dialog schließen",
+    "starting": "Analyse wird gestartet",
+    "startFailedAuthentication": "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an, um die Analyse zu starten.",
+    "startFailedVerification": "Ihre E-Mail-Adresse ist noch nicht bestätigt. Öffnen Sie den Bestätigungslink aus der E-Mail und versuchen Sie es danach erneut.",
+    "startFailedGeneric": "Bitte versuchen Sie es erneut. Bleibt der Fehler bestehen, hinterlegen Sie einen eigenen API-Schlüssel.",
+    "retry": "Erneut versuchen",
+    "goToSignIn": "Zur Anmeldung",
+    "magicLinkResend": "Link erneut senden"
   },
   "AnalysisRun": {
     "title": "Analyse Ihrer Policy",
@@ -263,5 +270,27 @@
       "finalizing": "Ergebnis aufbereiten",
       "completed": "Abgeschlossen"
     }
+  },
+  "Auth": {
+    "title": "Anmelden oder Konto erstellen",
+    "body": "Melden Sie sich an, um eine Analyse zu starten und Ergebnisse einzusehen. Die Registrierung ist kostenlos.",
+    "browserMismatch": "Der Anmeldelink wurde in einem anderen Browser geöffnet als dem, in dem er angefordert wurde. Fordern Sie den Link hier erneut an und öffnen Sie ihn im selben Browserprofil.",
+    "linkInvalid": "Der Anmeldelink ist abgelaufen oder wurde bereits verwendet. Fordern Sie einen neuen Link an.",
+    "email": "E-Mail-Adresse",
+    "magicLink": "Anmeldelink senden",
+    "magicLinkResend": "Link erneut senden",
+    "emailSent": "Der Anmeldelink wurde gesendet.",
+    "magicLinkBrowserHint": "Lassen Sie diesen Tab geöffnet und öffnen Sie den Link im selben Browserprofil.",
+    "magicLinkMode": "Anmeldelink",
+    "passwordMode": "Passwort",
+    "password": "Passwort",
+    "signIn": "Anmelden",
+    "signUp": "Konto erstellen",
+    "switchToSignIn": "Bereits registriert? Anmelden",
+    "switchToSignUp": "Noch kein Konto? Registrieren",
+    "authFailed": "Die Anmeldung konnte nicht abgeschlossen werden.",
+    "google": "Mit Google fortfahren",
+    "microsoft": "Mit Microsoft fortfahren",
+    "or": "oder"
   }
 }
