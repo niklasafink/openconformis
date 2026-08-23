@@ -6,7 +6,11 @@ import { createCatalogueItemHash } from "@/domain/frameworks/release-content";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { getActiveAnalysisInstructionPair } from "@/server/ai/analysis-instruction-service";
-import { getStrictAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
+import {
+  getStrictAnalysisProviderConfiguration,
+  sponsoredPrivacyProfileId,
+  sponsoredZeroDataRetention,
+} from "@/server/ai/provider-routing";
 import { ensurePersonalWorkspace } from "@/server/auth/personal-workspace";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
@@ -115,7 +119,12 @@ function readSponsoredRoute(): AnalysisRoute {
     verifierModelProfileId: process.env.VERIFIER_MODEL_PROFILE?.trim() || verifierProviderModelId,
     verifierProviderRouteAllowlist,
     modelCatalogueVersion: process.env.MODEL_CATALOGUE_VERSION?.trim() || "runtime-v1",
-    privacyProfileId: process.env.SPONSORED_PRIVACY_PROFILE?.trim() || "eu-zdr-v1",
+    // Nicht aus SPONSORED_PRIVACY_PROFILE übernehmen: das Profil muss der
+    // tatsächlichen Route folgen, sonst behauptet der Nachweis mehr als galt.
+    privacyProfileId: sponsoredPrivacyProfileId({
+      baseUrl: process.env.SPONSORED_OPENROUTER_BASE_URL?.trim() ?? "",
+      zeroDataRetention: sponsoredZeroDataRetention(),
+    }),
     promptVersion: "",
     verifierPromptVersion: "",
     unevaluatedWarningAccepted: false,

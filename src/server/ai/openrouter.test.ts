@@ -48,7 +48,6 @@ describe("OpenRouter EU structured adapter", () => {
     expect(body.provider).toEqual({
       only: ["eu-provider"],
       allow_fallbacks: false,
-      require_parameters: true,
       data_collection: "deny",
       zdr: true,
     });
@@ -58,25 +57,68 @@ describe("OpenRouter EU structured adapter", () => {
     expect(response.costMicrounits).toBe(1000);
   });
 
-  it("rejects a non-EU endpoint before sending policy data", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
-    await expect(
-      requestOpenRouterStructured(
-        {
-          apiKey: "test-key",
-          baseUrl: "https://openrouter.ai/api/v1",
-          modelId: "provider/model-v1",
-          system: "system",
-          user: "user",
-          schemaName: "answer",
-          jsonSchema: { type: "object" },
-          outputSchema,
-          providerOnly: ["provider"],
-          maxOutputTokens: 1_000,
-        },
-        fetchMock,
+  it("keeps zero data retention on unless it is switched off deliberately", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "generation-3",
+          model: "provider/model-v1",
+          choices: [{ message: { content: JSON.stringify({ answer: "ok" }) } }],
+        }),
+        { status: 200 },
       ),
-    ).rejects.toEqual(new ModelProviderError("INVALID_EU_ROUTE", false));
+    );
+
+    await requestOpenRouterStructured(
+      {
+        apiKey: "test-key",
+        baseUrl: "https://openrouter.ai/api/v1",
+        modelId: "provider/model-v1",
+        system: "system",
+        user: "user",
+        schemaName: "answer",
+        jsonSchema: { type: "object" },
+        outputSchema,
+        providerOnly: ["provider"],
+        zeroDataRetention: false,
+        maxOutputTokens: 1_000,
+      },
+      fetchMock,
+    );
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    ) as { provider: { zdr: boolean } };
+    expect(body.provider.zdr).toBe(false);
+  });
+
+  it("refuses a base URL outside OpenRouter before sending policy data", async () => {
+    // Die Hostliste bleibt geschlossen: der Betreiber wählt zwischen EU- und
+    // Standardroute, aber die Policy darf niemals an einen fremden Host gehen.
+    const fetchMock = vi.fn<typeof fetch>();
+    for (const baseUrl of [
+      "https://evil.example/api/v1",
+      "http://openrouter.ai/api/v1",
+      "https://openrouter.ai.evil.example/api/v1",
+    ]) {
+      await expect(
+        requestOpenRouterStructured(
+          {
+            apiKey: "test-key",
+            baseUrl,
+            modelId: "provider/model-v1",
+            system: "system",
+            user: "user",
+            schemaName: "answer",
+            jsonSchema: { type: "object" },
+            outputSchema,
+            providerOnly: ["provider"],
+            maxOutputTokens: 1_000,
+          },
+          fetchMock,
+        ),
+      ).rejects.toBeInstanceOf(ModelProviderError);
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

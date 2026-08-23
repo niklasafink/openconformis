@@ -32,6 +32,8 @@ import {
   getStrictAnalysisProviderConfiguration,
   isStrictAnalysisProviderAvailable,
   requestProviderStructured,
+  sponsoredPrivacyProfileId,
+  sponsoredZeroDataRetention,
 } from "@/server/ai/provider-routing";
 import { withTemporaryCredential } from "@/server/ai/temporary-credential-service";
 import { buildVerificationPrompt } from "@/server/ai/verification-prompt";
@@ -76,7 +78,7 @@ function sponsoredProviderConfiguration() {
   if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 16_000) {
     throw new Error("SPONSORED_MAX_OUTPUT_TOKENS_INVALID");
   }
-  return { apiKey, baseUrl, maxOutputTokens };
+  return { apiKey, baseUrl, maxOutputTokens, zeroDataRetention: sponsoredZeroDataRetention() };
 }
 
 async function requestStructuredForAnalysis<T>(
@@ -116,12 +118,29 @@ async function loadAnalysis(analysisId: string) {
   const [analysis] = await db.select().from(analyses).where(eq(analyses.id, analysisId)).limit(1);
   if (!analysis) throw new Error("ANALYSIS_NOT_FOUND");
   const routeProvider = aiRouteProviderSchema.safeParse(analysis.routeProvider);
+
+  // Der Lauf muss unter genau der Route ausgeführt werden, die beim Start
+  // eingefroren wurde. Zuvor stand hier ein fester Vergleich auf "eu-zdr-v1";
+  // das prüfte nicht die Unveränderlichkeit, sondern schrieb ein einzelnes
+  // Profil vor. Entscheidend ist, dass die Umgebung sich seit dem Start nicht
+  // still geändert hat — sonst entstünde ein Ergebnis unter anderen
+  // Datenschutzbedingungen als im Nachweis vermerkt.
+  const currentProfileId =
+    analysis.fundingMode === "sponsored"
+      ? sponsoredPrivacyProfileId({
+          baseUrl: process.env.SPONSORED_OPENROUTER_BASE_URL?.trim() ?? "",
+          zeroDataRetention: sponsoredZeroDataRetention(),
+        })
+      : routeProvider.success && isStrictAnalysisProviderAvailable(routeProvider.data)
+        ? getStrictAnalysisProviderConfiguration(routeProvider.data).privacyProfileId
+        : undefined;
+
   if (
     !routeProvider.success ||
     (analysis.fundingMode === "sponsored"
       ? analysis.routeProvider !== "openrouter"
       : !isStrictAnalysisProviderAvailable(routeProvider.data)) ||
-    analysis.privacyProfileId !== "eu-zdr-v1"
+    analysis.privacyProfileId !== currentProfileId
   ) {
     throw new Error("FROZEN_ROUTE_UNSUPPORTED");
   }

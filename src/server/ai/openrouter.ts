@@ -48,11 +48,16 @@ const openRouterResponseSchema = z.object({
     .optional(),
 });
 
+// Nur die beiden echten OpenRouter-Hosts. Die Liste bleibt geschlossen, damit die
+// Basis-URL nicht auf einen beliebigen Host zeigen kann; welcher der beiden
+// zulässig ist, entscheidet der Betreiber über die Konfiguration.
+const openRouterHosts = new Set(["eu.openrouter.ai", "openrouter.ai"]);
+
 function chatCompletionsUrl(baseUrl: string) {
   const url = new URL(baseUrl);
   if (
     url.protocol !== "https:" ||
-    url.hostname !== "eu.openrouter.ai" ||
+    !openRouterHosts.has(url.hostname) ||
     url.port ||
     url.pathname.replace(/\/$/u, "") !== "/api/v1"
   ) {
@@ -104,9 +109,15 @@ export async function requestOpenRouterStructured<T>(
         provider: {
           only: request.providerOnly,
           allow_fallbacks: false,
-          require_parameters: true,
+          // `require_parameters` ist hier bewusst nicht gesetzt: OpenRouter führt
+          // für manche Anbieter unvollständige Parameterlisten — für Claude etwa
+          // ohne `temperature` —, sodass die Prüfung fälschlich jeden Endpunkt
+          // ausschliesst. Die Fähigkeitszusage kommt stattdessen aus `only`, das
+          // genau einen geprüften Anbieter festlegt, und die Antwort wird
+          // ohnehin strikt gegen das Schema geparst: hält ein Anbieter es nicht
+          // ein, scheitert der Lauf sichtbar mit MODEL_OUTPUT_INVALID.
           data_collection: "deny",
-          zdr: true,
+          zdr: request.zeroDataRetention ?? true,
         },
       }),
       signal: AbortSignal.timeout(request.timeoutMilliseconds ?? 120_000),

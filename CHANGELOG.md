@@ -4,6 +4,22 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Made the sponsored OpenRouter route configurable instead of hard-wired to the
+  EU host with zero data retention forced on. Both stay the default; departing
+  from them is now an explicit operator decision via
+  `SPONSORED_OPENROUTER_ZDR`, and the base URL is still restricted to
+  OpenRouter's own hosts.
+- The privacy profile recorded on a run is now derived from the route that was
+  actually used, so a run without EU routing or without zero data retention can
+  no longer be filed as `eu-zdr-v1`.
+- Replaced the worker's fixed `eu-zdr-v1` precondition with the invariant it was
+  meant to express: the route at execution time must match the route frozen at
+  start, which catches configuration drift instead of pinning one profile.
+- Dropped `require_parameters` from the OpenRouter request. Its provider metadata
+  omits `temperature` for Claude endpoints, so the check excluded every endpoint
+  and no Claude model could be routed. The capability guarantee comes from the
+  pinned provider, and the response is still parsed strictly against the schema.
+
 - Fixed provider errors without an HTTP body reporting only
   ANALYSIS_RETRIES_EXHAUSTED. Every provider error now carries an explanation of
   its own — a base URL outside the permitted EU route, for instance, names the

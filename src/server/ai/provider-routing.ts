@@ -81,3 +81,30 @@ export function requestProviderStructured<T>(
       return requestOpenAiStructured(request, fetchImplementation);
   }
 }
+
+/**
+ * Leitet das Datenschutzprofil des gesponserten Laufs aus der tatsächlich
+ * konfigurierten Route ab, statt es frei setzen zu lassen.
+ *
+ * Ein Ergebnis, das mit abgeschaltetem Zero Data Retention oder ausserhalb der
+ * EU-Route entstanden ist, darf im Nachweis nicht als `eu-zdr-v1` erscheinen —
+ * das wäre eine falsche Zusage in genau dem Dokument, das die Zusage belegen soll.
+ */
+export function sponsoredPrivacyProfileId(input: {
+  baseUrl: string;
+  zeroDataRetention: boolean;
+}): string {
+  let euRoute = false;
+  try {
+    euRoute = new URL(input.baseUrl).hostname === "eu.openrouter.ai";
+  } catch {
+    euRoute = false;
+  }
+  if (euRoute && input.zeroDataRetention) return "eu-zdr-v1";
+  return `openrouter-${euRoute ? "eu" : "global"}-${input.zeroDataRetention ? "zdr" : "no-zdr"}-v1`;
+}
+
+/** Gesponserte Route: EU-Host und ZDR sind Standard, Abweichung ist ausdrücklich. */
+export function sponsoredZeroDataRetention() {
+  return process.env.SPONSORED_OPENROUTER_ZDR?.trim().toLowerCase() !== "false";
+}

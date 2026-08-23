@@ -12,6 +12,12 @@ export type StructuredModelRequest<T> = {
   jsonSchema: Record<string, unknown>;
   outputSchema: z.ZodType<T>;
   providerOnly?: string[];
+  /**
+   * Verlangt vom Anbieter Zero Data Retention. Standard ist an — abschalten ist
+   * eine bewusste Entscheidung des Betreibers und schlägt sich im Datenschutz-
+   * profil des Laufs nieder, damit ein Ergebnis nie strenger aussieht als es war.
+   */
+  zeroDataRetention?: boolean;
   maxOutputTokens: number;
   timeoutMilliseconds?: number;
 };
