@@ -2,3 +2,4 @@
 coverage
 enterprise-wireframe
 pnpm-lock.yaml
+src/app/.well-known/workflow/v1

@@ -45,6 +45,39 @@ test.describe("anonymous analysis setup", () => {
     await expect(page.getByRole("heading", { name: "Prüfungsumfang und Kontext" })).toBeVisible();
   });
 
+  test("shows an interactive locked result before opening registration", async ({ page }) => {
+    const pageErrors: Error[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error));
+    await page.goto("/de/analyses/new/framework?framework=dora");
+    await page.getByRole("button", { name: "Weiter" }).click();
+    await page.getByRole("button", { name: "Auswählen", exact: true }).click();
+    const unevaluatedWarning = page.locator(".scope-model-warning input");
+    await expect(unevaluatedWarning).toBeVisible();
+    await unevaluatedWarning.check();
+    await page.getByRole("button", { name: "Analyse starten" }).click();
+
+    await expect(page).toHaveURL(/\/de\/analyses\/new\/results\?/u);
+    await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u }).click();
+    await expect(
+      page.getByRole("heading", { name: "Schulung des Leitungsorgans zu IKT-Risiken" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Für Ergebnis registrieren" }).first().click();
+    await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toBeVisible();
+    await page.getByRole("tab", { name: "Passwort" }).click();
+    await page.getByLabel("E-Mail-Adresse").fill("origin-check-nobody@example.invalid");
+    await page.getByLabel("Passwort", { exact: true }).fill("not-a-real-password-123");
+    await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+    await expect(page.getByText("Die Anmeldung konnte nicht abgeschlossen werden.")).toBeVisible();
+    expect(pageErrors).toEqual([]);
+    await page.getByRole("button", { name: "Dialog schließen" }).click();
+    await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toHaveCount(0);
+  });
+
   test("serves the English workflow and production security headers", async ({ page }) => {
     const response = await page.goto("/en/analyses/new/framework");
 

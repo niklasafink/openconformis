@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { getSamplePolicyCanonicalText, samplePolicy } from "@/domain/policies/sample-policy";
 import { appendAuditEvent } from "@/server/audit/event";
@@ -85,6 +85,28 @@ export async function getCurrentPolicySelection(expectedDraftId?: string) {
     pageCount: selection.pageCount,
     persisted: true,
   } satisfies SelectedPolicy;
+}
+
+export async function getCurrentPolicyPreview(expectedDraftId?: string) {
+  const selection = await getCurrentPolicySelection(expectedDraftId);
+  if (!selection?.policyVersionId) return null;
+
+  const blocks = await db
+    .select({
+      id: documentBlocks.id,
+      blockKey: documentBlocks.blockKey,
+      ordinal: documentBlocks.ordinal,
+      blockType: documentBlocks.blockType,
+      canonicalText: documentBlocks.canonicalText,
+      headingPath: documentBlocks.headingPath,
+      pageNumber: documentBlocks.pageNumber,
+      paragraphNumber: documentBlocks.paragraphNumber,
+    })
+    .from(documentBlocks)
+    .where(eq(documentBlocks.policyVersionId, selection.policyVersionId))
+    .orderBy(asc(documentBlocks.ordinal));
+
+  return { selection, blocks };
 }
 
 export async function selectSamplePolicy(expectedDraftId?: string): Promise<SelectedPolicy> {

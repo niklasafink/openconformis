@@ -172,6 +172,7 @@
     "email": "E-Mail-Adresse",
     "magicLink": "Anmeldelink senden",
     "emailSent": "Der Anmeldelink wurde gesendet.",
+    "magicLinkBrowserHint": "Lassen Sie diesen Tab geöffnet und öffnen Sie den Link im selben Browserprofil.",
     "magicLinkMode": "Anmeldelink",
     "passwordMode": "Passwort",
     "password": "Passwort",
@@ -190,7 +191,9 @@
     "connecting": "Wird geprüft …",
     "keyLink": "API-Key erstellen",
     "keyFailed": "Der Schlüssel oder Modellzugriff konnte nicht bestätigt werden.",
-    "privacyAttestation": "Ich bestätige, dass für dieses Providerprojekt Zero Data Retention aktiviert ist und die gewählte Modellroute ausschließlich in der EU verarbeitet."
+    "privacyAttestation": "Ich bestätige, dass für dieses Providerprojekt Zero Data Retention aktiviert ist und die gewählte Modellroute ausschließlich in der EU verarbeitet.",
+    "unlockResult": "Für Ergebnis registrieren",
+    "close": "Dialog schließen"
   },
   "AnalysisRun": {
     "title": "Analyse Ihrer Policy",

@@ -13,7 +13,7 @@ import {
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { requireSessionPrincipal } from "@/server/auth/session-principal";
-import { requireVerifiedSessionUser } from "@/server/auth/session-user";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import { analyses } from "@/server/db/schema/analyses";
 import {
@@ -250,13 +250,13 @@ export async function executeChatTurn(
   const input = createTurnSchema.parse(rawInput);
   const [principal, user, selection] = await Promise.all([
     requireSessionPrincipal(),
-    requireVerifiedSessionUser(),
+    requireAuthenticatedSessionUser(),
     resolveChatModelSelection({
       modelProfileId: input.modelProfileId,
       catalogueVersion: input.modelCatalogueVersion,
     }),
   ]);
-  if (!principal.emailVerified || principal.userId !== user.id) {
+  if (principal.userId !== user.id) {
     throw new ChatServiceError("CHAT_THREAD_NOT_FOUND");
   }
   if (!selection.model.evaluated && !input.unevaluatedWarningAccepted) {
@@ -389,7 +389,7 @@ export async function executeChatTurn(
 export async function listRecentChatThreads() {
   const [principal, user] = await Promise.all([
     requireSessionPrincipal(),
-    requireVerifiedSessionUser(),
+    requireAuthenticatedSessionUser(),
   ]);
   if (principal.userId !== user.id) return [];
   return db

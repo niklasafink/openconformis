@@ -4,7 +4,10 @@ import { z } from "zod";
 import { getOwnedAnalysisExportData } from "@/server/analyses/read-analysis";
 import { appendAuditEvent } from "@/server/audit/event";
 import { AuthenticationRequiredError } from "@/server/auth/session-principal";
-import { requireVerifiedSessionUser, VerifiedEmailRequiredError } from "@/server/auth/session-user";
+import {
+  requireAuthenticatedSessionUser,
+  VerifiedEmailRequiredError,
+} from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import { buildAnalysisXlsx, createAnalysisExportFilename } from "@/server/exports/analysis-xlsx";
 
@@ -16,7 +19,7 @@ const maximumWorkbookBytes = 16 * 1024 * 1024;
 
 export async function GET(_request: Request, context: { params: Promise<{ analysisId: string }> }) {
   try {
-    const user = await requireVerifiedSessionUser();
+    const user = await requireAuthenticatedSessionUser();
     const { analysisId: rawAnalysisId } = await context.params;
     const analysisId = analysisIdSchema.parse(rawAnalysisId);
     const analysis = await getOwnedAnalysisExportData({ analysisId, ownerUserId: user.id });

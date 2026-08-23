@@ -11,20 +11,19 @@ export class VerifiedEmailRequiredError extends Error {
   }
 }
 
-export type VerifiedSessionUser = {
+export type AuthenticatedSessionUser = {
   id: string;
   sessionId: string;
   name: string;
   email: string;
-  emailVerified: true;
+  emailVerified: boolean;
 };
 
-export async function requireVerifiedSessionUser(): Promise<VerifiedSessionUser> {
+export async function requireAuthenticatedSessionUser(): Promise<AuthenticatedSessionUser> {
   if (!isAuthenticationConfigured) throw new AuthenticationRequiredError();
 
   const { data: session, error } = await auth.getSession();
   if (error || !session?.user || !session.session) throw new AuthenticationRequiredError();
-  if (!session.user.emailVerified) throw new VerifiedEmailRequiredError();
 
   await ensureApplicationUser(session.user);
 
@@ -33,6 +32,12 @@ export async function requireVerifiedSessionUser(): Promise<VerifiedSessionUser>
     sessionId: session.session.id,
     name: session.user.name,
     email: session.user.email,
-    emailVerified: true,
+    emailVerified: session.user.emailVerified,
   };
+}
+
+export async function requireVerifiedSessionUser() {
+  const user = await requireAuthenticatedSessionUser();
+  if (!user.emailVerified) throw new VerifiedEmailRequiredError();
+  return { ...user, emailVerified: true as const };
 }

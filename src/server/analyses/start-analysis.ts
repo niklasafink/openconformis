@@ -9,7 +9,7 @@ import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { getActiveAnalysisInstructionPair } from "@/server/ai/analysis-instruction-service";
 import { getStrictAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
-import { requireVerifiedSessionUser } from "@/server/auth/session-user";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { db, isDatabaseConfigured } from "@/server/db/client";
 import {
@@ -164,7 +164,7 @@ async function startAnalysis(input: {
   if (!isDatabaseConfigured) throw new AnalysisStartError("DATABASE_UNAVAILABLE");
 
   const [user, boundDraft, sponsoredRoute, instructions] = await Promise.all([
-    requireVerifiedSessionUser(),
+    requireAuthenticatedSessionUser(),
     getBoundActiveDraft(input.expectedDraftId),
     input.fundingMode === "sponsored" ? Promise.resolve().then(readSponsoredRoute) : undefined,
     getActiveAnalysisInstructionPair(),

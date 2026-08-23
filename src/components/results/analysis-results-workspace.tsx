@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Download, FileText, Pencil, X } from "lucide-react";
+import { ChevronDown, Download, FileText, LockKeyhole, Pencil, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type ResultStatus =
@@ -10,7 +10,7 @@ export type ResultStatus =
   | "not_applicable"
   | "no_assessment_possible";
 
-type ResultItem = {
+export type ResultItem = {
   id: string;
   regulatoryId: string;
   title: string;
@@ -40,7 +40,7 @@ type ResultItem = {
   }>;
 };
 
-type DocumentBlock = {
+export type DocumentBlock = {
   id: string;
   blockKey: string;
   ordinal: number;
@@ -51,7 +51,7 @@ type DocumentBlock = {
   paragraphNumber: number | null;
 };
 
-type Labels = {
+export type AnalysisResultLabels = {
   checked: string;
   status: Record<ResultStatus, string>;
   requirement: string;
@@ -99,7 +99,12 @@ type AnalysisResultsWorkspaceProps = {
   policyName: string;
   organizationContext: string;
   items: ResultItem[];
-  labels: Labels;
+  labels: AnalysisResultLabels;
+  lockedPreview?: {
+    documentBlocks: DocumentBlock[];
+    unlockLabel: string;
+    onUnlock: () => void;
+  };
 };
 
 export function splitEvidenceHighlight(text: string, quote: string) {
@@ -132,6 +137,7 @@ export function AnalysisResultsWorkspace({
   organizationContext,
   items,
   labels,
+  lockedPreview,
 }: AnalysisResultsWorkspaceProps) {
   const initialId = items.some(({ id }) => id === initialSelectedId)
     ? initialSelectedId
@@ -143,10 +149,12 @@ export function AnalysisResultsWorkspace({
   );
   const [savingConfirmationId, setSavingConfirmationId] = useState<string>();
   const [confirmationError, setConfirmationError] = useState(false);
-  const [documentBlocks, setDocumentBlocks] = useState<DocumentBlock[]>();
+  const [documentBlocks, setDocumentBlocks] = useState<DocumentBlock[] | undefined>(
+    lockedPreview?.documentBlocks,
+  );
   const [documentError, setDocumentError] = useState(false);
-  const [activeEvidenceId, setActiveEvidenceId] = useState<string | undefined>(
-    () => items.find(({ id }) => id === initialId)?.evidence[0]?.id,
+  const [activeEvidenceId, setActiveEvidenceId] = useState<string | undefined>(() =>
+    lockedPreview ? undefined : items.find(({ id }) => id === initialId)?.evidence[0]?.id,
   );
   const [hoveredEvidenceId, setHoveredEvidenceId] = useState<string>();
   const [mobilePane, setMobilePane] = useState<"assessment" | "policy">("assessment");
@@ -178,6 +186,7 @@ export function AnalysisResultsWorkspace({
   );
 
   useEffect(() => {
+    if (lockedPreview) return;
     let current = true;
     void fetch(`/api/analyses/${analysisId}/document`, { credentials: "same-origin" })
       .then(async (response) => {
@@ -193,7 +202,7 @@ export function AnalysisResultsWorkspace({
     return () => {
       current = false;
     };
-  }, [analysisId]);
+  }, [analysisId, lockedPreview]);
 
   if (!selected) return null;
   const selectedForReview = selected;
@@ -206,7 +215,9 @@ export function AnalysisResultsWorkspace({
 
   function selectRequirement(id: string) {
     setSelectedId(id);
-    setActiveEvidenceId(reviewItems.find((item) => item.id === id)?.evidence[0]?.id);
+    setActiveEvidenceId(
+      lockedPreview ? undefined : reviewItems.find((item) => item.id === id)?.evidence[0]?.id,
+    );
     setHoveredEvidenceId(undefined);
     setConfirmationError(false);
     const url = new URL(window.location.href);
@@ -307,18 +318,41 @@ export function AnalysisResultsWorkspace({
         <span>
           <strong>{reviewItems.length}</strong> {labels.checked}
         </span>
-        {statuses.map((status) => (
-          <span key={status} data-result-status={status}>
-            <i aria-hidden="true" />
-            <strong>{counts[status]}</strong> {labels.status[status]}
-          </span>
-        ))}
+        <div className="result-summary-statuses" data-preview-locked={!!lockedPreview || undefined}>
+          <div className={lockedPreview ? "result-preview-blur" : undefined}>
+            {statuses.map((status) => (
+              <span key={status} data-result-status={status}>
+                <i aria-hidden="true" />
+                <strong>{counts[status]}</strong> {labels.status[status]}
+              </span>
+            ))}
+          </div>
+          {lockedPreview ? (
+            <button
+              type="button"
+              className="result-preview-unlock result-preview-unlock-inline"
+              onClick={lockedPreview.onUnlock}
+            >
+              <LockKeyhole size={14} aria-hidden="true" />
+              {lockedPreview.unlockLabel}
+            </button>
+          ) : null}
+        </div>
         <div className="result-summary-actions">
-          <span>{confirmationCountLabel}</span>
-          <a className="result-export-button" href={`/api/analyses/${analysisId}/export/xlsx`}>
-            <Download size={16} aria-hidden="true" />
-            {labels.exportExcel}
-          </a>
+          {lockedPreview ? (
+            <button type="button" className="result-export-button" onClick={lockedPreview.onUnlock}>
+              <LockKeyhole size={15} aria-hidden="true" />
+              {labels.exportExcel}
+            </button>
+          ) : (
+            <>
+              <span>{confirmationCountLabel}</span>
+              <a className="result-export-button" href={`/api/analyses/${analysisId}/export/xlsx`}>
+                <Download size={16} aria-hidden="true" />
+                {labels.exportExcel}
+              </a>
+            </>
+          )}
         </div>
       </div>
 
@@ -357,7 +391,13 @@ export function AnalysisResultsWorkspace({
                   <strong>{item.regulatoryId}</strong>
                   <small>{item.title}</small>
                 </span>
-                <i data-result-status={item.status} aria-label={labels.status[item.status]} />
+                <i
+                  data-result-status={item.status}
+                  data-preview-locked={!!lockedPreview || undefined}
+                  aria-label={
+                    lockedPreview ? lockedPreview.unlockLabel : labels.status[item.status]
+                  }
+                />
               </button>
             ))}
           </div>
@@ -398,7 +438,19 @@ export function AnalysisResultsWorkspace({
                   </span>
                 </label>
               ) : null}
-              {canOverride ? (
+              {lockedPreview ? (
+                <button
+                  type="button"
+                  className="result-preview-status-lock"
+                  onClick={lockedPreview.onUnlock}
+                >
+                  <span className="result-status-pill" data-result-status={selected.status}>
+                    {labels.status[selected.status]}
+                  </span>
+                  <LockKeyhole size={14} aria-hidden="true" />
+                  <span>{lockedPreview.unlockLabel}</span>
+                </button>
+              ) : canOverride ? (
                 <button
                   type="button"
                   className="result-status-pill result-status-button"
@@ -447,62 +499,76 @@ export function AnalysisResultsWorkspace({
                 <span>{labels.assessment}</span>
                 <ChevronDown size={16} aria-hidden="true" />
               </summary>
-              <p>{selected.explanation}</p>
-              {selected.evidence.length > 0 ? (
-                <div className="result-citation-links" aria-label={labels.evidence}>
-                  {selected.evidence.map((evidence) => (
-                    <button
-                      key={evidence.id}
-                      type="button"
-                      data-active={
-                        evidence.id === (hoveredEvidenceId ?? activeEvidenceId) || undefined
-                      }
-                      aria-label={`${labels.openEvidence} ${evidence.citationOrder}`}
-                      onMouseEnter={() => setHoveredEvidenceId(evidence.id)}
-                      onMouseLeave={() => setHoveredEvidenceId(undefined)}
-                      onFocus={() => setHoveredEvidenceId(evidence.id)}
-                      onBlur={() => setHoveredEvidenceId(undefined)}
-                      onClick={() => openEvidence(evidence.id, evidence.documentBlockId)}
-                    >
-                      {evidence.citationOrder}
-                    </button>
-                  ))}
+              <div className="result-preview-lockable" data-locked={!!lockedPreview || undefined}>
+                <div className={lockedPreview ? "result-preview-blur" : undefined}>
+                  <p>{selected.explanation}</p>
+                  {selected.evidence.length > 0 ? (
+                    <div className="result-citation-links" aria-label={labels.evidence}>
+                      {selected.evidence.map((evidence) => (
+                        <button
+                          key={evidence.id}
+                          type="button"
+                          data-active={
+                            evidence.id === (hoveredEvidenceId ?? activeEvidenceId) || undefined
+                          }
+                          aria-label={`${labels.openEvidence} ${evidence.citationOrder}`}
+                          onMouseEnter={() => setHoveredEvidenceId(evidence.id)}
+                          onMouseLeave={() => setHoveredEvidenceId(undefined)}
+                          onFocus={() => setHoveredEvidenceId(evidence.id)}
+                          onBlur={() => setHoveredEvidenceId(undefined)}
+                          onClick={() => openEvidence(evidence.id, evidence.documentBlockId)}
+                        >
+                          {evidence.citationOrder}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <dl className="result-assessment-meta">
+                    <div>
+                      <dt>{labels.aiStatus}</dt>
+                      <dd>{labels.status[selected.aiStatus]}</dd>
+                    </div>
+                    <div>
+                      <dt>{labels.confidence}</dt>
+                      <dd>{selected.confidencePercent}%</dd>
+                    </div>
+                  </dl>
+                  {selected.override ? (
+                    <div className="result-override-note">
+                      <strong>
+                        {labels.manualOverride}: {labels.status[selected.override.status]}
+                      </strong>
+                      <span>{selected.override.reason}</span>
+                      <time dateTime={selected.override.createdAt}>
+                        {new Intl.DateTimeFormat(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(selected.override.createdAt))}
+                      </time>
+                    </div>
+                  ) : null}
+                  {selected.missingInformation.length > 0 ? (
+                    <div className="result-missing-information">
+                      <strong>{labels.missingInformation}</strong>
+                      <ul>
+                        {selected.missingInformation.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              <dl className="result-assessment-meta">
-                <div>
-                  <dt>{labels.aiStatus}</dt>
-                  <dd>{labels.status[selected.aiStatus]}</dd>
-                </div>
-                <div>
-                  <dt>{labels.confidence}</dt>
-                  <dd>{selected.confidencePercent}%</dd>
-                </div>
-              </dl>
-              {selected.override ? (
-                <div className="result-override-note">
-                  <strong>
-                    {labels.manualOverride}: {labels.status[selected.override.status]}
-                  </strong>
-                  <span>{selected.override.reason}</span>
-                  <time dateTime={selected.override.createdAt}>
-                    {new Intl.DateTimeFormat(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(selected.override.createdAt))}
-                  </time>
-                </div>
-              ) : null}
-              {selected.missingInformation.length > 0 ? (
-                <div className="result-missing-information">
-                  <strong>{labels.missingInformation}</strong>
-                  <ul>
-                    {selected.missingInformation.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+                {lockedPreview ? (
+                  <button
+                    type="button"
+                    className="result-preview-unlock"
+                    onClick={lockedPreview.onUnlock}
+                  >
+                    <LockKeyhole size={16} aria-hidden="true" />
+                    {lockedPreview.unlockLabel}
+                  </button>
+                ) : null}
+              </div>
             </details>
             <details className="result-section result-evidence-section" open>
               <summary>
@@ -511,38 +577,53 @@ export function AnalysisResultsWorkspace({
                 </span>
                 <ChevronDown size={16} aria-hidden="true" />
               </summary>
-              <div className="result-evidence-list">
-                {selected.evidence.length === 0 ? (
-                  <p className="result-empty-evidence">{labels.noEvidence}</p>
-                ) : (
-                  selected.evidence.map((evidence) => (
-                    <button
-                      key={evidence.id}
-                      type="button"
-                      className="result-evidence-row"
-                      data-active={
-                        evidence.id === (hoveredEvidenceId ?? activeEvidenceId) || undefined
-                      }
-                      onMouseEnter={() => setHoveredEvidenceId(evidence.id)}
-                      onMouseLeave={() => setHoveredEvidenceId(undefined)}
-                      onFocus={() => setHoveredEvidenceId(evidence.id)}
-                      onBlur={() => setHoveredEvidenceId(undefined)}
-                      onClick={() => openEvidence(evidence.id, evidence.documentBlockId)}
-                    >
-                      <span>{evidence.citationOrder}</span>
-                      <span>
-                        <q>{evidence.exactQuote}</q>
-                        <small>
-                          {evidence.pageNumber ? `${labels.page} ${evidence.pageNumber}` : ""}
-                          {evidence.pageNumber && evidence.paragraphNumber ? " · " : ""}
-                          {evidence.paragraphNumber
-                            ? `${labels.paragraph} ${evidence.paragraphNumber}`
-                            : ""}
-                        </small>
-                      </span>
-                    </button>
-                  ))
-                )}
+              <div
+                className="result-evidence-list result-preview-lockable"
+                data-locked={!!lockedPreview || undefined}
+              >
+                <div className={lockedPreview ? "result-preview-blur" : undefined}>
+                  {selected.evidence.length === 0 ? (
+                    <p className="result-empty-evidence">{labels.noEvidence}</p>
+                  ) : (
+                    selected.evidence.map((evidence) => (
+                      <button
+                        key={evidence.id}
+                        type="button"
+                        className="result-evidence-row"
+                        data-active={
+                          evidence.id === (hoveredEvidenceId ?? activeEvidenceId) || undefined
+                        }
+                        onMouseEnter={() => setHoveredEvidenceId(evidence.id)}
+                        onMouseLeave={() => setHoveredEvidenceId(undefined)}
+                        onFocus={() => setHoveredEvidenceId(evidence.id)}
+                        onBlur={() => setHoveredEvidenceId(undefined)}
+                        onClick={() => openEvidence(evidence.id, evidence.documentBlockId)}
+                      >
+                        <span>{evidence.citationOrder}</span>
+                        <span>
+                          <q>{evidence.exactQuote}</q>
+                          <small>
+                            {evidence.pageNumber ? `${labels.page} ${evidence.pageNumber}` : ""}
+                            {evidence.pageNumber && evidence.paragraphNumber ? " · " : ""}
+                            {evidence.paragraphNumber
+                              ? `${labels.paragraph} ${evidence.paragraphNumber}`
+                              : ""}
+                          </small>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                {lockedPreview ? (
+                  <button
+                    type="button"
+                    className="result-preview-unlock"
+                    onClick={lockedPreview.onUnlock}
+                  >
+                    <LockKeyhole size={16} aria-hidden="true" />
+                    {lockedPreview.unlockLabel}
+                  </button>
+                ) : null}
               </div>
             </details>
           </div>

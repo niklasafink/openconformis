@@ -11,7 +11,7 @@ import {
   getOwnedAnalysisResultWorkspace,
   getOwnedAnalysisStatus,
 } from "@/server/analyses/read-analysis";
-import { requireVerifiedSessionUser } from "@/server/auth/session-user";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { requireSessionPrincipal } from "@/server/auth/session-principal";
 import { canConfirmAssessment, canOverrideAssessment } from "@/server/analyses/review-analysis";
 import { isDatabaseConfigured } from "@/server/db/client";
@@ -27,7 +27,7 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
   setRequestLocale(locale);
 
   const [user, principal] = await Promise.all([
-    requireVerifiedSessionUser().catch(() => null),
+    requireAuthenticatedSessionUser().catch(() => null),
     requireSessionPrincipal().catch(() => null),
   ]);
   if (!user) notFound();

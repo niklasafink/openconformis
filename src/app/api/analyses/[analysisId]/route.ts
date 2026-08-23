@@ -4,7 +4,10 @@ import { z } from "zod";
 import { getOwnedAnalysisStatus } from "@/server/analyses/read-analysis";
 import { requestAnalysisDeletion } from "@/server/analyses/delete-analysis";
 import { AuthenticationRequiredError } from "@/server/auth/session-principal";
-import { requireVerifiedSessionUser, VerifiedEmailRequiredError } from "@/server/auth/session-user";
+import {
+  requireAuthenticatedSessionUser,
+  VerifiedEmailRequiredError,
+} from "@/server/auth/session-user";
 import { hasTrustedApplicationOrigin } from "@/server/security/trusted-origin";
 
 export const runtime = "nodejs";
@@ -14,7 +17,7 @@ const analysisIdSchema = z.uuid();
 
 export async function GET(_request: Request, context: { params: Promise<{ analysisId: string }> }) {
   try {
-    const user = await requireVerifiedSessionUser();
+    const user = await requireAuthenticatedSessionUser();
     const { analysisId: rawAnalysisId } = await context.params;
     const analysisId = analysisIdSchema.parse(rawAnalysisId);
     const analysis = await getOwnedAnalysisStatus({ analysisId, ownerUserId: user.id });

@@ -1648,9 +1648,9 @@ a {
 
 .preview-result-layout {
   position: relative;
-  min-height: calc(100dvh - 56px);
+  height: calc(100dvh - 56px);
+  min-height: 620px;
   overflow: hidden;
-  padding: 44px;
 }
 
 .preview-result {
@@ -1708,16 +1708,45 @@ a {
 }
 
 .preview-auth-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: relative;
   width: min(440px, calc(100% - 48px));
-  transform: translate(-50%, -50%);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
   padding: 28px;
   box-shadow: 0 22px 70px rgb(15 23 42 / 22%);
+}
+
+.preview-auth-backdrop {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: rgb(18 24 38 / 38%);
+  backdrop-filter: blur(2px);
+}
+
+.preview-auth-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.preview-auth-close:hover {
+  color: var(--text-primary);
+  background: var(--surface-subtle);
 }
 
 .preview-lock {
@@ -1905,6 +1934,14 @@ a {
   background: #eef8f3;
   padding: 12px;
   color: #176844;
+}
+
+.preview-email-sent small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .preview-authenticated-notice {
@@ -2509,7 +2546,12 @@ a {
   background: var(--surface);
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   text-decoration: none;
+}
+
+button.result-export-button {
+  cursor: pointer;
 }
 
 .result-export-button:hover {
@@ -2553,6 +2595,27 @@ a {
 .result-summary > span:first-child {
   min-width: 112px;
   color: var(--text-primary);
+}
+
+.result-summary-statuses {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.result-summary-statuses > div:first-child {
+  display: flex;
+}
+
+.result-summary-statuses > div:first-child > span {
+  display: flex;
+  min-width: 138px;
+  align-items: center;
+  gap: 8px;
+  border-right: 1px solid var(--border);
+  padding: 0 20px;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .result-summary strong {
@@ -2691,6 +2754,10 @@ i[data-result-status="no_assessment_possible"] {
   white-space: nowrap;
 }
 
+.result-list-row > i[data-preview-locked="true"] {
+  filter: blur(3px);
+}
+
 .result-detail-header {
   display: flex;
   min-height: 82px;
@@ -2786,6 +2853,38 @@ i[data-result-status="no_assessment_possible"] {
   filter: brightness(0.97);
 }
 
+.result-preview-status-lock {
+  position: relative;
+  display: inline-flex;
+  min-height: 32px;
+  cursor: pointer;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0 9px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.result-preview-status-lock .result-status-pill {
+  position: absolute;
+  inset: 3px;
+  justify-content: center;
+  filter: blur(5px);
+  opacity: 0.72;
+}
+
+.result-preview-status-lock > svg,
+.result-preview-status-lock > span:last-child {
+  position: relative;
+  z-index: 1;
+}
+
 .result-status-pill[data-result-status="fulfilled"] {
   border-color: #c8e8dc;
   background: var(--status-met-bg);
@@ -2863,6 +2962,50 @@ i[data-result-status="no_assessment_possible"] {
 .result-ai-section summary,
 .result-ai-section p {
   background: #f4f5f6;
+}
+
+.result-preview-lockable {
+  position: relative;
+  min-height: 92px;
+}
+
+.result-preview-blur {
+  user-select: none;
+  filter: blur(6px);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.result-preview-unlock {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  min-height: 34px;
+  cursor: pointer;
+  align-items: center;
+  gap: 7px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0 11px;
+  box-shadow: 0 3px 12px rgb(15 23 42 / 10%);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.result-preview-unlock:hover {
+  border-color: var(--selection);
+  color: var(--selection);
+}
+
+.result-preview-unlock-inline {
+  min-height: 30px;
 }
 
 .result-assessment-meta {

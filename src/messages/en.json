@@ -172,6 +172,7 @@
     "email": "Email address",
     "magicLink": "Send sign-in link",
     "emailSent": "The sign-in link has been sent.",
+    "magicLinkBrowserHint": "Keep this tab open and open the link in the same browser profile.",
     "magicLinkMode": "Sign-in link",
     "passwordMode": "Password",
     "password": "Password",
@@ -190,7 +191,9 @@
     "connecting": "Validating …",
     "keyLink": "Create API key",
     "keyFailed": "The key or model access could not be confirmed.",
-    "privacyAttestation": "I confirm that Zero Data Retention is enabled for this provider project and the selected model route is processed exclusively in the EU."
+    "privacyAttestation": "I confirm that Zero Data Retention is enabled for this provider project and the selected model route is processed exclusively in the EU.",
+    "unlockResult": "Register to view result",
+    "close": "Close dialog"
   },
   "AnalysisRun": {
     "title": "Analysis of your policy",

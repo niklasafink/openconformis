@@ -12,7 +12,7 @@ import {
 } from "@/domain/ai/provider";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
-import { requireVerifiedSessionUser } from "@/server/auth/session-user";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import { aiCredentials } from "@/server/db/schema/ai";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
@@ -78,7 +78,7 @@ export async function createTemporaryCredential(input: {
   secret: string;
   privacyAttestationAccepted?: boolean;
 }) {
-  const user = await requireVerifiedSessionUser();
+  const user = await requireAuthenticatedSessionUser();
   const provider = aiRouteProviderSchema.parse(input.provider);
   const purpose = aiCredentialPurposeSchema.parse(input.purpose);
   if (
@@ -219,7 +219,7 @@ export async function createTemporaryCredential(input: {
 }
 
 export async function revokeTemporaryCredential(credentialId: string) {
-  const user = await requireVerifiedSessionUser();
+  const user = await requireAuthenticatedSessionUser();
   const now = new Date();
   return db.transaction(async (transaction) => {
     const [revoked] = await transaction
@@ -259,7 +259,7 @@ export async function revokeTemporaryCredential(credentialId: string) {
 }
 
 export async function listActiveTemporaryCredentials(purpose: AiCredentialPurpose) {
-  const user = await requireVerifiedSessionUser();
+  const user = await requireAuthenticatedSessionUser();
   return db
     .select({
       credentialId: aiCredentials.id,

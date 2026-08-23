@@ -3,7 +3,10 @@ import { z } from "zod";
 
 import { getOwnedAnalysisDocumentBlocks } from "@/server/analyses/read-analysis";
 import { AuthenticationRequiredError } from "@/server/auth/session-principal";
-import { VerifiedEmailRequiredError, requireVerifiedSessionUser } from "@/server/auth/session-user";
+import {
+  VerifiedEmailRequiredError,
+  requireAuthenticatedSessionUser,
+} from "@/server/auth/session-user";
 
 export const runtime = "nodejs";
 
@@ -13,7 +16,7 @@ export async function GET(_request: Request, context: { params: Promise<{ analys
   try {
     const [{ analysisId }, user] = await Promise.all([
       paramsSchema.parseAsync(await context.params),
-      requireVerifiedSessionUser(),
+      requireAuthenticatedSessionUser(),
     ]);
     const result = await getOwnedAnalysisDocumentBlocks({ analysisId, ownerUserId: user.id });
     if (!result) return NextResponse.json({ code: "ANALYSIS_NOT_FOUND" }, { status: 404 });
