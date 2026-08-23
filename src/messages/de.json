@@ -273,7 +273,10 @@
       "verification": "Bewertungen verifizieren",
       "finalizing": "Ergebnis aufbereiten",
       "completed": "Abgeschlossen"
-    }
+    },
+    "failureTitle": "Der Lauf ist fehlgeschlagen",
+    "failureUnknown": "Die Ursache wurde nicht festgehalten.",
+    "failureHint": "Die Meldung stammt vom Modellanbieter. Bei Konfigurations- oder Zugangsfehlern muss sie in der Administration behoben werden; der Gratislauf wurde wieder freigegeben."
   },
   "Auth": {
     "title": "Anmelden oder Konto erstellen",

@@ -8,7 +8,17 @@ import { db } from "@/server/db/client";
 import { sponsoredRunGrants } from "@/server/db/schema/application";
 import { analyses } from "@/server/db/schema/analyses";
 
-export async function markAnalysisRetriesExhausted(analysisId: string) {
+export type AnalysisFailure = {
+  /** Fachlicher Fehlercode; der Standard bedeutet „alle Versuche verbraucht". */
+  failureCode?: string;
+  /** Gekürzte Begründung des Anbieters, falls vorhanden. */
+  failureDetail?: string;
+};
+
+export async function markAnalysisRetriesExhausted(
+  analysisId: string,
+  failure: AnalysisFailure = {},
+) {
   const result = await db.transaction(async (transaction) => {
     await transaction.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${analysisId}, 0))`,
@@ -22,6 +32,7 @@ export async function markAnalysisRetriesExhausted(analysisId: string) {
         sourceDraftId: analyses.sourceDraftId,
         sponsoredGrantId: analyses.sponsoredGrantId,
         fundingMode: analyses.fundingMode,
+        failureDetail: analyses.failureDetail,
       })
       .from(analyses)
       .where(eq(analyses.id, analysisId))
@@ -45,7 +56,13 @@ export async function markAnalysisRetriesExhausted(analysisId: string) {
       .update(analyses)
       .set({
         status: "failed",
-        failureCode: "ANALYSIS_RETRIES_EXHAUSTED",
+        // Wurde im Schritt bereits eine Anbieterbegründung festgehalten, war der
+        // Lauf nicht an erschöpften Versuchen, sondern an einer Ablehnung gescheitert.
+        failureCode:
+          failure.failureCode ??
+          (analysis.failureDetail ? "PROVIDER_REJECTED" : "ANALYSIS_RETRIES_EXHAUSTED"),
+        // Ein im Schritt erfasstes Anbieterdetail nicht durch null ersetzen.
+        ...(failure.failureDetail ? { failureDetail: failure.failureDetail } : {}),
         updatedAt: failedAt,
       })
       .where(and(eq(analyses.id, analysis.id), inArray(analyses.status, ["queued", "running"])))
@@ -76,7 +93,12 @@ export async function markAnalysisRetriesExhausted(analysisId: string) {
       action: "analysis.failed",
       targetType: "analysis",
       targetId: analysis.id,
-      metadata: { failureCode: "ANALYSIS_RETRIES_EXHAUSTED" },
+      metadata: {
+        failureCode:
+          failure.failureCode ??
+          (analysis.failureDetail ? "PROVIDER_REJECTED" : "ANALYSIS_RETRIES_EXHAUSTED"),
+        ...(failure.failureDetail ? { failureDetail: failure.failureDetail } : {}),
+      },
     });
     return {
       changed: true as const,

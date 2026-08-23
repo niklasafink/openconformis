@@ -133,6 +133,7 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
             analysisId={analysis.id}
             frameworkSlug={analysis.frameworkSlug}
             requirementCount={analysis.requirementCount}
+            failure={{ code: analysis.failureCode, detail: analysis.failureDetail }}
             createdAtLabel={new Intl.DateTimeFormat(locale, {
               dateStyle: "medium",
               timeStyle: "short",
@@ -144,6 +145,9 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
             }}
             labels={{
               title: t("title"),
+              failureTitle: t("failureTitle"),
+              failureUnknown: t("failureUnknown"),
+              failureHint: t("failureHint"),
               progressLabel: t("progressLabel"),
               stageLabel: t("stageLabel"),
               requirementsLabel: t("requirementsLabel"),

@@ -4,6 +4,19 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed a sponsored analysis being startable only once. A failed run returns its
+  free-run grant but keeps the link the funding check requires, and the unique
+  index over that link then blocked every later attempt with an internal error.
+  The index now covers only runs that still hold the grant.
+- Fixed re-analysing the same document failing with an internal error. Policy
+  versions are content-addressed per organization, so the claim now reuses an
+  existing version instead of inserting a duplicate.
+- Fixed a failed run reporting only "failed". The provider's reason is recorded
+  and shown, and the status distinguishes a rejected provider call from genuinely
+  exhausted retries.
+- Fixed permanent provider errors being retried three more times. A rejected
+  route, an unknown model or an invalid key now ends the run immediately.
+
 - Added `pnpm dev:https` and `pnpm dev:certs` so local sign-in works in Safari
   and Firefox, which discard the `__Secure-` prefixed Neon Auth cookies over
   plain http. `pnpm dev` is unchanged.

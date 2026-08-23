@@ -270,6 +270,7 @@ async function failInvocation(
   startedAt: number,
   error: unknown,
   outputHash?: string,
+  analysisId?: string,
 ) {
   await db
     .update(analysisModelInvocations)
@@ -281,6 +282,17 @@ async function failInvocation(
       completedAt: new Date(),
     })
     .where(eq(analysisModelInvocations.id, invocationId));
+
+  // Die Begründung des Anbieters hier festhalten, solange sie vorliegt. Über die
+  // Grenze eines Workflow-Schritts hinweg übersteht der Fehler nur seinen Typ,
+  // nicht seine Meldung — der abschliessende Fehlschritt sähe sonst wieder nur
+  // „alle Versuche verbraucht" und die eigentliche Ursache wäre verloren.
+  const detail = error instanceof ModelProviderError ? error.detail : undefined;
+  if (!analysisId || !detail) return;
+  await db
+    .update(analyses)
+    .set({ failureDetail: detail })
+    .where(and(eq(analyses.id, analysisId), isNull(analyses.failureDetail)));
 }
 
 function requirementFromScope(scope: ScopeRecord["scope"]) {
@@ -478,7 +490,7 @@ async function assessItem(
         deterministicFallback: false,
       };
     } catch (error) {
-      await failInvocation(invocationId, startedAt, error, outputHash);
+      await failInvocation(invocationId, startedAt, error, outputHash, analysis.id);
       if (error instanceof ModelProviderError) {
         if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw error;
         continue;
@@ -565,7 +577,7 @@ async function verifyItem(
       await finishInvocation(invocationId, startedAt, response, outputHash);
       return { result: response.output, inputHash, outputHash };
     } catch (error) {
-      await failInvocation(invocationId, startedAt, error);
+      await failInvocation(invocationId, startedAt, error, undefined, analysis.id);
       if (error instanceof ModelProviderError) {
         if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw error;
         continue;

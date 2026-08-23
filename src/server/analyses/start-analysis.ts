@@ -377,19 +377,40 @@ async function startAnalysis(input: {
           inArray(policyUploadIntents.status, ["issued", "uploaded"]),
         ),
       );
-    await transaction
-      .update(policies)
-      .set({
-        organizationId: membership.organizationId,
-        anonymousDraftId: null,
-        ownerUserId: user.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(policies.id, selectedPolicy.policyId));
-    await transaction
-      .update(policyVersions)
-      .set({ organizationId: membership.organizationId, anonymousDraftId: null })
-      .where(eq(policyVersions.id, selectedPolicy.policyVersionId));
+    // Policy-Fassungen liegen je Organisation inhaltsadressiert:
+    // (organization_id, sha256, parser_version) ist eindeutig. Wer dieselbe Datei
+    // ein zweites Mal prüft — etwa die Beispiel-Policy —, darf sie nicht erneut
+    // übernehmen, sonst bricht die Übernahme an genau diesem Index ab und der
+    // Start scheitert mit einem internen Fehler. Die vorhandene Fassung wird
+    // stattdessen weiterverwendet; die Draft-Kopie räumt die Aufbewahrung ab.
+    const [existingPolicyVersion] = await transaction
+      .select({ id: policyVersions.id })
+      .from(policyVersions)
+      .where(
+        and(
+          eq(policyVersions.organizationId, membership.organizationId),
+          eq(policyVersions.sha256, selectedPolicy.sha256),
+          eq(policyVersions.parserVersion, selectedPolicy.parserVersion),
+        ),
+      )
+      .limit(1);
+    const policyVersionId = existingPolicyVersion?.id ?? selectedPolicy.policyVersionId;
+
+    if (!existingPolicyVersion) {
+      await transaction
+        .update(policies)
+        .set({
+          organizationId: membership.organizationId,
+          anonymousDraftId: null,
+          ownerUserId: user.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(policies.id, selectedPolicy.policyId));
+      await transaction
+        .update(policyVersions)
+        .set({ organizationId: membership.organizationId, anonymousDraftId: null })
+        .where(eq(policyVersions.id, selectedPolicy.policyVersionId));
+    }
 
     const configurationHash = createContentHash({
       route,
@@ -405,7 +426,7 @@ async function startAnalysis(input: {
         organizationId: membership.organizationId,
         ownerUserId: user.id,
         sourceDraftId: draft.id,
-        policyVersionId: selectedPolicy.policyVersionId,
+        policyVersionId,
         sponsoredGrantId,
         aiCredentialId: route.aiCredentialId,
         frameworkSlug: release.frameworkSlug,
@@ -474,7 +495,6 @@ async function startAnalysis(input: {
         fundingMode: route.fundingMode,
         frameworkContentHash: release.contentHash,
         modelProfileId: route.modelProfileId,
-        policySha256: selectedPolicy.sha256,
         requirementCount: selectedRequirements.length,
       },
     });

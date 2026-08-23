@@ -45,6 +45,7 @@ export async function getOwnedAnalysisStatus(input: { analysisId: string; ownerU
       frameworkSlug: analyses.frameworkSlug,
       requirementCount: analyses.requirementCount,
       failureCode: analyses.failureCode,
+      failureDetail: analyses.failureDetail,
       createdAt: analyses.createdAt,
       updatedAt: analyses.updatedAt,
       completedAt: analyses.completedAt,

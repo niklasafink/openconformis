@@ -42,10 +42,37 @@ export class ModelProviderError extends Error {
       | "PROVIDER_REFUSAL"
       | "MODEL_OUTPUT_INVALID",
     public readonly retryable: boolean,
+    /**
+     * Kurze, gekürzte Begründung des Anbieters. Ohne sie bleibt ein
+     * Konfigurationsfehler wie „Regional routing not enabled for this account"
+     * als blosses `PROVIDER_HTTP_ERROR` unsichtbar, und der Lauf meldet nur
+     * „fehlgeschlagen". Bewusst nur die Meldung des Anbieters, nie Anfrage,
+     * Header oder Antwortkörper — dort stünden Policy-Inhalte und Schlüssel.
+     */
+    public readonly detail?: string,
   ) {
-    super(code);
+    super(detail ? `${code}: ${detail}` : code);
     this.name = "ModelProviderError";
   }
+}
+
+const maximumProviderDetailLength = 200;
+
+/** Zieht die Fehlermeldung aus den bei allen Anbietern üblichen Formen. */
+export function readProviderErrorDetail(payload: unknown): string | undefined {
+  if (typeof payload === "string") return payload.slice(0, maximumProviderDetailLength);
+  if (!payload || typeof payload !== "object") return undefined;
+  const record = payload as Record<string, unknown>;
+  const error = record.error;
+  const candidate =
+    (typeof error === "object" &&
+    error &&
+    typeof (error as Record<string, unknown>).message === "string"
+      ? ((error as Record<string, unknown>).message as string)
+      : undefined) ??
+    (typeof error === "string" ? error : undefined) ??
+    (typeof record.message === "string" ? record.message : undefined);
+  return candidate?.trim().slice(0, maximumProviderDetailLength) || undefined;
 }
 
 export function assertStructuredRequest(request: { apiKey: string; maxOutputTokens: number }) {
@@ -61,7 +88,19 @@ export function retryableProviderStatus(status: number) {
 
 export async function readProviderJson(response: Response) {
   if (!response.ok) {
-    throw new ModelProviderError("PROVIDER_HTTP_ERROR", retryableProviderStatus(response.status));
+    // Den Fehlerkörper noch lesen, bevor geworfen wird: er trägt die einzige
+    // Auskunft darüber, warum der Anbieter abgelehnt hat.
+    let detail: string | undefined;
+    try {
+      detail = readProviderErrorDetail(JSON.parse((await response.text()).slice(0, 4_000)));
+    } catch {
+      detail = undefined;
+    }
+    throw new ModelProviderError(
+      "PROVIDER_HTTP_ERROR",
+      retryableProviderStatus(response.status),
+      detail ? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`,
+    );
   }
   const declaredLength = Number(response.headers.get("content-length") ?? "0");
   if (declaredLength > 2_000_000) {

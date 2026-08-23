@@ -3583,3 +3583,32 @@ i[data-result-status="no_assessment_possible"] {
 .preview-start-actions {
   margin-top: 8px;
 }
+
+/* Fehlgeschlagener Lauf: die Begründung des Anbieters ist der Kern der Seite,
+   nicht eine Randnotiz — ohne sie ist der Fehler nicht zu beheben. */
+.analysis-run-failure {
+  margin: 20px 0;
+  border: 1px solid #f2c9c9;
+  border-radius: 8px;
+  background: #fdeeee;
+  padding: 16px 18px;
+}
+
+.analysis-run-failure h2 {
+  margin: 0 0 8px;
+  color: #a32222;
+  font-size: 15px;
+}
+
+.analysis-run-failure p {
+  margin: 0;
+  color: #7a2020;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.analysis-run-failure-hint {
+  margin-top: 10px !important;
+  color: var(--text-secondary) !important;
+  font-size: 12px !important;
+}

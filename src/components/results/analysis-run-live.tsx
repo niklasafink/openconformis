@@ -25,7 +25,11 @@ type AnalysisRunLiveProps = {
   requirementCount: number;
   createdAtLabel: string;
   initialState: LiveState;
+  failure?: { code: string | null; detail: string | null };
   labels: {
+    failureTitle: string;
+    failureUnknown: string;
+    failureHint: string;
     title: string;
     progressLabel: string;
     stageLabel: string;
@@ -42,6 +46,7 @@ const terminalStatuses = new Set<AnalysisStatus>(["completed", "failed", "cancel
 
 export function AnalysisRunLive({
   analysisId,
+  failure,
   frameworkSlug,
   requirementCount,
   createdAtLabel,
@@ -76,7 +81,10 @@ export function AnalysisRunLive({
         if (disposed) return;
         setPollingFailed(false);
         setState(next);
-        if (next.status === "completed") router.refresh();
+        // Auch beim Fehlschlag neu laden: die Begründung des Anbieters wird
+        // erst beim Scheitern geschrieben und steckt in der Serverantwort,
+        // nicht im Statusabruf.
+        if (terminalStatuses.has(next.status)) router.refresh();
         if (!terminalStatuses.has(next.status)) schedule();
       } catch {
         if (disposed) return;
@@ -103,6 +111,16 @@ export function AnalysisRunLive({
           {labels.status[state.status]}
         </span>
       </div>
+      {state.status === "failed" ? (
+        <section className="analysis-run-failure" role="alert">
+          <h2>{labels.failureTitle}</h2>
+          {/* Der Text kommt vom Anbieter und nennt bei Konfigurationsfehlern die
+              genaue Ursache. Ohne ihn stand hier nur „Fehlgeschlagen". */}
+          <p>{failure?.detail || failure?.code || labels.failureUnknown}</p>
+          <p className="analysis-run-failure-hint">{labels.failureHint}</p>
+        </section>
+      ) : null}
+
       <div className="analysis-run-progress" aria-label={labels.progressLabel}>
         <span style={{ width: `${state.progressPercent}%` }} />
       </div>

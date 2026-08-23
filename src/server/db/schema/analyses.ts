@@ -176,6 +176,9 @@ export const analyses = pgTable(
     requirementCount: integer("requirement_count").notNull(),
     unevaluatedWarningAccepted: boolean("unevaluated_warning_accepted").default(false).notNull(),
     failureCode: text("failure_code"),
+    // Gekürzte Begründung des Anbieters. Ohne sie ist ein Konfigurationsfehler
+    // vom Modellfehler nicht zu unterscheiden. Enthält nie Policy-Text oder Schlüssel.
+    failureDetail: text("failure_detail"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),

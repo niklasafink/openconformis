@@ -4,11 +4,33 @@ import {
   prepareAnalysisExecution,
 } from "@/server/worker/execute-analysis";
 import { markAnalysisRetriesExhausted } from "@/server/worker/fail-analysis";
-import { getWorkflowMetadata } from "workflow";
+import { ModelProviderError } from "@/server/ai/structured-model";
+import { FatalError, getWorkflowMetadata } from "workflow";
+
+/**
+ * Ein Anbieterfehler, der beim nächsten Versuch genauso ausfällt — eine gesperrte
+ * Route, ein unbekanntes Modell, ein ungültiger Schlüssel —, wird als `FatalError`
+ * weitergereicht. Ohne das wiederholte der Workflow ihn dreimal, verbrannte Zeit
+ * und meldete am Ende „alle Versuche verbraucht", was die eigentliche Ursache
+ * verdeckte.
+ */
+function terminalIfPermanent(error: unknown): never {
+  if (error instanceof ModelProviderError && !error.retryable) {
+    throw new FatalError(error.message);
+  }
+  throw error;
+}
 
 async function prepareAnalysisStep(analysisId: string, workflowRunId: string) {
   "use step";
-  return prepareAnalysisExecution({ kind: "analysis_execution", analysisId }, workflowRunId);
+  try {
+    return await prepareAnalysisExecution(
+      { kind: "analysis_execution", analysisId },
+      workflowRunId,
+    );
+  } catch (error) {
+    terminalIfPermanent(error);
+  }
 }
 prepareAnalysisStep.maxRetries = 3;
 
@@ -19,7 +41,11 @@ async function analyzeRequirementStep(
   total: number,
 ) {
   "use step";
-  return executeAnalysisScopeItem({ analysisId, scopeItemId, index, total });
+  try {
+    return await executeAnalysisScopeItem({ analysisId, scopeItemId, index, total });
+  } catch (error) {
+    terminalIfPermanent(error);
+  }
 }
 analyzeRequirementStep.maxRetries = 3;
 
@@ -29,9 +55,12 @@ async function finalizeAnalysisStep(analysisId: string) {
 }
 finalizeAnalysisStep.maxRetries = 3;
 
-async function failAnalysisStep(analysisId: string) {
+async function failAnalysisStep(analysisId: string, failureDetail?: string) {
   "use step";
-  return markAnalysisRetriesExhausted(analysisId);
+  return markAnalysisRetriesExhausted(analysisId, {
+    failureCode: failureDetail ? "PROVIDER_REJECTED" : undefined,
+    failureDetail,
+  });
 }
 failAnalysisStep.maxRetries = 3;
 
@@ -49,7 +78,11 @@ export async function analysisWorkflow(analysisId: string) {
     }
     return await finalizeAnalysisStep(analysisId);
   } catch (error) {
-    await failAnalysisStep(analysisId);
+    // Die Begründung des Anbieters mitschreiben, damit die Ergebnisseite den
+    // Grund nennen kann statt nur „fehlgeschlagen".
+    const detail =
+      error instanceof Error && error.message ? error.message.slice(0, 300) : undefined;
+    await failAnalysisStep(analysisId, detail);
     throw error;
   }
 }
