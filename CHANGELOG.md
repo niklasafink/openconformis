@@ -4,6 +4,15 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed a signed-in user without a personal workspace being locked out of chat.
+  The workspace was created only when an analysis started, so anyone who signed
+  in and went to chat first had no organization and no access.
+- Added a unique index on `members(organization_id, user_id)`. The invariant that
+  a person belongs to an organization once existed only in TypeScript.
+- Fixed the request size limit being bypassable by omitting `content-length`,
+  which was read as zero.
+- Fixed an unreachable bot-check service producing a 500 instead of failing
+  closed with its own error code.
 - Fixed the sign-in flow, which was unusable: the application had no root route,
   so `/`, `/de` and every authentication redirect resolved to a 404.
 - Fixed the sign-in link callback bypassing localization, which turned a

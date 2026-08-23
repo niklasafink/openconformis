@@ -36,9 +36,20 @@ function subjectHash(request: Request) {
   return createHmac("sha256", secret).update(requestAddress(request)).digest("hex");
 }
 
+/**
+ * Grenzt JSON-Anfragen der Größe nach ein.
+ *
+ * Ein fehlender `content-length` wird abgelehnt statt als 0 gelesen: ohne diesen
+ * Header — etwa bei `Transfer-Encoding: chunked` — ließe sich die Grenze sonst
+ * vollständig umgehen. Alle Aufrufer sind JSON-Endpunkte, deren Clients den
+ * Header setzen; Datei-Uploads laufen über einen anderen Weg.
+ */
 export function assertRequestSize(request: Request, maximumBytes: number) {
-  const length = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
-  if (Number.isFinite(length) && length > maximumBytes) {
+  const header = request.headers.get("content-length");
+  if (header === null) throw new RequestProtectionError("REQUEST_TOO_LARGE");
+
+  const length = Number.parseInt(header, 10);
+  if (!Number.isFinite(length) || length < 0 || length > maximumBytes) {
     throw new RequestProtectionError("REQUEST_TOO_LARGE");
   }
 }
@@ -85,13 +96,23 @@ export async function verifyTurnstileToken(token: string | undefined) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5_000);
   try {
-    const response = await fetch(verifyUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token }),
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(verifyUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } catch {
+      // Ein nicht erreichbarer oder zu langsamer Prüfdienst ist kein interner
+      // Anwendungsfehler. Die Prüfung schlägt geschlossen fehl und der Aufrufer
+      // bekommt denselben klaren Code wie bei einem ungültigen Token, statt einer
+      // 500 ohne Aussage.
+      throw new RequestProtectionError("BOT_CHECK_FAILED");
+    }
+
     const result = (await response.json().catch(() => null)) as { success?: boolean } | null;
     if (!response.ok || result?.success !== true)
       throw new RequestProtectionError("BOT_CHECK_FAILED");

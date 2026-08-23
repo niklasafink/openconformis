@@ -1,14 +1,13 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
-import { and, asc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, or, sql } from "drizzle-orm";
 
 import { createCatalogueItemHash } from "@/domain/frameworks/release-content";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { getActiveAnalysisInstructionPair } from "@/server/ai/analysis-instruction-service";
 import { getStrictAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
+import { ensurePersonalWorkspace } from "@/server/auth/personal-workspace";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { db, isDatabaseConfigured } from "@/server/db/client";
@@ -20,7 +19,6 @@ import {
 } from "@/server/db/schema/application";
 import { aiCredentials, draftModelSelections } from "@/server/db/schema/ai";
 import { analyses, analysisScopeItems } from "@/server/db/schema/analyses";
-import { members, organizations } from "@/server/db/schema/auth";
 import {
   draftPolicySelections,
   policies,
@@ -122,19 +120,6 @@ function readSponsoredRoute(): AnalysisRoute {
     verifierPromptVersion: "",
     unevaluatedWarningAccepted: false,
   };
-}
-
-function workspaceSlug(email: string, userId: string) {
-  const prefix = email
-    .split("@")[0]
-    ?.toLocaleLowerCase("de")
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-|-$/gu, "")
-    .slice(0, 32);
-  return `${prefix || "workspace"}-${userId
-    .replace(/[^a-z0-9]/giu, "")
-    .slice(-10)
-    .toLowerCase()}-${randomUUID().slice(0, 6)}`;
 }
 
 export type StartAnalysisResult = {
@@ -260,33 +245,12 @@ async function startAnalysis(input: {
       throw new AnalysisStartError("POLICY_NOT_READY");
     }
 
-    let [membership] = await transaction
-      .select({ organizationId: members.organizationId })
-      .from(members)
-      .where(eq(members.userId, user.id))
-      .orderBy(asc(members.createdAt))
-      .limit(1);
-
-    if (!membership) {
-      const organizationId = randomUUID();
-      await transaction.insert(organizations).values({
-        id: organizationId,
-        name: user.name.trim() || "Mein Arbeitsbereich",
-        slug: workspaceSlug(user.email, user.id),
-        createdAt: new Date(),
-        deploymentProfile: "hosted-beta",
-        defaultLocale: draft.locale,
-        retentionDays: 30,
-      });
-      await transaction.insert(members).values({
-        id: randomUUID(),
-        organizationId,
-        userId: user.id,
-        role: "owner",
-        createdAt: new Date(),
-      });
-      membership = { organizationId };
-    }
+    // Der Advisory Lock oben serialisiert diesen Abschnitt je Nutzer.
+    const membership = await ensurePersonalWorkspace(
+      transaction,
+      { id: user.id, name: user.name, email: user.email },
+      draft.locale,
+    );
 
     let route: AnalysisRoute;
     let sponsoredGrantId: string | undefined;

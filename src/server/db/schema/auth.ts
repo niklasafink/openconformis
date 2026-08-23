@@ -1,5 +1,13 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, integer, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -42,6 +50,10 @@ export const members = pgTable(
   (table) => [
     index("members_organizationId_idx").on(table.organizationId),
     index("members_userId_idx").on(table.userId),
+    // Eine Person gehört einer Organisation genau einmal an. Bisher stand diese
+    // Invariante nur im TypeScript-Code; zwei gleichzeitige Requests desselben
+    // Nutzers konnten sie unterlaufen.
+    uniqueIndex("members_organization_user_uidx").on(table.organizationId, table.userId),
   ],
 );
 
