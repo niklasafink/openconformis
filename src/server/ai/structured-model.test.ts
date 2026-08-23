@@ -83,3 +83,24 @@ describe("readProviderJson", () => {
     await expect(readProviderJson(response)).resolves.toEqual({ id: "gen-1" });
   });
 });
+
+describe("ModelProviderError", () => {
+  it("explains itself even when the provider gave no message", () => {
+    // Genau dieser Fall stand im Ergebnis nur als "ANALYSIS_RETRIES_EXHAUSTED":
+    // eine Basis-URL ausserhalb der zugelassenen EU-Route.
+    const error = new ModelProviderError("INVALID_EU_ROUTE", false);
+    expect(error.detail).toContain("eu.openrouter.ai");
+    expect(error.message).toBe(error.detail);
+  });
+
+  it("prefers the provider message when there is one", () => {
+    const error = new ModelProviderError("PROVIDER_HTTP_ERROR", false, "HTTP 403: nope");
+    expect(error.detail).toBe("HTTP 403: nope");
+  });
+
+  it("names the token limit when the model truncated its answer", () => {
+    expect(new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", false).detail).toContain(
+      "Token-Obergrenze",
+    );
+  });
+});

@@ -4,6 +4,11 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed provider errors without an HTTP body reporting only
+  ANALYSIS_RETRIES_EXHAUSTED. Every provider error now carries an explanation of
+  its own — a base URL outside the permitted EU route, for instance, names the
+  expected host instead of leaving the run unexplained.
+
 - Fixed a sponsored analysis being startable only once. A failed run returns its
   free-run grant but keeps the link the funding check requires, and the unique
   index over that link then blocked every later attempt with an internal error.

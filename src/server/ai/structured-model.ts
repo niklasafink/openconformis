@@ -30,17 +30,19 @@ export type StructuredModelResponse<T> = {
   costMicrounits?: number;
 };
 
+export type ModelProviderErrorCode =
+  | "INVALID_EU_ROUTE"
+  | "INVALID_PROVIDER_ROUTE"
+  | "PROVIDER_HTTP_ERROR"
+  | "PROVIDER_RESPONSE_TOO_LARGE"
+  | "PROVIDER_RESPONSE_INVALID"
+  | "PROVIDER_OUTPUT_INCOMPLETE"
+  | "PROVIDER_REFUSAL"
+  | "MODEL_OUTPUT_INVALID";
+
 export class ModelProviderError extends Error {
   constructor(
-    public readonly code:
-      | "INVALID_EU_ROUTE"
-      | "INVALID_PROVIDER_ROUTE"
-      | "PROVIDER_HTTP_ERROR"
-      | "PROVIDER_RESPONSE_TOO_LARGE"
-      | "PROVIDER_RESPONSE_INVALID"
-      | "PROVIDER_OUTPUT_INCOMPLETE"
-      | "PROVIDER_REFUSAL"
-      | "MODEL_OUTPUT_INVALID",
+    public readonly code: ModelProviderErrorCode,
     public readonly retryable: boolean,
     /**
      * Kurze, gekürzte Begründung des Anbieters. Ohne sie bleibt ein
@@ -49,12 +51,36 @@ export class ModelProviderError extends Error {
      * „fehlgeschlagen". Bewusst nur die Meldung des Anbieters, nie Anfrage,
      * Header oder Antwortkörper — dort stünden Policy-Inhalte und Schlüssel.
      */
-    public readonly detail?: string,
+    detail?: string,
   ) {
-    super(detail ? `${code}: ${detail}` : code);
+    super(detail ?? defaultProviderDetail[code]);
     this.name = "ModelProviderError";
+    this.detail = detail ?? defaultProviderDetail[code];
   }
+
+  /** Immer gesetzt: entweder die Meldung des Anbieters oder die Erklärung zum Code. */
+  public readonly detail: string;
 }
+
+/**
+ * Jeder Providerfehler muss sich selbst erklären. Ohne diese Texte erschien etwa
+ * eine unzulässige Basis-URL im Ergebnis nur als „ANALYSIS_RETRIES_EXHAUSTED" —
+ * ein Code, der weder die Ursache nennt noch sagt, wo sie zu beheben ist.
+ */
+const defaultProviderDetail: Record<ModelProviderErrorCode, string> = {
+  INVALID_EU_ROUTE:
+    "Die konfigurierte Basis-URL ist keine zugelassene EU-Route. Für OpenRouter ist ausschließlich https://eu.openrouter.ai/api/v1 erlaubt.",
+  INVALID_PROVIDER_ROUTE:
+    "Die Providerkonfiguration ist unvollständig — API-Schlüssel oder Token-Obergrenze fehlen oder sind ungültig.",
+  PROVIDER_HTTP_ERROR: "Der Modellanbieter war nicht erreichbar.",
+  PROVIDER_RESPONSE_TOO_LARGE: "Die Antwort des Modellanbieters war zu groß.",
+  PROVIDER_RESPONSE_INVALID: "Die Antwort des Modellanbieters war nicht auswertbar.",
+  PROVIDER_OUTPUT_INCOMPLETE:
+    "Das Modell hat die Antwort abgeschnitten. Die Token-Obergrenze ist zu niedrig.",
+  PROVIDER_REFUSAL: "Das Modell hat die Bearbeitung abgelehnt.",
+  MODEL_OUTPUT_INVALID:
+    "Das Modell hat kein gültiges Ergebnis nach dem vereinbarten Schema geliefert.",
+};
 
 const maximumProviderDetailLength = 200;
 
