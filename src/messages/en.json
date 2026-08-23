@@ -278,7 +278,6 @@
   "Auth": {
     "title": "Sign in or create an account",
     "body": "Sign in to start an analysis and view results. Registration is free.",
-    "browserMismatch": "The sign-in link was opened in a different browser than the one that requested it. Request a new link here and open it in the same browser profile.",
     "linkInvalid": "The sign-in link has expired or was already used. Request a new link.",
     "email": "Email address",
     "magicLink": "Send sign-in link",

@@ -24,6 +24,28 @@ Workflow arguments contain opaque database IDs only. Policy text and API keys ar
 4. Run `pnpm db:migrate` and `pnpm db:seed:catalogue`.
 5. Run `pnpm dev`. Workflow SDK runs its local development world through Next.js.
 
+### Signing in locally
+
+Neon Auth prefixes every cookie with `__Secure-`, which browsers only accept over
+a secure origin. Over plain `http://localhost` this splits by browser:
+
+- **Chrome and other Chromium browsers** treat `localhost` as trustworthy and
+  store the cookies, so signing in works with `pnpm dev`.
+- **Safari and Firefox** discard them. Registration appears to succeed and the
+  redirect happens, but no session exists and the next page sends you back to
+  sign-in.
+
+To sign in locally with those browsers, serve development over HTTPS:
+
+```bash
+mkcert -install   # once per machine, asks for your password
+pnpm dev:https
+```
+
+Then set `NEXT_PUBLIC_APP_URL=https://localhost:3000` in `.env.local`. In
+production the application is served over HTTPS, where every browser accepts the
+cookies and no workaround is needed.
+
 Useful checks:
 
 ```bash

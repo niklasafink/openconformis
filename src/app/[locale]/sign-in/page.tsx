@@ -52,11 +52,7 @@ export default async function SignInPage({ params, searchParams }: SignInPagePro
           <h1 id="sign-in-title">{t("title")}</h1>
           <p>{t("body")}</p>
 
-          {authError === "magic_link_browser_mismatch" ? (
-            <p className="auth-notice" role="alert">
-              {t("browserMismatch")}
-            </p>
-          ) : authError ? (
+          {authError ? (
             <p className="auth-notice" role="alert">
               {t("linkInvalid")}
             </p>

@@ -4,6 +4,15 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed every sign-in link being rejected before it was ever verified. The proxy
+  required an OAuth challenge cookie that a sign-in link never sets, so each
+  callback was refused with the false claim that it had been opened in another
+  browser. The library now decides whether the link carries.
+- Fixed an unreachable authentication service producing a 500 on the callback
+  path instead of returning the visitor to sign-in.
+- Documented that Neon Auth cookies carry the `__Secure-` prefix, so Safari and
+  Firefox drop them over plain `http://localhost`, and added `pnpm dev:https`.
+
 - Fixed registration reporting "sign-in could not be completed" when an account
   already existed for the address. The provider names the reason, the form threw
   it away. Known provider failures now say what happened, and an existing account

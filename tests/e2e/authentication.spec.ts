@@ -35,14 +35,16 @@ test.describe("authentication routing", () => {
     await expect(page.getByRole("heading", { name: "Sign in or create an account" })).toBeVisible();
   });
 
-  test("explains a sign-in link opened in another browser instead of a 404", async ({ page }) => {
+  test("explains a spent sign-in link instead of a 404", async ({ page }) => {
+    // Ein Anmeldelink setzt beim Anfordern keinen Cookie — die Bibliothek nutzt
+    // den Challenge-Cookie nur für OAuth. Ein abgelaufener oder erfundener
+    // Verifier muss deshalb an der Bibliothek scheitern und auf der
+    // Anmeldefläche erklärt werden, nicht vorab pauschal blockiert.
     const response = await page.goto(`/de/analyses/new/results?draft=${draftId}&${verifier}`);
 
     expect(response?.status()).toBeLessThan(400);
-    await expect(page).toHaveURL(/\/de\/sign-in\?auth_error=magic_link_browser_mismatch$/);
-    // Nicht über die Rolle suchen: der Route-Announcer von Next.js trägt
-    // ebenfalls role="alert" und bricht die Strict-Mode-Auflösung.
-    await expect(page.locator("p.auth-notice")).toContainText("anderen Browser");
+    await expect(page).toHaveURL(/\/de\/sign-in\?auth_error=magic_link_invalid/);
+    await expect(page.locator("p.auth-notice")).toContainText("abgelaufen");
   });
 
   test("sends an unbound preview visitor to sign-in rather than a dead end", async ({ page }) => {

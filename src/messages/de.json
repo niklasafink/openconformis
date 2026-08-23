@@ -278,7 +278,6 @@
   "Auth": {
     "title": "Anmelden oder Konto erstellen",
     "body": "Melden Sie sich an, um eine Analyse zu starten und Ergebnisse einzusehen. Die Registrierung ist kostenlos.",
-    "browserMismatch": "Der Anmeldelink wurde in einem anderen Browser geöffnet als dem, in dem er angefordert wurde. Fordern Sie den Link hier erneut an und öffnen Sie ihn im selben Browserprofil.",
     "linkInvalid": "Der Anmeldelink ist abgelaufen oder wurde bereits verwendet. Fordern Sie einen neuen Link an.",
     "email": "E-Mail-Adresse",
     "magicLink": "Anmeldelink senden",

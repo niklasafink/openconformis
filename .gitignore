@@ -13,6 +13,9 @@ blob-report/
 # Local platform state
 .vercel/
 
+# Locally generated development certificates (next dev --experimental-https)
+certificates/
+
 # Environment secrets
 .env
 .env.local

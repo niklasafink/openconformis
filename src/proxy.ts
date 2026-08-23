@@ -1,5 +1,4 @@
 import createMiddleware from "next-intl/middleware";
-import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from "@neondatabase/auth/server";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -8,7 +7,6 @@ import { auth } from "@/server/auth";
 
 const handleInternationalization = createMiddleware(routing);
 const verifierParameter = "neon_auth_session_verifier";
-const legacyNeonChallengeCookie = "__Secure-neon-auth.session_challange";
 
 // Die Bibliothek leitet bei nicht herstellbarer Sitzung auf `loginUrl` um. Dieses
 // Ziel muss eine real existierende, lokalisierte Route sein — sonst endet der
@@ -88,7 +86,15 @@ async function completeAuthCallback(request: NextRequest) {
   const target = request.nextUrl.clone();
   target.searchParams.delete(verifierParameter);
 
-  const authResponse = await handleNeonAuthCallback(request);
+  let authResponse: NextResponse | undefined;
+  try {
+    authResponse = await handleNeonAuthCallback(request);
+  } catch {
+    // Ein nicht erreichbarer Auth-Dienst darf keinen 500 auf dem Rücksprungpfad
+    // erzeugen. Der Nutzer landet auf der Anmeldefläche und kann es erneut
+    // versuchen, statt auf einer Fehlerseite zu stehen.
+    return signInRedirect(request, "magic_link_invalid", `${target.pathname}${target.search}`);
+  }
   if (!authResponse) return NextResponse.redirect(target);
 
   if (authResponse.headers.get("location")) {
@@ -108,19 +114,13 @@ export default async function proxy(request: NextRequest) {
   const canonicalRedirect = canonicalDevelopmentOriginRedirect(request);
   if (canonicalRedirect) return canonicalRedirect;
 
+  // Rücksprung aus Anmeldelink oder OAuth. Es wird bewusst nicht vorab auf einen
+  // Challenge-Cookie geprüft: der wird ausschließlich im OAuth-Fluss gesetzt
+  // (siehe `src/server/middleware/oauth.ts` der Bibliothek), ein Anmeldelink setzt
+  // beim Anfordern gar keinen Cookie. Eine solche Vorabprüfung blockierte jeden
+  // Anmeldelink mit der falschen Begründung, er sei im falschen Browser geöffnet
+  // worden. Die Bibliothek entscheidet selbst, ob der Verifier trägt.
   if (request.nextUrl.searchParams.has(verifierParameter)) {
-    const hasChallenge =
-      request.cookies.has(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME) ||
-      request.cookies.has(legacyNeonChallengeCookie);
-
-    if (!hasChallenge) {
-      // Der Link wurde in einem anderen Browserprofil geöffnet, typischerweise aus
-      // einem Mail-Client. Das Ziel darf hier nicht die Vorschauseite sein: deren
-      // Draft-Bindung hängt an einem Cookie, das in diesem Profil ebenfalls fehlt,
-      // und die Seite bräche vor jeder Fehlermeldung mit 404 ab.
-      return signInRedirect(request, "magic_link_browser_mismatch");
-    }
-
     return completeAuthCallback(request);
   }
 
