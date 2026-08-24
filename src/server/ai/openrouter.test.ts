@@ -7,8 +7,8 @@ import { ModelProviderError, requestOpenRouterStructured } from "./openrouter";
 
 const outputSchema = z.object({ answer: z.string() });
 
-describe("OpenRouter EU structured adapter", () => {
-  it("enforces the frozen privacy and structured-output request", async () => {
+describe("OpenRouter structured adapter", () => {
+  it("sends the pinned provider and the strict schema, and asks for retention only when required", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -33,6 +33,7 @@ describe("OpenRouter EU structured adapter", () => {
         jsonSchema: { type: "object" },
         outputSchema,
         providerOnly: ["eu-provider"],
+        zeroDataRetention: true,
         maxOutputTokens: 1_000,
       },
       fetchMock,
@@ -57,7 +58,7 @@ describe("OpenRouter EU structured adapter", () => {
     expect(response.costMicrounits).toBe(1000);
   });
 
-  it("keeps zero data retention on unless it is switched off deliberately", async () => {
+  it("omits the retention constraints when they are not requested, so routing stays open", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -88,8 +89,47 @@ describe("OpenRouter EU structured adapter", () => {
 
     const body = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
-    ) as { provider: { zdr: boolean } };
-    expect(body.provider.zdr).toBe(false);
+    ) as { provider: Record<string, unknown> };
+    expect(body.provider).not.toHaveProperty("zdr");
+    expect(body.provider).not.toHaveProperty("data_collection");
+  });
+
+  it("routes without a pinned provider, which BYOK requires", async () => {
+    // Die Datenbank verlangt fuer BYOK eine leere Anbieterliste
+    // (analyses_provider_route_check); der Adapter verlangte frueher eine
+    // gefuellte, wodurch BYOK ueber OpenRouter unmoeglich war.
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "generation-5",
+          model: "provider/model-v1",
+          choices: [{ message: { content: JSON.stringify({ answer: "ok" }) } }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await requestOpenRouterStructured(
+      {
+        apiKey: "test-key",
+        baseUrl: "https://openrouter.ai/api/v1",
+        modelId: "provider/model-v1",
+        system: "system",
+        user: "user",
+        schemaName: "answer",
+        jsonSchema: { type: "object" },
+        outputSchema,
+        providerOnly: [],
+        maxOutputTokens: 1_000,
+      },
+      fetchMock,
+    );
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    ) as { provider: Record<string, unknown> };
+    expect(body.provider).not.toHaveProperty("only");
+    expect(body.provider.allow_fallbacks).toBe(true);
   });
 
   it("refuses a base URL outside OpenRouter before sending policy data", async () => {

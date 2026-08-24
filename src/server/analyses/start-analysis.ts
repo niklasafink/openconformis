@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, notInArray, or, sql } from "drizzle-orm";
 
 import { createCatalogueItemHash } from "@/domain/frameworks/release-content";
 import { createContentHash } from "@/domain/frameworks/content-hash";
@@ -330,6 +330,23 @@ async function startAnalysis(input: {
         )
         .returning({ id: sponsoredRunGrants.id });
       if (!grant) throw new AnalysisStartError("BYOK_REQUIRED");
+
+      // Ein Kontingent, das noch an einem lebenden oder abgeschlossenen Lauf
+      // haengt, darf nicht erneut vergeben werden: analyses_sponsored_grant_uidx
+      // laesst je Kontingent genau einen solchen Lauf zu, und der Einfuegeversuch
+      // endete sonst in einem internen Fehler statt in einer klaren Auskunft.
+      const [holder] = await transaction
+        .select({ id: analyses.id })
+        .from(analyses)
+        .where(
+          and(
+            eq(analyses.sponsoredGrantId, grant.id),
+            notInArray(analyses.status, ["failed", "cancelled"]),
+          ),
+        )
+        .limit(1);
+      if (holder) throw new AnalysisStartError("BYOK_REQUIRED");
+
       sponsoredGrantId = grant.id;
     } else {
       if (!input.credentialId) throw new AnalysisStartError("BYOK_CREDENTIAL_REQUIRED");

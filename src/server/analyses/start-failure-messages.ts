@@ -42,6 +42,8 @@ const startFailureMessages: Record<string, string> = {
     "Ihr Arbeitsbereich konnte nicht ermittelt werden. Melden Sie sich erneut an.",
   UNTRUSTED_ORIGIN: "Die Anfrage kam von einer nicht vertrauenswürdigen Adresse.",
   INVALID_ANALYSIS_START: "Die Anfrage war unvollständig. Bitte laden Sie die Seite neu.",
+  ANALYSIS_START_FAILED:
+    "Der Start ist an einem unerwarteten Fehler gescheitert. Die Einzelheiten stehen im Serverprotokoll; der Gratislauf wurde nicht verbraucht.",
 };
 
 export function describeStartFailure(code: string): string | undefined {

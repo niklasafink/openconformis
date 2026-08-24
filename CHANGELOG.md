@@ -4,6 +4,18 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed BYOK through OpenRouter being impossible. The database requires an empty
+  provider allow-list for BYOK while the adapter rejected an empty one, so every
+  such run failed before reaching the model. Pinning a provider is now optional.
+- EU routing and zero data retention are no longer enforced. Both are sent only
+  when the operator asks for them, and the BYOK base URL is no longer restricted
+  to EU endpoints. The base URL still has to belong to the chosen provider, which
+  keeps a policy from being sent to an arbitrary host, and the privacy profile
+  still records the route that was actually used.
+- Fixed a free-run grant still held by a completed run producing an internal
+  error when reissued. The reservation now checks for a holder and answers with
+  the ordinary "own key required" path.
+
 - Fixed an analysis never reaching `completed`. A trigger held a parsed policy
   version immutable and allowed only two transitions, so finalising a run — which
   sets the 24-hour retention deadline on that version — was rejected. The same

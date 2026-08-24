@@ -20,7 +20,8 @@ export type AnalysisProviderConfiguration = {
   provider: AiRouteProvider;
   baseUrl: string;
   maxOutputTokens: number;
-  privacyProfileId: "eu-zdr-v1";
+  /** Beschreibt die tatsächlich verwendete Route, statt eine Zusage zu behaupten. */
+  privacyProfileId: string;
 };
 
 function maxOutputTokens() {
@@ -31,18 +32,31 @@ function maxOutputTokens() {
   return value;
 }
 
-export function isStrictAnalysisProviderAvailable(provider: AiRouteProvider) {
+/** Basis-URL der BYOK-Route je Anbieter; EU-Varianten bleiben die Voreinstellung. */
+function byokBaseUrl(provider: AiRouteProvider) {
   switch (provider) {
     case "openrouter":
-      return Boolean(process.env.OPENROUTER_EU_BASE_URL?.trim());
+      return (
+        process.env.OPENROUTER_BASE_URL?.trim() ||
+        process.env.OPENROUTER_EU_BASE_URL?.trim() ||
+        undefined
+      );
     case "requesty":
-      return process.env.BYOK_REQUESTY_EU_ZDR_ENABLED === "true";
+      return process.env.BYOK_REQUESTY_EU_ZDR_ENABLED === "true"
+        ? "https://router.eu.requesty.ai/v1"
+        : undefined;
     case "openai":
-      return process.env.BYOK_OPENAI_EU_ZDR_ENABLED === "true";
+      return process.env.BYOK_OPENAI_EU_ZDR_ENABLED === "true"
+        ? "https://eu.api.openai.com/v1"
+        : undefined;
     case "anthropic":
     case "google":
-      return false;
+      return undefined;
   }
+}
+
+export function isStrictAnalysisProviderAvailable(provider: AiRouteProvider) {
+  return Boolean(byokBaseUrl(provider));
 }
 
 export function getStrictAnalysisProviderConfiguration(
@@ -51,16 +65,18 @@ export function getStrictAnalysisProviderConfiguration(
   if (!isStrictAnalysisProviderAvailable(provider)) {
     throw new ProviderRouteConfigurationError("STRICT_PRIVACY_ROUTE_UNAVAILABLE");
   }
-  const baseUrl =
-    provider === "openrouter"
-      ? process.env.OPENROUTER_EU_BASE_URL?.trim()
-      : provider === "requesty"
-        ? "https://router.eu.requesty.ai/v1"
-        : provider === "openai"
-          ? "https://eu.api.openai.com/v1"
-          : undefined;
+  const baseUrl = byokBaseUrl(provider);
   if (!baseUrl) throw new ProviderRouteConfigurationError("STRICT_PRIVACY_ROUTE_UNAVAILABLE");
-  return { provider, baseUrl, maxOutputTokens: maxOutputTokens(), privacyProfileId: "eu-zdr-v1" };
+  return {
+    provider,
+    baseUrl,
+    maxOutputTokens: maxOutputTokens(),
+    // Auch hier gilt: das Profil beschreibt die Route, es behauptet sie nicht.
+    privacyProfileId:
+      provider === "openrouter"
+        ? sponsoredPrivacyProfileId({ baseUrl, zeroDataRetention: sponsoredZeroDataRetention() })
+        : "eu-zdr-v1",
+  };
 }
 
 export function requestProviderStructured<T>(

@@ -76,9 +76,9 @@ export async function requestOpenRouterStructured<T>(
 ): Promise<StructuredModelResponse<T>> {
   const endpoint = chatCompletionsUrl(request.baseUrl);
   assertStructuredRequest(request);
-  if (!request.providerOnly?.length) {
-    throw new ModelProviderError("INVALID_EU_ROUTE", false);
-  }
+  // Eine Anbieterfestlegung ist optional. Sie war zuvor Pflicht, was BYOK über
+  // OpenRouter unmöglich machte: die Datenbank verlangt dort eine leere Liste
+  // (analyses_provider_route_check), der Adapter verlangte eine gefüllte.
 
   const { payload } = await fetchProviderJson(
     endpoint,
@@ -108,8 +108,10 @@ export async function requestOpenRouterStructured<T>(
           },
         },
         provider: {
-          only: request.providerOnly,
-          allow_fallbacks: false,
+          // Nur senden, was der Betreiber tatsächlich verlangt. Ein leeres
+          // Feld wäre für OpenRouter eine Einschränkung auf nichts.
+          ...(request.providerOnly?.length ? { only: request.providerOnly } : {}),
+          allow_fallbacks: !request.providerOnly?.length,
           // `require_parameters` ist hier bewusst nicht gesetzt: OpenRouter führt
           // für manche Anbieter unvollständige Parameterlisten — für Claude etwa
           // ohne `temperature` —, sodass die Prüfung fälschlich jeden Endpunkt
@@ -117,8 +119,10 @@ export async function requestOpenRouterStructured<T>(
           // genau einen geprüften Anbieter festlegt, und die Antwort wird
           // ohnehin strikt gegen das Schema geparst: hält ein Anbieter es nicht
           // ein, scheitert der Lauf sichtbar mit MODEL_OUTPUT_INVALID.
-          data_collection: "deny",
-          zdr: request.zeroDataRetention ?? true,
+          // Datenschutzauflagen sind Entscheidungen des Betreibers, keine
+          // Konstanten. Werden sie nicht verlangt, dürfen sie die Routenwahl
+          // auch nicht einschränken.
+          ...(request.zeroDataRetention ? { data_collection: "deny", zdr: true } : {}),
         },
       }),
       signal: AbortSignal.timeout(request.timeoutMilliseconds ?? 120_000),
