@@ -154,17 +154,53 @@ export async function readProviderJson(response: Response) {
   }
 }
 
+export const providerRequestTimeoutMilliseconds = 180_000;
+
+/**
+ * Führt die Anbieteranfrage aus und erzwingt die Zeitgrenze zusätzlich über einen
+ * eigenen Timer.
+ *
+ * `AbortSignal.timeout` allein reichte nicht: einzelne Aufrufe blieben 7 und 15
+ * Minuten hängen, obwohl 120 Sekunden gesetzt waren — ein stehengebliebener
+ * Lesevorgang löst das Abbruchsignal nicht zuverlässig aus. Ein hängender Aufruf
+ * blockiert den Workflow-Schritt und verbrennt die Wiederholungen, ohne dass
+ * jemand erfährt, worauf gewartet wird.
+ */
 export async function fetchProviderJson(
   url: URL,
   init: RequestInit,
   fetchImplementation: typeof fetch,
+  timeoutMilliseconds: number = providerRequestTimeoutMilliseconds,
 ) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new ModelProviderError(
+            "PROVIDER_HTTP_ERROR",
+            true,
+            `Der Modellanbieter hat nach ${Math.round(timeoutMilliseconds / 1000)} Sekunden nicht geantwortet.`,
+          ),
+        ),
+      timeoutMilliseconds,
+    );
+  });
+
   let response: Response;
   try {
-    response = await fetchImplementation(url, init);
-  } catch {
-    throw new ModelProviderError("PROVIDER_HTTP_ERROR", true);
+    response = await Promise.race([fetchImplementation(url, init), deadline]);
+  } catch (error) {
+    if (error instanceof ModelProviderError) throw error;
+    throw new ModelProviderError(
+      "PROVIDER_HTTP_ERROR",
+      true,
+      "Der Modellanbieter war nicht erreichbar.",
+    );
+  } finally {
+    if (timer) clearTimeout(timer);
   }
+
   return { response, payload: await readProviderJson(response) };
 }
 

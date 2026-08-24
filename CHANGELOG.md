@@ -4,6 +4,11 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed a stalled provider call hanging a run for minutes. Two calls took 408 and
+  929 seconds against a 120 second limit, because a stalled read does not reliably
+  trigger the abort signal. The timeout is now enforced with its own timer and the
+  wait is named in the reason.
+
 - Fixed BYOK through OpenRouter being impossible. The database requires an empty
   provider allow-list for BYOK while the adapter rejected an empty one, so every
   such run failed before reaching the model. Pinning a provider is now optional.

@@ -8,6 +8,7 @@ import {
   fetchProviderJson,
   ModelProviderError,
   parseStructuredOutput,
+  providerRequestTimeoutMilliseconds,
   type StructuredModelRequest,
   type StructuredModelResponse,
 } from "./structured-model";
@@ -125,9 +126,12 @@ export async function requestOpenRouterStructured<T>(
           ...(request.zeroDataRetention ? { data_collection: "deny", zdr: true } : {}),
         },
       }),
-      signal: AbortSignal.timeout(request.timeoutMilliseconds ?? 120_000),
+      signal: AbortSignal.timeout(
+        request.timeoutMilliseconds ?? providerRequestTimeoutMilliseconds,
+      ),
     },
     fetchImplementation,
+    request.timeoutMilliseconds ?? providerRequestTimeoutMilliseconds,
   );
   let providerResponse: z.infer<typeof openRouterResponseSchema>;
   try {

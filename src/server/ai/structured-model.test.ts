@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  fetchProviderJson,
   ModelProviderError,
   readProviderErrorDetail,
   readProviderJson,
@@ -102,5 +103,27 @@ describe("ModelProviderError", () => {
     expect(new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", false).detail).toContain(
       "Token-Obergrenze",
     );
+  });
+});
+
+describe("fetchProviderJson", () => {
+  it("gives up on a stalled provider instead of waiting indefinitely", async () => {
+    // Zwei echte Aufrufe blieben 408 und 929 Sekunden haengen, obwohl 120
+    // Sekunden gesetzt waren; das Abbruchsignal allein greift dort nicht.
+    const stalled = vi.fn<typeof fetch>().mockImplementation(() => new Promise<Response>(() => {}));
+
+    await expect(
+      fetchProviderJson(new URL("https://provider.invalid/v1"), {}, stalled, 40),
+    ).rejects.toMatchObject({ code: "PROVIDER_HTTP_ERROR", retryable: true });
+  });
+
+  it("names the wait in the reason so the limit is visible", async () => {
+    const stalled = vi.fn<typeof fetch>().mockImplementation(() => new Promise<Response>(() => {}));
+    try {
+      await fetchProviderJson(new URL("https://provider.invalid/v1"), {}, stalled, 40);
+      expect.unreachable("fetchProviderJson should have given up");
+    } catch (error) {
+      expect((error as ModelProviderError).detail).toContain("nicht geantwortet");
+    }
   });
 });
