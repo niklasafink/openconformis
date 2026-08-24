@@ -281,6 +281,13 @@
       "when": 1787500075715,
       "tag": "0039_retryable_sponsored_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1787518315841,
+      "tag": "0040_verification_trigger_field_resolution",
+      "breakpoints": true
     }
   ]
 }

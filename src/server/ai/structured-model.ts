@@ -171,9 +171,21 @@ export async function fetchProviderJson(
 export function parseStructuredOutput<T>(rawOutput: string, outputSchema: z.ZodType<T>): T {
   try {
     return outputSchema.parse(JSON.parse(rawOutput));
-  } catch {
-    throw new ModelProviderError("MODEL_OUTPUT_INVALID", false);
+  } catch (error) {
+    // Die verletzten Regeln benennen, statt sie zu verwerfen: der zweite Versuch
+    // bekam bisher nur „schema validation failed" und scheiterte deshalb
+    // zuverlässig ein zweites Mal an derselben Stelle. Die Meldungen stammen aus
+    // dem eigenen Schema und enthalten keine Policy-Inhalte.
+    throw new ModelProviderError("MODEL_OUTPUT_INVALID", false, describeSchemaIssues(error));
   }
+}
+
+function describeSchemaIssues(error: unknown): string | undefined {
+  if (!(error instanceof z.ZodError)) return undefined;
+  const issues = error.issues
+    .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
+    .slice(0, 6);
+  return issues.length ? issues.join("; ").slice(0, 400) : undefined;
 }
 
 export function dollarsToMicrounits(cost?: number) {

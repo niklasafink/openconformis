@@ -19,6 +19,7 @@ type StartFailure = "authentication" | "verification" | "generic";
 type PreviewGateProps = {
   callbackUrl: string;
   authCallbackError?: string;
+  localAuthBypass?: boolean;
   draftId: string;
   locale: string;
   frameworkSlug: string;
@@ -67,6 +68,7 @@ const animationStepMilliseconds = 650;
 export function PreviewGate({
   callbackUrl,
   authCallbackError,
+  localAuthBypass = false,
   draftId,
   locale,
   frameworkSlug,
@@ -83,11 +85,14 @@ export function PreviewGate({
   const [step, setStep] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(Boolean(authCallbackError));
   const [startFailure, setStartFailure] = useState<StartFailure | null>(null);
+  // Die Begründung des Servers, falls er eine mitgeschickt hat.
+  const [startFailureMessage, setStartFailureMessage] = useState<string | null>(null);
   const [byokRequired, setByokRequired] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [credentialPending, setCredentialPending] = useState(false);
   const [credentialError, setCredentialError] = useState(false);
   const [privacyAttestationAccepted, setPrivacyAttestationAccepted] = useState(false);
+  const [startAttempt, setStartAttempt] = useState(0);
   const startRequested = useRef(false);
   const steps = [labels.parsing, labels.mapping, labels.checking];
 
@@ -101,7 +106,7 @@ export function PreviewGate({
   }, [step, steps.length]);
 
   useEffect(() => {
-    if (!session || step < steps.length || startRequested.current) return;
+    if ((!localAuthBypass && !session) || step < steps.length || startRequested.current) return;
     startRequested.current = true;
 
     void fetch("/api/analyses/start", {
@@ -111,7 +116,12 @@ export function PreviewGate({
       body: JSON.stringify({ draftId }),
     })
       .then(async (response) => {
-        const payload = (await response.json()) as { analysisId?: string; code?: string };
+        const payload = (await response.json()) as {
+          analysisId?: string;
+          code?: string;
+          message?: string;
+        };
+        setStartFailureMessage(payload.message ?? null);
 
         // Fehlendes Sponsoring ist kein Fehler, sondern der reguläre Weg in den
         // eigenen Modellzugang.
@@ -139,8 +149,11 @@ export function PreviewGate({
         if (!response.ok || !payload.analysisId) throw new Error("ANALYSIS_START_FAILED");
         router.replace(`/${locale}/analyses/${payload.analysisId}`);
       })
-      .catch(() => setStartFailure("generic"));
-  }, [draftId, locale, router, session, step, steps.length]);
+      .catch(() => {
+        setStartFailureMessage(null);
+        setStartFailure("generic");
+      });
+  }, [draftId, locale, localAuthBypass, router, session, startAttempt, step, steps.length]);
 
   async function connectCredentialAndStart(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -186,7 +199,8 @@ export function PreviewGate({
   function retryStart() {
     startRequested.current = false;
     setStartFailure(null);
-    router.refresh();
+    setStartFailureMessage(null);
+    setStartAttempt((attempt) => attempt + 1);
   }
 
   if (step < steps.length) {
@@ -210,10 +224,11 @@ export function PreviewGate({
     );
   }
 
-  // Nach der Anmeldung wird die Vorschau nicht freigeschaltet, sondern ersetzt.
+  // Nach der Anmeldung oder im lokalen Entwicklungsmodus wird die Vorschau
+  // nicht freigeschaltet, sondern durch eine echte Analyse ersetzt.
   // Die Vorschauwerte sind Demo-Stati ohne echte Bewertung — sie unverschwommen
   // zu zeigen, ließe erfundene Ergebnisse wie geprüfte aussehen.
-  if (session) {
+  if (session || localAuthBypass) {
     return (
       <div className="preview-result-layout">
         {byokRequired ? (
@@ -274,11 +289,14 @@ export function PreviewGate({
           <section className="preview-start-state preview-start-failed" role="alert">
             <h1>{labels.startFailed}</h1>
             <p>
-              {startFailure === "authentication"
-                ? labels.startFailedAuthentication
-                : startFailure === "verification"
-                  ? labels.startFailedVerification
-                  : labels.startFailedGeneric}
+              {/* Die Begründung des Servers hat Vorrang: sie benennt den konkreten
+                  Zustand, während die lokalen Texte nur die Fallgruppe kennen. */}
+              {startFailureMessage ??
+                (startFailure === "authentication"
+                  ? labels.startFailedAuthentication
+                  : startFailure === "verification"
+                    ? labels.startFailedVerification
+                    : labels.startFailedGeneric)}
             </p>
             <div className="preview-start-actions">
               {startFailure === "authentication" ? (
@@ -324,7 +342,7 @@ export function PreviewGate({
         }}
       />
 
-      {authDialogOpen ? (
+      {!localAuthBypass && authDialogOpen ? (
         <div
           className="preview-auth-backdrop"
           role="presentation"

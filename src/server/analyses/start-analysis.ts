@@ -266,6 +266,43 @@ async function startAnalysis(input: {
     if (input.fundingMode === "sponsored") {
       if (!sponsoredRoute) throw new AnalysisStartError("SPONSORED_ROUTE_NOT_CONFIGURED");
       route = sponsoredRoute;
+
+      // Ein Lauf, dessen Reservierung abgelaufen ist, wurde von seinem Worker nie
+      // beendet — der Prozess ist gestorben. Er bleibt auf `running` stehen und
+      // hält das Kontingent über analyses_sponsored_grant_uidx weiter besetzt.
+      // Die Reservierung unten holt das Kontingent zwar zurück, der Einfüge-
+      // versuch scheiterte dann aber an genau diesem Index und der Nutzer sah
+      // einen internen Fehler. Abgebrochene Läufe werden deshalb zuerst als
+      // gescheitert markiert; das gibt den Index frei und benennt, was geschah.
+      const abandoned = await transaction
+        .select({ id: analyses.id })
+        .from(analyses)
+        .innerJoin(sponsoredRunGrants, eq(sponsoredRunGrants.id, analyses.sponsoredGrantId))
+        .where(
+          and(
+            eq(analyses.ownerUserId, user.id),
+            inArray(analyses.status, ["queued", "running"]),
+            sql`${sponsoredRunGrants.reservedUntil} < now()`,
+          ),
+        );
+      if (abandoned.length > 0) {
+        await transaction
+          .update(analyses)
+          .set({
+            status: "failed",
+            failureCode: "ANALYSIS_ABANDONED",
+            failureDetail:
+              "Der Lauf wurde unterbrochen und nach Ablauf der Reservierung freigegeben. Starten Sie ihn erneut.",
+            updatedAt: new Date(),
+          })
+          .where(
+            inArray(
+              analyses.id,
+              abandoned.map(({ id }) => id),
+            ),
+          );
+      }
+
       await transaction
         .insert(sponsoredRunGrants)
         .values({ userId: user.id })

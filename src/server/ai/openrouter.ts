@@ -29,6 +29,7 @@ const openRouterResponseSchema = z.object({
           content: z.string(),
         }),
         finish_reason: z.string().nullable().optional(),
+        native_finish_reason: z.string().nullable().optional(),
       }),
     )
     .min(1),
@@ -131,7 +132,22 @@ export async function requestOpenRouterStructured<T>(
     throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
   }
 
-  const rawOutput = providerResponse.choices[0]?.message.content;
+  const choice = providerResponse.choices[0];
+
+  // Eine abgeschnittene Antwort ist kein Schemafehler, sondern ein zu niedriges
+  // Ausgabelimit. Ohne diese Unterscheidung meldete der Lauf „kein gültiges
+  // Ergebnis nach dem vereinbarten Schema" und schickte den Betreiber damit auf
+  // die falsche Spur — der Anthropic-Adapter prüft das seit jeher.
+  const finishReason = choice?.finish_reason ?? choice?.native_finish_reason;
+  if (finishReason === "length" || finishReason === "max_tokens") {
+    throw new ModelProviderError(
+      "PROVIDER_OUTPUT_INCOMPLETE",
+      false,
+      `Das Modell hat die Antwort nach ${request.maxOutputTokens} Tokens abgeschnitten. Erhöhen Sie das Ausgabelimit.`,
+    );
+  }
+
+  const rawOutput = choice?.message.content;
   if (!rawOutput) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
 
   const output = parseStructuredOutput(rawOutput, request.outputSchema);

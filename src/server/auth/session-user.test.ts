@@ -38,6 +38,7 @@ const unverifiedSession = {
 
 describe("authenticated application sessions", () => {
   beforeEach(() => {
+    delete process.env.LOCAL_AUTH_BYPASS;
     mocks.ensureApplicationUser.mockReset();
     mocks.getSession.mockReset();
     mocks.getSession.mockResolvedValue(unverifiedSession);
@@ -50,6 +51,20 @@ describe("authenticated application sessions", () => {
       emailVerified: false,
     });
     expect(mocks.ensureApplicationUser).toHaveBeenCalledWith(unverifiedSession.data.user);
+  });
+
+  it("uses an isolated local identity without a Neon Auth session in development", async () => {
+    process.env.LOCAL_AUTH_BYPASS = "true";
+
+    await expect(requireAuthenticatedSessionUser()).resolves.toMatchObject({
+      id: "local-evaluation-user",
+      sessionId: "local-evaluation-session",
+      emailVerified: true,
+    });
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.ensureApplicationUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "local-evaluation-user" }),
+    );
   });
 
   it("still requires verification for legally relevant human approvals", async () => {

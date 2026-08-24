@@ -26,6 +26,8 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
+  const localAuthBypass =
+    process.env.NODE_ENV !== "production" && process.env.LOCAL_AUTH_BYPASS === "true";
   const user = await requireAuthenticatedSessionUser().catch(() => null);
 
   // Der Claim setzt den Draft auf `claimed`; danach findet ihn getBoundActiveDraft
@@ -132,6 +134,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
       <PreviewGate
         callbackUrl={callbackUrl}
         authCallbackError={authCallbackError}
+        localAuthBypass={localAuthBypass}
         draftId={boundDraft.id}
         locale={locale}
         frameworkSlug={boundDraft.frameworkSlug ?? "dora"}

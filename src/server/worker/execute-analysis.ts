@@ -444,13 +444,16 @@ async function assessItem(
       }
     }
   }
+  let previousFailure: string | undefined;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const attemptPrompt =
       attempt === 1
         ? prompt
         : {
             ...prompt,
-            system: `${prompt.system}\nA prior output failed deterministic schema or citation validation. Re-check every field and copy quotes exactly.`,
+            system: `${prompt.system}\nA prior output failed deterministic schema or citation validation${
+              previousFailure ? `: ${previousFailure}` : ""
+            }. Re-check every field and copy quotes exactly.`,
           };
     const invocationId = await startInvocation({
       analysisId: analysis.id,
@@ -512,6 +515,7 @@ async function assessItem(
       await failInvocation(invocationId, startedAt, error, outputHash, analysis.id);
       if (error instanceof ModelProviderError) {
         if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw error;
+        previousFailure = error.detail;
         continue;
       }
       if (

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { AnalysisStartError, startSponsoredAnalysis } from "@/server/analyses/start-analysis";
+import { describeStartFailure } from "@/server/analyses/start-failure-messages";
 import { AuthenticationRequiredError } from "@/server/auth/session-principal";
 import { VerifiedEmailRequiredError } from "@/server/auth/session-user";
 import { hasTrustedApplicationOrigin } from "@/server/security/trusted-origin";
@@ -21,7 +22,10 @@ const inputSchema = z.object({
 
 export async function POST(request: Request) {
   if (!hasTrustedApplicationOrigin(request)) {
-    return NextResponse.json({ code: "UNTRUSTED_ORIGIN" }, { status: 403 });
+    return NextResponse.json(
+      { code: "UNTRUSTED_ORIGIN", message: describeStartFailure("UNTRUSTED_ORIGIN") },
+      { status: 403 },
+    );
   }
 
   try {
@@ -39,13 +43,28 @@ export async function POST(request: Request) {
     const protectedResponse = requestProtectionResponse(error);
     if (protectedResponse) return protectedResponse;
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ code: "INVALID_ANALYSIS_START" }, { status: 400 });
+      return NextResponse.json(
+        { code: "INVALID_ANALYSIS_START", message: describeStartFailure("INVALID_ANALYSIS_START") },
+        { status: 400 },
+      );
     }
     if (error instanceof AuthenticationRequiredError) {
-      return NextResponse.json({ code: "AUTHENTICATION_REQUIRED" }, { status: 401 });
+      return NextResponse.json(
+        {
+          code: "AUTHENTICATION_REQUIRED",
+          message: describeStartFailure("AUTHENTICATION_REQUIRED"),
+        },
+        { status: 401 },
+      );
     }
     if (error instanceof VerifiedEmailRequiredError) {
-      return NextResponse.json({ code: "VERIFIED_EMAIL_REQUIRED" }, { status: 403 });
+      return NextResponse.json(
+        {
+          code: "VERIFIED_EMAIL_REQUIRED",
+          message: describeStartFailure("VERIFIED_EMAIL_REQUIRED"),
+        },
+        { status: 403 },
+      );
     }
 
     const code = error instanceof AnalysisStartError ? error.code : "ANALYSIS_START_FAILED";
@@ -64,6 +83,9 @@ export async function POST(request: Request) {
       ["BYOK_REQUIRED", 402],
     ]).get(code);
 
-    return NextResponse.json({ code }, { status: status ?? 500 });
+    return NextResponse.json(
+      { code, message: describeStartFailure(code) },
+      { status: status ?? 500 },
+    );
   }
 }

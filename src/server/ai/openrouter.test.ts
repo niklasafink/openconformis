@@ -150,7 +150,41 @@ describe("OpenRouter EU structured adapter", () => {
         },
         fetchMock,
       ),
-    ).rejects.toEqual(new ModelProviderError("MODEL_OUTPUT_INVALID", false));
+    ).rejects.toMatchObject({ code: "MODEL_OUTPUT_INVALID", retryable: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a truncated answer as an output limit, not a schema violation", async () => {
+    // Sonnet 5 lief bei 4000 Tokens regelmässig gegen die Decke; die abgeschnittene
+    // Antwort erschien als "kein gültiges Ergebnis nach dem Schema" und verdeckte,
+    // dass nur das Limit zu niedrig war.
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "generation-4",
+          model: "provider/model-v1",
+          choices: [{ message: { content: '{"answer": "abgeschn' }, finish_reason: "length" }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      requestOpenRouterStructured(
+        {
+          apiKey: "test-key",
+          baseUrl: "https://eu.openrouter.ai/api/v1",
+          modelId: "provider/model-v1",
+          system: "system",
+          user: "user",
+          schemaName: "answer",
+          jsonSchema: { type: "object" },
+          outputSchema,
+          providerOnly: ["provider"],
+          maxOutputTokens: 4_000,
+        },
+        fetchMock,
+      ),
+    ).rejects.toMatchObject({ code: "PROVIDER_OUTPUT_INCOMPLETE", retryable: false });
   });
 });

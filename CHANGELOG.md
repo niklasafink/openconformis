@@ -4,6 +4,24 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed a database trigger that prevented any analysis result from ever being
+  stored. A shared trigger function selected its key field with a CASE
+  expression; PL/pgSQL resolves both field accesses when planning, so it demanded
+  a column the results table does not have and every insert failed.
+- Fixed an interrupted run blocking every later start. The run stayed on
+  `running`, kept occupying the free-run grant through its unique index, and the
+  next start failed with an internal error. Abandoned runs whose reservation has
+  expired are now closed as `ANALYSIS_ABANDONED` before the grant is reissued.
+- Fixed a truncated model answer being reported as a schema violation. The
+  OpenRouter adapter read `finish_reason` but never checked it; it now names the
+  output limit instead of blaming the model.
+- Fixed the assessment prompt omitting rules the schema enforces, most notably
+  that a not-fulfilled result needs contradicting evidence. The model was judged
+  by rules it was never given, and the repair attempt was told only that
+  validation had failed, never what had failed.
+- Start failures now carry a sentence naming the cause and the next step instead
+  of a single generic message.
+
 - Made the sponsored OpenRouter route configurable instead of hard-wired to the
   EU host with zero data retention forced on. Both stay the default; departing
   from them is now an explicit operator decision via

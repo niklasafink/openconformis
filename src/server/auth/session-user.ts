@@ -19,7 +19,30 @@ export type AuthenticatedSessionUser = {
   emailVerified: boolean;
 };
 
+const localEvaluationUser: AuthenticatedSessionUser = {
+  id: "local-evaluation-user",
+  sessionId: "local-evaluation-session",
+  name: "Local Evaluation",
+  email: "local-evaluation@openconformis.invalid",
+  emailVerified: true,
+};
+
+function isLocalAuthBypassEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.LOCAL_AUTH_BYPASS === "true";
+}
+
 export async function requireAuthenticatedSessionUser(): Promise<AuthenticatedSessionUser> {
+  if (isLocalAuthBypassEnabled()) {
+    await ensureApplicationUser({
+      id: localEvaluationUser.id,
+      name: localEvaluationUser.name,
+      email: localEvaluationUser.email,
+      emailVerified: localEvaluationUser.emailVerified,
+      image: null,
+    });
+    return localEvaluationUser;
+  }
+
   if (!isAuthenticationConfigured) throw new AuthenticationRequiredError();
 
   const { data: session, error } = await auth.getSession();

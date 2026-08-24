@@ -40,6 +40,7 @@ export default defineConfig({
           DATABASE_URL: databaseUrl,
           DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED ?? databaseUrl,
           TURNSTILE_ENFORCED: "false",
+          LOCAL_AUTH_BYPASS: "false",
           ABUSE_HASH_SECRET: "e2e-only-abuse-hash-secret-at-least-thirty-two-characters",
         },
       },
