@@ -4,6 +4,13 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Fixed an analysis never reaching `completed`. A trigger held a parsed policy
+  version immutable and allowed only two transitions, so finalising a run — which
+  sets the 24-hour retention deadline on that version — was rejected. The same
+  guard blocked both retention jobs, meaning the promised deletion of the
+  original document could not be carried out either. Retention bookkeeping is now
+  permitted; content, object key, hashes and parse output stay protected.
+
 - Fixed a database trigger that prevented any analysis result from ever being
   stored. A shared trigger function selected its key field with a CASE
   expression; PL/pgSQL resolves both field accesses when planning, so it demanded

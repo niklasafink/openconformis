@@ -288,6 +288,20 @@
       "when": 1787518315841,
       "tag": "0040_verification_trigger_field_resolution",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1787566793079,
+      "tag": "0041_policy_version_retention_bookkeeping",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1787566874431,
+      "tag": "0042_restore_policy_version_guard",
+      "breakpoints": true
     }
   ]
 }
