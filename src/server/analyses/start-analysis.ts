@@ -1,16 +1,12 @@
 import "server-only";
 
-import { and, eq, gt, inArray, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
 
 import { createCatalogueItemHash } from "@/domain/frameworks/release-content";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { getActiveAnalysisInstructionPair } from "@/server/ai/analysis-instruction-service";
-import {
-  getStrictAnalysisProviderConfiguration,
-  sponsoredPrivacyProfileId,
-  sponsoredZeroDataRetention,
-} from "@/server/ai/provider-routing";
+import { getAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
 import { ensurePersonalWorkspace } from "@/server/auth/personal-workspace";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
@@ -19,7 +15,6 @@ import {
   anonymousDrafts,
   draftAnalysisScopes,
   draftRequirementSelections,
-  sponsoredRunGrants,
 } from "@/server/db/schema/application";
 import { aiCredentials, draftModelSelections } from "@/server/db/schema/ai";
 import { analyses, analysisScopeItems } from "@/server/db/schema/analyses";
@@ -32,103 +27,11 @@ import {
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { launchAnalysisWorkflow } from "@/server/workflows/launch";
 
-const sponsoredReservationMilliseconds = 60 * 60 * 1000;
-
 export class AnalysisStartError extends Error {
   constructor(public readonly code: string) {
     super(code);
     this.name = "AnalysisStartError";
   }
-}
-
-type AnalysisRoute = {
-  fundingMode: "sponsored" | "byok";
-  aiCredentialId?: string;
-  routeProvider: string;
-  providerRouteAllowlist: string[];
-  providerModelId: string;
-  modelProfileId: string;
-  verifierProviderModelId: string;
-  verifierModelProfileId: string;
-  verifierProviderRouteAllowlist: string[];
-  modelCatalogueVersion: string;
-  privacyProfileId: string;
-  promptVersion: string;
-  verifierPromptVersion: string;
-  assessmentInstructionId?: string;
-  assessmentInstructionHash?: string;
-  verificationInstructionId?: string;
-  verificationInstructionHash?: string;
-  unevaluatedWarningAccepted: boolean;
-};
-
-function readSponsoredRoute(): AnalysisRoute {
-  if (process.env.SPONSORED_RUNS_ENABLED !== "true") {
-    throw new AnalysisStartError("SPONSORED_RUNS_DISABLED");
-  }
-
-  const routeProvider = process.env.SPONSORED_AI_PROVIDER?.trim();
-  const providerModelId = process.env.SPONSORED_ANALYSIS_MODEL?.trim();
-  const verifierProviderModelId = process.env.SPONSORED_VERIFIER_MODEL?.trim();
-  const providerRouteAllowlist = (process.env.SPONSORED_OPENROUTER_PROVIDER_ONLY ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const verifierProviderRouteAllowlist = (process.env.SPONSORED_VERIFIER_PROVIDER_ONLY ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const allowlist = new Set(
-    (process.env.AI_PROVIDER_ALLOWLIST ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
-
-  if (
-    !routeProvider ||
-    !providerModelId ||
-    !verifierProviderModelId ||
-    !allowlist.has(routeProvider) ||
-    (routeProvider === "openrouter" &&
-      (providerRouteAllowlist.length !== 1 || verifierProviderRouteAllowlist.length !== 1))
-  ) {
-    throw new AnalysisStartError("SPONSORED_ROUTE_NOT_CONFIGURED");
-  }
-
-  const sponsoredModels = new Set(
-    (process.env.SPONSORED_MODEL_ALLOWLIST ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
-  if (
-    sponsoredModels.size > 0 &&
-    (!sponsoredModels.has(providerModelId) || !sponsoredModels.has(verifierProviderModelId))
-  ) {
-    throw new AnalysisStartError("SPONSORED_MODEL_NOT_ALLOWED");
-  }
-
-  return {
-    fundingMode: "sponsored",
-    routeProvider,
-    providerRouteAllowlist,
-    providerModelId,
-    modelProfileId: process.env.DEFAULT_ANALYSIS_MODEL_PROFILE?.trim() || providerModelId,
-    verifierProviderModelId,
-    verifierModelProfileId: process.env.VERIFIER_MODEL_PROFILE?.trim() || verifierProviderModelId,
-    verifierProviderRouteAllowlist,
-    modelCatalogueVersion: process.env.MODEL_CATALOGUE_VERSION?.trim() || "runtime-v1",
-    // Nicht aus SPONSORED_PRIVACY_PROFILE übernehmen: das Profil muss der
-    // tatsächlichen Route folgen, sonst behauptet der Nachweis mehr als galt.
-    privacyProfileId: sponsoredPrivacyProfileId({
-      baseUrl: process.env.SPONSORED_OPENROUTER_BASE_URL?.trim() ?? "",
-      zeroDataRetention: sponsoredZeroDataRetention(),
-    }),
-    promptVersion: "",
-    verifierPromptVersion: "",
-    unevaluatedWarningAccepted: false,
-  };
 }
 
 export type StartAnalysisResult = {
@@ -137,30 +40,21 @@ export type StartAnalysisResult = {
   reused: boolean;
 };
 
-export async function startSponsoredAnalysis(input: {
-  expectedDraftId: string;
-}): Promise<StartAnalysisResult> {
-  return startAnalysis({ ...input, fundingMode: "sponsored" });
-}
-
-export async function startByokAnalysis(input: {
-  expectedDraftId: string;
+/**
+ * Übernimmt den anonymen Draft in den Arbeitsbereich des Nutzers und friert den
+ * Lauf ein: Rahmenwerk-Fassung, Prüfungsumfang, Policy-Fassung, Modellroute und
+ * Anweisungsversionen. Jeder Lauf läuft über den eigenen, kurzlebig hinterlegten
+ * Schlüssel des Nutzers — einen Betreiber-Schlüssel gibt es nicht.
+ */
+export async function startAnalysis(input: {
+  draftId: string;
   credentialId: string;
-}): Promise<StartAnalysisResult> {
-  return startAnalysis({ ...input, fundingMode: "byok" });
-}
-
-async function startAnalysis(input: {
-  expectedDraftId: string;
-  fundingMode: "sponsored" | "byok";
-  credentialId?: string;
 }): Promise<StartAnalysisResult> {
   if (!isDatabaseConfigured) throw new AnalysisStartError("DATABASE_UNAVAILABLE");
 
-  const [user, boundDraft, sponsoredRoute, instructions] = await Promise.all([
+  const [user, boundDraft, instructions] = await Promise.all([
     requireAuthenticatedSessionUser(),
-    getBoundActiveDraft(input.expectedDraftId),
-    input.fundingMode === "sponsored" ? Promise.resolve().then(readSponsoredRoute) : undefined,
+    getBoundActiveDraft(input.draftId),
     getActiveAnalysisInstructionPair(),
   ]);
   if (!boundDraft?.frameworkSlug) throw new AnalysisStartError("DRAFT_NOT_FOUND");
@@ -254,169 +148,53 @@ async function startAnalysis(input: {
       throw new AnalysisStartError("POLICY_NOT_READY");
     }
 
+    const [modelSelection] = await transaction
+      .select()
+      .from(draftModelSelections)
+      .where(eq(draftModelSelections.anonymousDraftId, draft.id))
+      .limit(1);
+    if (!modelSelection) throw new AnalysisStartError("MODEL_SELECTION_NOT_FOUND");
+    let provider;
+    try {
+      provider = getAnalysisProviderConfiguration(modelSelection.routeProvider);
+    } catch {
+      throw new AnalysisStartError("BYOK_ROUTE_NOT_EXECUTABLE");
+    }
+
+    const [credential] = await transaction
+      .select({
+        id: aiCredentials.id,
+        privacyAttestationAccepted: aiCredentials.privacyAttestationAccepted,
+      })
+      .from(aiCredentials)
+      .where(
+        and(
+          eq(aiCredentials.id, input.credentialId),
+          eq(aiCredentials.ownerUserId, user.id),
+          eq(aiCredentials.sessionId, user.sessionId),
+          eq(aiCredentials.provider, modelSelection.routeProvider),
+          eq(aiCredentials.purpose, "analysis"),
+          eq(aiCredentials.bindingId, draft.id),
+          eq(aiCredentials.status, "active"),
+          gt(aiCredentials.expiresAt, new Date()),
+          sql`${modelSelection.providerModelId} = ANY(${aiCredentials.accessibleModelIds})`,
+        ),
+      )
+      .limit(1);
+    if (!credential) throw new AnalysisStartError("BYOK_CREDENTIAL_INVALID");
+    if (
+      (modelSelection.routeProvider === "requesty" || modelSelection.routeProvider === "openai") &&
+      !credential.privacyAttestationAccepted
+    ) {
+      throw new AnalysisStartError("BYOK_PRIVACY_ATTESTATION_REQUIRED");
+    }
+
     // Der Advisory Lock oben serialisiert diesen Abschnitt je Nutzer.
     const membership = await ensurePersonalWorkspace(
       transaction,
       { id: user.id, name: user.name, email: user.email },
       draft.locale,
     );
-
-    let route: AnalysisRoute;
-    let sponsoredGrantId: string | undefined;
-    if (input.fundingMode === "sponsored") {
-      if (!sponsoredRoute) throw new AnalysisStartError("SPONSORED_ROUTE_NOT_CONFIGURED");
-      route = sponsoredRoute;
-
-      // Ein Lauf, dessen Reservierung abgelaufen ist, wurde von seinem Worker nie
-      // beendet — der Prozess ist gestorben. Er bleibt auf `running` stehen und
-      // hält das Kontingent über analyses_sponsored_grant_uidx weiter besetzt.
-      // Die Reservierung unten holt das Kontingent zwar zurück, der Einfüge-
-      // versuch scheiterte dann aber an genau diesem Index und der Nutzer sah
-      // einen internen Fehler. Abgebrochene Läufe werden deshalb zuerst als
-      // gescheitert markiert; das gibt den Index frei und benennt, was geschah.
-      const abandoned = await transaction
-        .select({ id: analyses.id })
-        .from(analyses)
-        .innerJoin(sponsoredRunGrants, eq(sponsoredRunGrants.id, analyses.sponsoredGrantId))
-        .where(
-          and(
-            eq(analyses.ownerUserId, user.id),
-            inArray(analyses.status, ["queued", "running"]),
-            sql`${sponsoredRunGrants.reservedUntil} < now()`,
-          ),
-        );
-      if (abandoned.length > 0) {
-        await transaction
-          .update(analyses)
-          .set({
-            status: "failed",
-            failureCode: "ANALYSIS_ABANDONED",
-            failureDetail:
-              "Der Lauf wurde unterbrochen und nach Ablauf der Reservierung freigegeben. Starten Sie ihn erneut.",
-            updatedAt: new Date(),
-          })
-          .where(
-            inArray(
-              analyses.id,
-              abandoned.map(({ id }) => id),
-            ),
-          );
-      }
-
-      await transaction
-        .insert(sponsoredRunGrants)
-        .values({ userId: user.id })
-        .onConflictDoNothing({ target: sponsoredRunGrants.userId });
-      const reservedUntil = new Date(Date.now() + sponsoredReservationMilliseconds);
-      const [grant] = await transaction
-        .update(sponsoredRunGrants)
-        .set({
-          status: "reserved",
-          reservedUntil,
-          revision: sql`${sponsoredRunGrants.revision} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(sponsoredRunGrants.userId, user.id),
-            or(
-              eq(sponsoredRunGrants.status, "available"),
-              and(
-                eq(sponsoredRunGrants.status, "reserved"),
-                sql`${sponsoredRunGrants.reservedUntil} < now()`,
-              ),
-            ),
-          ),
-        )
-        .returning({ id: sponsoredRunGrants.id });
-      if (!grant) throw new AnalysisStartError("BYOK_REQUIRED");
-
-      // Ein Kontingent, das noch an einem lebenden oder abgeschlossenen Lauf
-      // haengt, darf nicht erneut vergeben werden: analyses_sponsored_grant_uidx
-      // laesst je Kontingent genau einen solchen Lauf zu, und der Einfuegeversuch
-      // endete sonst in einem internen Fehler statt in einer klaren Auskunft.
-      const [holder] = await transaction
-        .select({ id: analyses.id })
-        .from(analyses)
-        .where(
-          and(
-            eq(analyses.sponsoredGrantId, grant.id),
-            notInArray(analyses.status, ["failed", "cancelled"]),
-          ),
-        )
-        .limit(1);
-      if (holder) throw new AnalysisStartError("BYOK_REQUIRED");
-
-      sponsoredGrantId = grant.id;
-    } else {
-      if (!input.credentialId) throw new AnalysisStartError("BYOK_CREDENTIAL_REQUIRED");
-      const [modelSelection] = await transaction
-        .select()
-        .from(draftModelSelections)
-        .where(eq(draftModelSelections.anonymousDraftId, draft.id))
-        .limit(1);
-      if (!modelSelection) throw new AnalysisStartError("MODEL_SELECTION_NOT_FOUND");
-      let byokProvider;
-      try {
-        byokProvider = getStrictAnalysisProviderConfiguration(modelSelection.routeProvider);
-      } catch {
-        throw new AnalysisStartError("BYOK_ROUTE_NOT_EXECUTABLE");
-      }
-      const [credential] = await transaction
-        .select({
-          id: aiCredentials.id,
-          privacyAttestationAccepted: aiCredentials.privacyAttestationAccepted,
-        })
-        .from(aiCredentials)
-        .where(
-          and(
-            eq(aiCredentials.id, input.credentialId),
-            eq(aiCredentials.ownerUserId, user.id),
-            eq(aiCredentials.sessionId, user.sessionId),
-            eq(aiCredentials.provider, modelSelection.routeProvider),
-            eq(aiCredentials.purpose, "analysis"),
-            eq(aiCredentials.bindingId, draft.id),
-            eq(aiCredentials.status, "active"),
-            gt(aiCredentials.expiresAt, new Date()),
-            sql`${modelSelection.providerModelId} = ANY(${aiCredentials.accessibleModelIds})`,
-          ),
-        )
-        .limit(1);
-      if (!credential) throw new AnalysisStartError("BYOK_CREDENTIAL_INVALID");
-      if (
-        (modelSelection.routeProvider === "requesty" ||
-          modelSelection.routeProvider === "openai") &&
-        !credential.privacyAttestationAccepted
-      ) {
-        throw new AnalysisStartError("BYOK_PRIVACY_ATTESTATION_REQUIRED");
-      }
-      route = {
-        fundingMode: "byok",
-        aiCredentialId: credential.id,
-        routeProvider: modelSelection.routeProvider,
-        providerRouteAllowlist: [],
-        providerModelId: modelSelection.providerModelId,
-        modelProfileId: modelSelection.modelProfileId,
-        verifierProviderModelId: modelSelection.providerModelId,
-        verifierModelProfileId: modelSelection.modelProfileId,
-        verifierProviderRouteAllowlist: [],
-        modelCatalogueVersion: modelSelection.modelCatalogueVersion,
-        privacyProfileId: byokProvider.privacyProfileId,
-        promptVersion: "",
-        verifierPromptVersion: "",
-        unevaluatedWarningAccepted: modelSelection.unevaluatedWarningAccepted,
-      };
-    }
-
-    route = {
-      ...route,
-      promptVersion: instructions.assessment.version,
-      verifierPromptVersion: instructions.verification.version,
-      assessmentInstructionId: instructions.assessment.id,
-      assessmentInstructionHash: instructions.assessment.contentHash,
-      verificationInstructionId: instructions.verification.id,
-      verificationInstructionHash: instructions.verification.contentHash,
-    };
 
     const [claimed] = await transaction
       .update(anonymousDrafts)
@@ -475,6 +253,22 @@ async function startAnalysis(input: {
         .where(eq(policyVersions.id, selectedPolicy.policyVersionId));
     }
 
+    const route = {
+      routeProvider: modelSelection.routeProvider,
+      providerModelId: modelSelection.providerModelId,
+      modelProfileId: modelSelection.modelProfileId,
+      verifierProviderModelId: modelSelection.providerModelId,
+      verifierModelProfileId: modelSelection.modelProfileId,
+      modelCatalogueVersion: modelSelection.modelCatalogueVersion,
+      privacyProfileId: provider.privacyProfileId,
+      promptVersion: instructions.assessment.version,
+      verifierPromptVersion: instructions.verification.version,
+      assessmentInstructionId: instructions.assessment.id,
+      assessmentInstructionHash: instructions.assessment.contentHash,
+      verificationInstructionId: instructions.verification.id,
+      verificationInstructionHash: instructions.verification.contentHash,
+      unevaluatedWarningAccepted: modelSelection.unevaluatedWarningAccepted,
+    };
     const configurationHash = createContentHash({
       route,
       frameworkContentHash: release.contentHash,
@@ -486,39 +280,22 @@ async function startAnalysis(input: {
     const [analysis] = await transaction
       .insert(analyses)
       .values({
+        ...route,
         organizationId: membership.organizationId,
         ownerUserId: user.id,
         sourceDraftId: draft.id,
         policyVersionId,
-        sponsoredGrantId,
-        aiCredentialId: route.aiCredentialId,
+        aiCredentialId: credential.id,
         frameworkSlug: release.frameworkSlug,
         frameworkReleaseKey: release.id,
         frameworkContentHash: release.contentHash,
         institutionSize: scope.institutionSize,
         organizationContext: scope.organizationContext,
         locale: draft.locale,
-        fundingMode: route.fundingMode,
-        routeProvider: route.routeProvider,
-        providerRouteAllowlist: route.providerRouteAllowlist,
-        providerModelId: route.providerModelId,
-        modelProfileId: route.modelProfileId,
-        verifierProviderModelId: route.verifierProviderModelId,
-        verifierModelProfileId: route.verifierModelProfileId,
-        verifierProviderRouteAllowlist: route.verifierProviderRouteAllowlist,
-        modelCatalogueVersion: route.modelCatalogueVersion,
-        privacyProfileId: route.privacyProfileId,
-        promptVersion: route.promptVersion,
-        verifierPromptVersion: route.verifierPromptVersion,
-        assessmentInstructionId: route.assessmentInstructionId,
-        assessmentInstructionHash: route.assessmentInstructionHash,
-        verificationInstructionId: route.verificationInstructionId,
-        verificationInstructionHash: route.verificationInstructionHash,
         configurationHash,
         policySha256: selectedPolicy.sha256,
         policyParserVersion: selectedPolicy.parserVersion,
         requirementCount: selectedRequirements.length,
-        unevaluatedWarningAccepted: route.unevaluatedWarningAccepted,
       })
       .returning({ id: analyses.id, status: analyses.status });
     if (!analysis) throw new AnalysisStartError("ANALYSIS_NOT_CREATED");
@@ -555,7 +332,6 @@ async function startAnalysis(input: {
       targetType: "analysis",
       targetId: analysis.id,
       metadata: {
-        fundingMode: route.fundingMode,
         frameworkContentHash: release.contentHash,
         modelProfileId: route.modelProfileId,
         requirementCount: selectedRequirements.length,

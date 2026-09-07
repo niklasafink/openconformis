@@ -2,7 +2,7 @@
 
 import { Check, LoaderCircle, LockKeyhole, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AuthForm, type AuthFormLabels } from "@/components/auth/auth-form";
 import { authClient } from "@/lib/auth-client";
@@ -13,8 +13,6 @@ import {
   type DocumentBlock,
   type ResultItem,
 } from "@/components/results/analysis-results-workspace";
-
-type StartFailure = "authentication" | "verification" | "generic";
 
 type PreviewGateProps = {
   callbackUrl: string;
@@ -40,13 +38,7 @@ type PreviewGateProps = {
     parsing: string;
     mapping: string;
     checking: string;
-    complete: string;
-    starting: string;
     startFailed: string;
-    startFailedAuthentication: string;
-    startFailedVerification: string;
-    startFailedGeneric: string;
-    retry: string;
     goToSignIn: string;
     lockedTitle: string;
     lockedBody: string;
@@ -63,8 +55,24 @@ type PreviewGateProps = {
   };
 };
 
+type StartFailure = { message: string; signInRequired: boolean };
+
 const animationStepMilliseconds = 650;
 
+function postJson(url: string, body: unknown) {
+  return fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Die Vorschau zeigt Demo-Stati ohne echte Bewertung und bleibt deshalb
+ * verschwommen. Wer angemeldet ist, verbindet hier seinen eigenen Schlüssel;
+ * damit startet die echte Analyse und ersetzt die Vorschau.
+ */
 export function PreviewGate({
   callbackUrl,
   authCallbackError,
@@ -82,18 +90,18 @@ export function PreviewGate({
 }: PreviewGateProps) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
+  const signedIn = localAuthBypass || Boolean(session);
   const [step, setStep] = useState(0);
-  const [authDialogOpen, setAuthDialogOpen] = useState(Boolean(authCallbackError));
-  const [startFailure, setStartFailure] = useState<StartFailure | null>(null);
-  // Die Begründung des Servers, falls er eine mitgeschickt hat.
-  const [startFailureMessage, setStartFailureMessage] = useState<string | null>(null);
-  const [byokRequired, setByokRequired] = useState(false);
+  // Solange niemand den Dialog angefasst hat, entscheidet die Anmeldung: nach ihr
+  // gibt es nur noch einen nächsten Schritt, den Schlüssel.
+  const [dialog, setDialog] = useState<"open" | "closed" | undefined>(
+    authCallbackError ? "open" : undefined,
+  );
+  const dialogOpen = dialog === "open" || (dialog === undefined && signedIn);
   const [apiKey, setApiKey] = useState("");
-  const [credentialPending, setCredentialPending] = useState(false);
-  const [credentialError, setCredentialError] = useState(false);
   const [privacyAttestationAccepted, setPrivacyAttestationAccepted] = useState(false);
-  const [startAttempt, setStartAttempt] = useState(0);
-  const startRequested = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [failure, setFailure] = useState<StartFailure | null>(null);
   const steps = [labels.parsing, labels.mapping, labels.checking];
 
   useEffect(() => {
@@ -105,102 +113,49 @@ export function PreviewGate({
     return () => window.clearTimeout(timer);
   }, [step, steps.length]);
 
-  useEffect(() => {
-    if ((!localAuthBypass && !session) || step < steps.length || startRequested.current) return;
-    startRequested.current = true;
-
-    void fetch("/api/analyses/start", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ draftId }),
-    })
-      .then(async (response) => {
-        const payload = (await response.json()) as {
-          analysisId?: string;
-          code?: string;
-          message?: string;
-        };
-        setStartFailureMessage(payload.message ?? null);
-
-        // Fehlendes Sponsoring ist kein Fehler, sondern der reguläre Weg in den
-        // eigenen Modellzugang.
-        if (
-          response.status === 402 ||
-          payload.code === "SPONSORED_RUNS_DISABLED" ||
-          payload.code === "SPONSORED_ROUTE_NOT_CONFIGURED" ||
-          payload.code === "SPONSORED_MODEL_NOT_ALLOWED"
-        ) {
-          setByokRequired(true);
-          return;
-        }
-
-        // Diese Fälle sind für den Nutzer auflösbar — er muss aber erfahren, was
-        // fehlt, statt eine generische Fehlermeldung zu sehen.
-        if (response.status === 401 || payload.code === "AUTHENTICATION_REQUIRED") {
-          setStartFailure("authentication");
-          return;
-        }
-        if (response.status === 403 || payload.code === "VERIFIED_EMAIL_REQUIRED") {
-          setStartFailure("verification");
-          return;
-        }
-
-        if (!response.ok || !payload.analysisId) throw new Error("ANALYSIS_START_FAILED");
-        router.replace(`/${locale}/analyses/${payload.analysisId}`);
-      })
-      .catch(() => {
-        setStartFailureMessage(null);
-        setStartFailure("generic");
-      });
-  }, [draftId, locale, localAuthBypass, router, session, startAttempt, step, steps.length]);
-
   async function connectCredentialAndStart(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCredentialPending(true);
-    setCredentialError(false);
+    setPending(true);
+    setFailure(null);
     try {
-      const credentialResponse = await fetch("/api/ai-credentials", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          provider: selectedModel.routeProvider,
-          purpose: "analysis",
-          bindingId: draftId,
-          requiredModelId: selectedModel.providerModelId,
-          apiKey,
-          privacyAttestationAccepted,
-        }),
+      const credentialResponse = await postJson("/api/ai-credentials", {
+        provider: selectedModel.routeProvider,
+        purpose: "analysis",
+        bindingId: draftId,
+        requiredModelId: selectedModel.providerModelId,
+        apiKey,
+        privacyAttestationAccepted,
       });
       const credential = (await credentialResponse.json()) as { credentialId?: string };
-      setApiKey("");
       if (!credentialResponse.ok || !credential.credentialId) {
-        throw new Error("CREDENTIAL_CONNECTION_FAILED");
+        setFailure({
+          message: labels.keyFailed,
+          signInRequired: credentialResponse.status === 401,
+        });
+        return;
       }
 
-      const startResponse = await fetch("/api/analyses/start/byok", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ draftId, credentialId: credential.credentialId }),
+      const startResponse = await postJson("/api/analyses/start", {
+        draftId,
+        credentialId: credential.credentialId,
       });
-      const analysis = (await startResponse.json()) as { analysisId?: string };
-      if (!startResponse.ok || !analysis.analysisId) throw new Error("BYOK_START_FAILED");
+      const analysis = (await startResponse.json()) as { analysisId?: string; message?: string };
+      if (!startResponse.ok || !analysis.analysisId) {
+        // Die Begründung des Servers hat Vorrang: sie benennt den konkreten
+        // Zustand, der lokale Text kennt nur die Fallgruppe.
+        setFailure({
+          message: analysis.message ?? labels.startFailed,
+          signInRequired: startResponse.status === 401,
+        });
+        return;
+      }
       router.replace(`/${locale}/analyses/${analysis.analysisId}`);
     } catch {
-      setCredentialError(true);
+      setFailure({ message: labels.startFailed, signInRequired: false });
     } finally {
       setApiKey("");
-      setCredentialPending(false);
+      setPending(false);
     }
-  }
-
-  function retryStart() {
-    startRequested.current = false;
-    setStartFailure(null);
-    setStartFailureMessage(null);
-    setStartAttempt((attempt) => attempt + 1);
   }
 
   if (step < steps.length) {
@@ -224,106 +179,6 @@ export function PreviewGate({
     );
   }
 
-  // Nach der Anmeldung oder im lokalen Entwicklungsmodus wird die Vorschau
-  // nicht freigeschaltet, sondern durch eine echte Analyse ersetzt.
-  // Die Vorschauwerte sind Demo-Stati ohne echte Bewertung — sie unverschwommen
-  // zu zeigen, ließe erfundene Ergebnisse wie geprüfte aussehen.
-  if (session || localAuthBypass) {
-    return (
-      <div className="preview-result-layout">
-        {byokRequired ? (
-          <div className="preview-auth-backdrop">
-            <section
-              className="preview-auth-card preview-byok-card"
-              role="dialog"
-              aria-modal="true"
-            >
-              <h1>{labels.byokTitle}</h1>
-              <p>{labels.byokBody}</p>
-              <dl className="preview-byok-model">
-                <div>
-                  <dt>{labels.selectedModel}</dt>
-                  <dd>{selectedModel.providerModelId}</dd>
-                </div>
-              </dl>
-              <form onSubmit={connectCredentialAndStart}>
-                <label htmlFor="preview-api-key">{selectedModel.routeProviderLabel} API-Key</label>
-                <input
-                  id="preview-api-key"
-                  type="password"
-                  required
-                  minLength={8}
-                  maxLength={20_000}
-                  autoComplete="off"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                />
-                {credentialError ? <p className="preview-key-error">{labels.keyFailed}</p> : null}
-                {selectedModel.privacyAttestationRequired ? (
-                  <label className="preview-privacy-attestation">
-                    <input
-                      type="checkbox"
-                      required
-                      checked={privacyAttestationAccepted}
-                      onChange={(event) => setPrivacyAttestationAccepted(event.target.checked)}
-                    />
-                    <span>{labels.privacyAttestation}</span>
-                  </label>
-                ) : null}
-                <div className="preview-key-actions">
-                  <a href={selectedModel.credentialHelpUrl} target="_blank" rel="noreferrer">
-                    {labels.keyLink}
-                  </a>
-                  <button
-                    className="button button-primary"
-                    type="submit"
-                    disabled={credentialPending}
-                  >
-                    {credentialPending ? labels.connecting : labels.connect}
-                  </button>
-                </div>
-              </form>
-            </section>
-          </div>
-        ) : startFailure ? (
-          <section className="preview-start-state preview-start-failed" role="alert">
-            <h1>{labels.startFailed}</h1>
-            <p>
-              {/* Die Begründung des Servers hat Vorrang: sie benennt den konkreten
-                  Zustand, während die lokalen Texte nur die Fallgruppe kennen. */}
-              {startFailureMessage ??
-                (startFailure === "authentication"
-                  ? labels.startFailedAuthentication
-                  : startFailure === "verification"
-                    ? labels.startFailedVerification
-                    : labels.startFailedGeneric)}
-            </p>
-            <div className="preview-start-actions">
-              {startFailure === "authentication" ? (
-                <a
-                  className="button button-primary"
-                  href={`/${locale}/sign-in?next=${encodeURIComponent(callbackUrl)}`}
-                >
-                  {labels.goToSignIn}
-                </a>
-              ) : (
-                <button className="button button-primary" type="button" onClick={retryStart}>
-                  {labels.retry}
-                </button>
-              )}
-            </div>
-          </section>
-        ) : (
-          <section className="preview-start-state" role="status" aria-live="polite">
-            <LoaderCircle className="preview-spinner" size={24} aria-hidden="true" />
-            <h1>{labels.starting}</h1>
-            <p>{labels.complete}</p>
-          </section>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="preview-result-layout">
       <AnalysisResultsWorkspace
@@ -337,43 +192,105 @@ export function PreviewGate({
         labels={resultLabels}
         lockedPreview={{
           documentBlocks: previewDocumentBlocks,
-          unlockLabel: labels.unlockResult,
-          onUnlock: () => setAuthDialogOpen(true),
+          unlockLabel: signedIn ? labels.byokTitle : labels.unlockResult,
+          onUnlock: () => setDialog("open"),
         }}
       />
 
-      {!localAuthBypass && authDialogOpen ? (
+      {dialogOpen ? (
         <div
           className="preview-auth-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setAuthDialogOpen(false);
+            if (event.target === event.currentTarget) setDialog("closed");
           }}
         >
           <section
-            className="preview-auth-card"
+            className={signedIn ? "preview-auth-card preview-byok-card" : "preview-auth-card"}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="preview-auth-title"
+            aria-labelledby="preview-dialog-title"
           >
             <button
               type="button"
               className="preview-auth-close"
               aria-label={labels.close}
-              onClick={() => setAuthDialogOpen(false)}
+              onClick={() => setDialog("closed")}
             >
               <X size={18} aria-hidden="true" />
             </button>
-            <span className="preview-lock">
-              <LockKeyhole size={18} />
-            </span>
-            <h1 id="preview-auth-title">{labels.lockedTitle}</h1>
-            <p>{labels.lockedBody}</p>
-            <AuthForm
-              callbackUrl={callbackUrl}
-              initialError={Boolean(authCallbackError)}
-              labels={labels}
-            />
+            {signedIn ? (
+              <>
+                <h1 id="preview-dialog-title">{labels.byokTitle}</h1>
+                <p>{labels.byokBody}</p>
+                <dl className="preview-byok-model">
+                  <div>
+                    <dt>{labels.selectedModel}</dt>
+                    <dd>{selectedModel.providerModelId}</dd>
+                  </div>
+                </dl>
+                <form onSubmit={connectCredentialAndStart}>
+                  <label htmlFor="preview-api-key">
+                    {selectedModel.routeProviderLabel} API-Key
+                  </label>
+                  <input
+                    id="preview-api-key"
+                    type="password"
+                    required
+                    minLength={8}
+                    maxLength={20_000}
+                    autoComplete="off"
+                    value={apiKey}
+                    onChange={(event) => setApiKey(event.target.value)}
+                  />
+                  {selectedModel.privacyAttestationRequired ? (
+                    <label className="preview-privacy-attestation">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={privacyAttestationAccepted}
+                        onChange={(event) => setPrivacyAttestationAccepted(event.target.checked)}
+                      />
+                      <span>{labels.privacyAttestation}</span>
+                    </label>
+                  ) : null}
+                  {failure ? (
+                    <p className="preview-key-error" role="alert">
+                      {failure.message}
+                      {failure.signInRequired ? (
+                        <>
+                          {" "}
+                          <a href={`/${locale}/sign-in?next=${encodeURIComponent(callbackUrl)}`}>
+                            {labels.goToSignIn}
+                          </a>
+                        </>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  <div className="preview-key-actions">
+                    <a href={selectedModel.credentialHelpUrl} target="_blank" rel="noreferrer">
+                      {labels.keyLink}
+                    </a>
+                    <button className="button button-primary" type="submit" disabled={pending}>
+                      {pending ? labels.connecting : labels.connect}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <span className="preview-lock">
+                  <LockKeyhole size={18} />
+                </span>
+                <h1 id="preview-dialog-title">{labels.lockedTitle}</h1>
+                <p>{labels.lockedBody}</p>
+                <AuthForm
+                  callbackUrl={callbackUrl}
+                  initialError={Boolean(authCallbackError)}
+                  labels={labels}
+                />
+              </>
+            )}
           </section>
         </div>
       ) : null}

@@ -12,7 +12,6 @@ export const analysisModelProfileSchema = z.object({
   promptPricePerMillion: z.number().nonnegative().optional(),
   completionPricePerMillion: z.number().nonnegative().optional(),
   evaluated: z.boolean(),
-  sponsorshipEligible: z.boolean(),
   lifecycle: z.enum(["unevaluated", "candidate", "certified", "deprecated", "blocked"]).optional(),
   recommendation: z.enum(["quality", "balanced", "economy"]).optional(),
   evaluationVersion: z.string().optional(),

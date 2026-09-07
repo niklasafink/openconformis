@@ -12,7 +12,7 @@ The hosted beta is intended only for test documents and non-confidential materia
 - Neon PostgreSQL and Neon Auth in Frankfurt, accessed through Drizzle ORM
 - local PDF rendering with `pdfjs-dist` and `@napi-rs/canvas`
 - local German/English OCR with Tesseract.js; document images do not leave the application
-- OpenRouter for the sponsored first run and OpenRouter, Requesty, Anthropic, Google or OpenAI for temporary BYOK sessions
+- OpenRouter, Requesty, Anthropic, Google or OpenAI through temporary user-supplied keys; every analysis runs on the user's own key, there is no operator credential
 
 Workflow arguments contain opaque database IDs only. Policy text and API keys are loaded inside isolated steps and are not serialized into the Workflow event log.
 

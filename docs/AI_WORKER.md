@@ -28,13 +28,13 @@ Each step receives only an analysis ID and, where needed, a scope-item ID. It lo
 
 ## Model routing
 
-The sponsored route uses an administrator-curated model through OpenRouter EU with ZDR-compatible provider allowlists. Users may choose evaluated or non-evaluated models for BYOK; non-evaluated choices require an explicit warning acknowledgement. Direct Requesty, Anthropic, Google and OpenAI adapters are supported only when their configured privacy profile passes the route guard.
+Every analysis runs on the user's own temporary key; there is no operator credential. Users may choose evaluated or non-evaluated models; non-evaluated choices require an explicit warning acknowledgement. For OpenRouter, zero data retention is requested unless `OPENROUTER_ZDR=false`, and the privacy profile frozen with the run records the route that was actually used. Direct Requesty, Anthropic, Google and OpenAI adapters are supported only when their configured privacy profile passes the route guard.
 
 Model approval is an admin release decision. Quality evaluation should measure at least grounding accuracy, unsupported-claim rate, status agreement with expert labels, false-negative rate, structured-output validity, latency and cost per requirement. Low hallucination and evidence fidelity outrank raw benchmark scores.
 
 ## Failure behavior
 
-Workflow steps retry transient failures. Database writes are idempotent through frozen IDs and unique constraints. Exhausted analysis retries mark the analysis failed, release an unused sponsored grant and delete the temporary BYOK secret. OCR processes four pages per step; exhausted OCR retries move the document to manual-review state.
+Workflow steps retry transient failures. Database writes are idempotent through frozen IDs and unique constraints. Exhausted analysis retries mark the analysis failed and delete the temporary BYOK secret. OCR processes four pages per step; exhausted OCR retries move the document to manual-review state.
 
 ## Privacy and retention
 

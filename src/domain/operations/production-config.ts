@@ -63,17 +63,6 @@ function requireHttpsUrl(
   }
 }
 
-function requirePositiveInteger(
-  issues: ProductionConfigIssue[],
-  environment: NodeJS.ProcessEnv,
-  name: string,
-) {
-  const parsed = Number.parseInt(value(environment, name), 10);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    issues.push({ variable: name, message: "must be a positive integer", severity: "error" });
-  }
-}
-
 function validateByokKey(issues: ProductionConfigIssue[], environment: NodeJS.ProcessEnv) {
   const encoded = value(environment, "BYOK_ENCRYPTION_KEY");
   try {
@@ -122,30 +111,6 @@ export function checkProductionConfig(
         severity: "error",
       });
     }
-  }
-
-  if (value(environment, "TURNSTILE_ENFORCED") === "true") {
-    requireValue(issues, environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY");
-    requireHttpsUrl(issues, environment, "TURNSTILE_SITEVERIFY_WORKER_URL");
-  } else {
-    issues.push({
-      variable: "TURNSTILE_ENFORCED",
-      message:
-        "is disabled; database rate limits remain active but automated abuse protection is reduced",
-      severity: "warning",
-    });
-  }
-
-  if (value(environment, "SPONSORED_RUNS_ENABLED") === "true") {
-    for (const name of [
-      "SPONSORED_OPENROUTER_API_KEY",
-      "SPONSORED_OPENROUTER_PROVIDER_ONLY",
-      "SPONSORED_ANALYSIS_MODEL",
-    ]) {
-      requireValue(issues, environment, name);
-    }
-    requirePositiveInteger(issues, environment, "SPONSORED_DAILY_RUN_LIMIT");
-    requirePositiveInteger(issues, environment, "SPONSORED_MAX_CONCURRENCY");
   }
 
   const databaseUrl = value(environment, "DATABASE_URL");

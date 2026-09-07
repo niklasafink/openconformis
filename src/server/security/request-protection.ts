@@ -9,7 +9,7 @@ import { rateLimitWindows } from "@/server/db/schema/jobs";
 
 export class RequestProtectionError extends Error {
   constructor(
-    public readonly code: "REQUEST_TOO_LARGE" | "RATE_LIMITED" | "BOT_CHECK_FAILED",
+    public readonly code: "REQUEST_TOO_LARGE" | "RATE_LIMITED",
     public readonly retryAfterSeconds?: number,
   ) {
     super(code);
@@ -89,42 +89,9 @@ export async function enforceRequestRateLimit(
   }
 }
 
-export async function verifyTurnstileToken(token: string | undefined) {
-  if (process.env.TURNSTILE_ENFORCED !== "true") return;
-  const verifyUrl = process.env.TURNSTILE_SITEVERIFY_WORKER_URL?.trim();
-  if (!verifyUrl || !token) throw new RequestProtectionError("BOT_CHECK_FAILED");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5_000);
-  try {
-    let response: Response;
-    try {
-      response = await fetch(verifyUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token }),
-        cache: "no-store",
-        signal: controller.signal,
-      });
-    } catch {
-      // Ein nicht erreichbarer oder zu langsamer Prüfdienst ist kein interner
-      // Anwendungsfehler. Die Prüfung schlägt geschlossen fehl und der Aufrufer
-      // bekommt denselben klaren Code wie bei einem ungültigen Token, statt einer
-      // 500 ohne Aussage.
-      throw new RequestProtectionError("BOT_CHECK_FAILED");
-    }
-
-    const result = (await response.json().catch(() => null)) as { success?: boolean } | null;
-    if (!response.ok || result?.success !== true)
-      throw new RequestProtectionError("BOT_CHECK_FAILED");
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 export function requestProtectionResponse(error: unknown) {
   if (!(error instanceof RequestProtectionError)) return null;
-  const status =
-    error.code === "REQUEST_TOO_LARGE" ? 413 : error.code === "RATE_LIMITED" ? 429 : 403;
+  const status = error.code === "REQUEST_TOO_LARGE" ? 413 : 429;
   return Response.json(
     { code: error.code },
     {

@@ -7,8 +7,8 @@ import { requestAnthropicStructured } from "./anthropic";
 import { requestGoogleStructured } from "./google";
 import { requestOpenAiStructured } from "./openai";
 import {
-  getStrictAnalysisProviderConfiguration,
-  isStrictAnalysisProviderAvailable,
+  getAnalysisProviderConfiguration,
+  isAnalysisProviderAvailable,
   ProviderRouteConfigurationError,
 } from "./provider-routing";
 import { requestRequestyStructured } from "./requesty";
@@ -200,23 +200,21 @@ describe("direct structured-output adapters", () => {
   });
 });
 
-describe("strict EU and ZDR provider policy", () => {
+describe("analysis provider availability", () => {
   it("keeps direct Anthropic and Google routes unavailable", () => {
-    expect(isStrictAnalysisProviderAvailable("anthropic")).toBe(false);
-    expect(isStrictAnalysisProviderAvailable("google")).toBe(false);
-    expect(() => getStrictAnalysisProviderConfiguration("anthropic")).toThrow(
-      new ProviderRouteConfigurationError("STRICT_PRIVACY_ROUTE_UNAVAILABLE"),
+    expect(isAnalysisProviderAvailable("anthropic")).toBe(false);
+    expect(isAnalysisProviderAvailable("google")).toBe(false);
+    expect(() => getAnalysisProviderConfiguration("anthropic")).toThrow(
+      new ProviderRouteConfigurationError("ANALYSIS_ROUTE_UNAVAILABLE"),
     );
   });
 
   it("enables only explicitly qualified Requesty and OpenAI profiles", () => {
     vi.stubEnv("BYOK_REQUESTY_EU_ZDR_ENABLED", "true");
     vi.stubEnv("BYOK_OPENAI_EU_ZDR_ENABLED", "true");
-    expect(getStrictAnalysisProviderConfiguration("requesty").baseUrl).toBe(
+    expect(getAnalysisProviderConfiguration("requesty").baseUrl).toBe(
       "https://router.eu.requesty.ai/v1",
     );
-    expect(getStrictAnalysisProviderConfiguration("openai").baseUrl).toBe(
-      "https://eu.api.openai.com/v1",
-    );
+    expect(getAnalysisProviderConfiguration("openai").baseUrl).toBe("https://eu.api.openai.com/v1");
   });
 });

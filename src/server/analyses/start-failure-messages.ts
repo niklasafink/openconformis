@@ -11,12 +11,6 @@ import "server-only";
 const startFailureMessages: Record<string, string> = {
   DATABASE_UNAVAILABLE:
     "Die Datenbank ist nicht erreichbar. Bitte versuchen Sie es in einigen Minuten erneut.",
-  SPONSORED_RUNS_DISABLED:
-    "Kostenlose Läufe sind auf dieser Instanz nicht aktiviert. Hinterlegen Sie einen eigenen API-Schlüssel.",
-  SPONSORED_ROUTE_NOT_CONFIGURED:
-    "Die gesponserte Modellroute ist unvollständig konfiguriert. Das muss in der Umgebung behoben werden.",
-  SPONSORED_MODEL_NOT_ALLOWED:
-    "Das konfigurierte Modell steht für gesponserte Läufe nicht auf der Freigabeliste.",
   DRAFT_NOT_FOUND:
     "Der Analyseentwurf wurde nicht gefunden. Beginnen Sie den Ablauf noch einmal bei der Rahmenwerkauswahl.",
   DRAFT_NOT_ACTIVE:
@@ -30,11 +24,14 @@ const startFailureMessages: Record<string, string> = {
   SCOPE_INVALID: "Der Prüfungsumfang ist unvollständig. Bitte legen Sie ihn erneut fest.",
   POLICY_NOT_READY:
     "Das Dokument ist noch nicht fertig verarbeitet. Warten Sie einen Moment und versuchen Sie es erneut.",
-  BYOK_REQUIRED:
-    "Ihr kostenloser Lauf ist aufgebraucht. Hinterlegen Sie einen eigenen API-Schlüssel, um fortzufahren.",
-  BYOK_CREDENTIAL_REQUIRED: "Für diesen Lauf fehlt der hinterlegte Modellzugang.",
   MODEL_SELECTION_NOT_FOUND:
     "Es wurde kein Modell ausgewählt. Bitte legen Sie den Prüfungsumfang erneut fest.",
+  BYOK_CREDENTIAL_INVALID:
+    "Der hinterlegte API-Schlüssel passt nicht zu diesem Entwurf oder Modell. Verbinden Sie ihn erneut.",
+  BYOK_ROUTE_NOT_EXECUTABLE:
+    "Die Modellroute des gewählten Anbieters ist auf dieser Instanz nicht freigeschaltet. Wählen Sie im Prüfungsumfang ein anderes Modell.",
+  BYOK_PRIVACY_ATTESTATION_REQUIRED:
+    "Für diesen Anbieter fehlt die Bestätigung zur Datenverarbeitung. Verbinden Sie den Schlüssel erneut und bestätigen Sie sie.",
   AUTHENTICATION_REQUIRED: "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
   VERIFIED_EMAIL_REQUIRED:
     "Ihre E-Mail-Adresse ist noch nicht bestätigt. Öffnen Sie den Bestätigungslink aus der E-Mail.",
@@ -43,7 +40,7 @@ const startFailureMessages: Record<string, string> = {
   UNTRUSTED_ORIGIN: "Die Anfrage kam von einer nicht vertrauenswürdigen Adresse.",
   INVALID_ANALYSIS_START: "Die Anfrage war unvollständig. Bitte laden Sie die Seite neu.",
   ANALYSIS_START_FAILED:
-    "Der Start ist an einem unerwarteten Fehler gescheitert. Die Einzelheiten stehen im Serverprotokoll; der Gratislauf wurde nicht verbraucht.",
+    "Der Start ist an einem unerwarteten Fehler gescheitert. Die Einzelheiten stehen im Serverprotokoll.",
 };
 
 export function describeStartFailure(code: string): string | undefined {

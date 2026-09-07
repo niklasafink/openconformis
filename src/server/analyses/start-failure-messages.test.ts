@@ -9,9 +9,6 @@ import { describeStartFailure } from "./start-failure-messages";
  */
 const codesTheRouteCanReturn = [
   "DATABASE_UNAVAILABLE",
-  "SPONSORED_RUNS_DISABLED",
-  "SPONSORED_ROUTE_NOT_CONFIGURED",
-  "SPONSORED_MODEL_NOT_ALLOWED",
   "DRAFT_NOT_FOUND",
   "DRAFT_NOT_ACTIVE",
   "DRAFT_ALREADY_CLAIMED",
@@ -19,12 +16,16 @@ const codesTheRouteCanReturn = [
   "SCOPE_RELEASE_MISMATCH",
   "SCOPE_INVALID",
   "POLICY_NOT_READY",
-  "BYOK_REQUIRED",
+  "MODEL_SELECTION_NOT_FOUND",
+  "BYOK_CREDENTIAL_INVALID",
+  "BYOK_ROUTE_NOT_EXECUTABLE",
+  "BYOK_PRIVACY_ATTESTATION_REQUIRED",
   "AUTHENTICATION_REQUIRED",
   "VERIFIED_EMAIL_REQUIRED",
   "MEMBERSHIP_REQUIRED",
   "UNTRUSTED_ORIGIN",
   "INVALID_ANALYSIS_START",
+  "ANALYSIS_START_FAILED",
 ];
 
 describe("describeStartFailure", () => {
@@ -37,7 +38,7 @@ describe("describeStartFailure", () => {
   });
 
   it("names the next step for the cases a user can resolve", () => {
-    expect(describeStartFailure("BYOK_REQUIRED")).toContain("API-Schlüssel");
+    expect(describeStartFailure("BYOK_CREDENTIAL_INVALID")).toContain("erneut");
     expect(describeStartFailure("AUTHENTICATION_REQUIRED")).toContain("melden Sie sich erneut an");
     expect(describeStartFailure("DRAFT_NOT_ACTIVE")).toContain("Rahmenwerkauswahl");
   });

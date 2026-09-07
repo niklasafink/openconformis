@@ -23,7 +23,6 @@ function fixture(): AnalysisExportData {
     organizationContext: "Leitungsorgan ist der Gesamtvorstand.",
     locale: "de",
     status: "completed",
-    fundingMode: "sponsored",
     routeProvider: "openrouter",
     providerModelId: "anthropic/claude-test",
     modelProfileId: "strict-analysis",

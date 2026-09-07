@@ -213,6 +213,9 @@ References: [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/
 
 ## D-014 Sponsored analysis eligibility
 
+> Superseded by D-025 on 2026-09-07: the sponsored run was removed; every
+> analysis runs on the user's own key.
+
 Product direction: the official hosted service sponsors one successfully completed,
 bounded analysis per verified account, then requires BYOK. IP address and bot signals
 are rate-limit and abuse inputs only; they are not the entitlement key.
@@ -299,8 +302,8 @@ opens the matching credential dialog.
 
 Recommendations `Beste Qualität`, `Ausgewogen` and `Günstig` are based on project
 evaluations, not vendor claims. Unevaluated models remain selectable with a warning.
-Sponsored models are marked `Kostenlos`; any other model requires BYOK. The UI may
-recommend a model automatically, but the user can override it.
+Every model requires the user's own key (see D-025). The UI may recommend a model
+automatically, but the user can override it.
 
 Decision: accepted by current product direction.
 
@@ -370,3 +373,22 @@ an equivalent EU Docker runtime.
 
 Decision: accepted as the V1 hosted topology. Provider contracts, DPA, restore
 evidence and production credentials remain external launch gates.
+
+## D-025 Every analysis runs on the user's own key
+
+Product direction (2026-09-07): the sponsored first run is withdrawn. There is no
+operator analysis credential, no account grant and no `Kostenlos` model label.
+Steps 1–3 stay anonymous and the preview stays a non-billable animation with a
+blurred skeleton. After registration the result screen asks for the user's own
+provider key, validates it server-side, binds it to the draft and only then
+freezes and enqueues the run. The key remains a short-lived encrypted secret and
+is deleted when the run ends.
+
+Consequences: `sponsored_run_grants`, `analyses.funding_mode`, the provider
+allow-list columns and the Turnstile gate in front of the start endpoint are
+removed. Rate limits, verified identity and the credential TTL remain the abuse
+controls. OpenRouter zero data retention is a single `OPENROUTER_ZDR` setting
+that is both sent with the request and recorded in the run's privacy profile.
+
+Decision: accepted. Supersedes D-014 and the sponsorship parts of D-015 and the
+model-selector decision.

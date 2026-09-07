@@ -17,7 +17,6 @@ export type AnalysisExportData = {
   organizationContext: string;
   locale: string;
   status: "queued" | "running" | "completed" | "failed" | "cancelled";
-  fundingMode: "sponsored" | "byok";
   routeProvider: string;
   providerModelId: string;
   modelProfileId: string;
@@ -149,7 +148,6 @@ const translations = {
     created: "Erstellt",
     started: "Gestartet",
     completed: "Abgeschlossen",
-    fundingMode: "Finanzierungsart",
     organizationContext: "Unternehmenskontext",
     statusSummary: "Statusübersicht",
     count: "Anzahl",
@@ -238,7 +236,6 @@ const translations = {
     created: "Created",
     started: "Started",
     completed: "Completed",
-    fundingMode: "Funding mode",
     organizationContext: "Company context",
     statusSummary: "Status summary",
     count: "Count",
@@ -389,7 +386,6 @@ function addOverview(workbook: ExcelJS.Workbook, data: AnalysisExportData, local
     [t.created, iso(data.createdAt, t.notAvailable)],
     [t.started, iso(data.startedAt, t.notAvailable)],
     [t.completed, iso(data.completedAt, t.notAvailable)],
-    [t.fundingMode, data.fundingMode],
     [t.organizationContext, data.organizationContext || t.notAvailable],
   ];
   for (const row of rows) sheet.addRow(row.map(safeExcelText));

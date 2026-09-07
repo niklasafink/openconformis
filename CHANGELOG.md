@@ -4,6 +4,19 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Every analysis now runs on the user's own API key. The sponsored first run,
+  its account grant, the operator OpenRouter credential and the Turnstile gate
+  in front of it are gone. After registration the result screen asks for the
+  key directly; `POST /api/analyses/start` takes the credential and replaces
+  the separate BYOK route. Migration `0043_byok_only` drops the grant table,
+  the funding-mode and provider allow-list columns and the related constraints.
+- Zero data retention for OpenRouter is now configured with `OPENROUTER_ZDR`
+  (default on) and is actually sent with each request, so the recorded privacy
+  profile matches what the provider was asked for.
+- Simplified the result screens: the result-workspace labels are translated in
+  one place, the model catalogue builds its offline fallback once, and the
+  environment list parser is shared.
+
 - Fixed a stalled provider call hanging a run for minutes. Two calls took 408 and
   929 seconds against a 120 second limit, because a stalled read does not reliably
   trigger the abort signal. The timeout is now enforced with its own timer and the

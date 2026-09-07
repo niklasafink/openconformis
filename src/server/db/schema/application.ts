@@ -21,13 +21,6 @@ export const anonymousDraftStatus = pgEnum("anonymous_draft_status", [
   "revoked",
 ]);
 
-export const grantStatus = pgEnum("sponsored_grant_status", [
-  "available",
-  "reserved",
-  "consumed",
-  "blocked",
-]);
-
 export const institutionSize = pgEnum("institution_size", ["small", "medium", "large"]);
 
 export const anonymousDrafts = pgTable(
@@ -52,25 +45,6 @@ export const anonymousDrafts = pgTable(
     uniqueIndex("anonymous_drafts_binding_hash_uidx").on(table.bindingHash),
     index("anonymous_drafts_status_expires_at_idx").on(table.status, table.expiresAt),
   ],
-);
-
-export const sponsoredRunGrants = pgTable(
-  "sponsored_run_grants",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    status: grantStatus("status").default("available").notNull(),
-    revision: integer("revision").default(1).notNull(),
-    reservedUntil: timestamp("reserved_until", { withTimezone: true }),
-    consumedAt: timestamp("consumed_at", { withTimezone: true }),
-    blockedAt: timestamp("blocked_at", { withTimezone: true }),
-    blockReasonCode: text("block_reason_code"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [uniqueIndex("sponsored_run_grants_user_id_uidx").on(table.userId)],
 );
 
 export const auditEvents = pgTable(
@@ -170,13 +144,6 @@ export const draftRequirementSelectionRelations = relations(
     }),
   }),
 );
-
-export const sponsoredRunGrantRelations = relations(sponsoredRunGrants, ({ one }) => ({
-  user: one(users, {
-    fields: [sponsoredRunGrants.userId],
-    references: [users.id],
-  }),
-}));
 
 export const auditEventRelations = relations(auditEvents, ({ one }) => ({
   organization: one(organizations, {

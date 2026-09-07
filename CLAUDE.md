@@ -62,10 +62,9 @@ Diese Punkte sind bewusst so entschieden. Nicht ohne neue Ansage ändern:
 - **Source-available ohne Maintainer-Secret.** Der Anwendungscode ist zunächst unter
   PolyForm Noncommercial 1.0.0 ausschließlich für nichtkommerzielle Nutzung
   vorgesehen. Das Projekt darf deshalb nicht als OSI Open Source bezeichnet werden.
-  Kommerzielle Nutzung benötigt eine gesonderte schriftliche Lizenz. Der
-  Betreiber-Key der offiziellen Instanz steht ausschließlich in
-  Server-Umgebungsvariablen. Self-Hosting und lokale Tests funktionieren ohne diesen
-  Key; Sponsoring ist dort standardmäßig aus.
+  Kommerzielle Nutzung benötigt eine gesonderte schriftliche Lizenz. Für Analysen
+  gibt es keinen Betreiber-Key; Self-Hosting und lokale Tests brauchen deshalb
+  keinen Modellzugang des Betreibers.
 - **Relizenzierung offenhalten.** Vor Annahme externer Codebeiträge muss ein rechtlich
   geprüfter CLA-Prozess mit ausdrücklichem Relizenzierungs- und Dual-Licensing-Recht
   aktiv sein. Ein DCO allein genügt für diese Produktentscheidung nicht. Fremde
@@ -73,11 +72,12 @@ Diese Punkte sind bewusst so entschieden. Nicht ohne neue Ansage ändern:
   Nachweispflichten. Eigene Dokumentation, synthetische Beispieldokumente und
   eigene Mappings sind zunächst unter CC BY-NC 4.0 vorgesehen. Marken und Logos
   werden nicht zur Wiederverwendung lizenziert.
-- **Ein Gratislauf ist ein Konto-Grant.** Ein erfolgreich abgeschlossener,
-  kostenloser Analyse-Lauf pro verifiziertem Konto wird atomar in PostgreSQL
-  reserviert und erst bei erfolgreichem Abschluss verbraucht. IP- und Bot-Signale
-  dienen nur der Missbrauchserkennung. Niemals als Cookie- oder Local-Storage-Zähler
-  bauen.
+- **Jeder Lauf läuft über einen eigenen API-Key.** Es gibt kein
+  Betreiber-Kontingent, keinen Gratislauf und keinen serverseitigen
+  Analyse-Schlüssel. Nach der Registrierung verbindet der Nutzer seinen Key; er
+  wird serverseitig gegen den Anbieter geprüft, verschlüsselt an den Draft gebunden
+  und ist Voraussetzung für den Start. Rate-Limits und verifizierte Identität
+  bleiben die Missbrauchskontrolle.
 - **Fremde API-Keys sind kurzlebige Secrets.** Kein Key in Browser-Speicher, URLs,
   Logs oder Workflow-Payloads. Für durable Workflows nur verschlüsselt und über eine
   Credential-ID referenzieren; nach Abschluss oder TTL löschen.
@@ -107,8 +107,9 @@ Die Sidebar führt durch vier Schritte, der Inhaltsbereich tauscht:
 
 Zwischen 3 und 4 liegt vor Registrierung eine klar als Vorschau bezeichnete,
 simulierte Animation ohne KI-Aufruf. Der Ergebnis-Screen bleibt unscharf. Nach
-Registrierung startet den echten, dauerhaften Vercel-Workflow und zeigt ausschließlich
-persistierte Fortschrittsdaten. Beides ist **kein eigener Sidebar-Schritt**.
+Registrierung verbindet der Nutzer seinen eigenen API-Key; erst damit startet der
+echte, dauerhafte Vercel-Workflow, der ausschließlich persistierte Fortschrittsdaten
+zeigt. Beides ist **kein eigener Sidebar-Schritt**.
 
 ## Das Belegstellen-Modell
 

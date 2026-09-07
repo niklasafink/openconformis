@@ -17,11 +17,7 @@ function completeEnvironment(): NodeJS.ProcessEnv {
     STORAGE_DRIVER: "vercel-blob",
     BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_example",
     CRON_SECRET: "c".repeat(32),
-    NEXT_PUBLIC_TURNSTILE_SITE_KEY: "site-key",
-    TURNSTILE_SITEVERIFY_WORKER_URL: "https://turnstile.example.workers.dev",
-    TURNSTILE_ENFORCED: "true",
     BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
-    SPONSORED_RUNS_ENABLED: "false",
   };
 }
 
@@ -38,7 +34,6 @@ describe("production configuration", () => {
 
   it("fails closed on missing protection and storage controls", () => {
     const environment = completeEnvironment();
-    environment.TURNSTILE_ENFORCED = "false";
     environment.BLOB_READ_WRITE_TOKEN = "";
     environment.BYOK_ENCRYPTION_KEY = "not-a-key";
 
@@ -48,11 +43,6 @@ describe("production configuration", () => {
 
     expect(variables).toEqual(
       expect.arrayContaining(["BLOB_READ_WRITE_TOKEN", "BYOK_ENCRYPTION_KEY"]),
-    );
-    expect(checkProductionConfig(environment)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ variable: "TURNSTILE_ENFORCED", severity: "warning" }),
-      ]),
     );
   });
 
@@ -77,23 +67,6 @@ describe("production configuration", () => {
     expect(checkProductionConfig(environment, "web")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ variable: "NEON_AUTH_COOKIE_SECRET", severity: "error" }),
-      ]),
-    );
-  });
-
-  it("requires sponsored limits only when sponsorship is enabled", () => {
-    const environment = completeEnvironment();
-    environment.SPONSORED_RUNS_ENABLED = "true";
-
-    const variables = checkProductionConfig(environment)
-      .filter((issue) => issue.severity === "error")
-      .map((issue) => issue.variable);
-
-    expect(variables).toEqual(
-      expect.arrayContaining([
-        "SPONSORED_OPENROUTER_API_KEY",
-        "SPONSORED_DAILY_RUN_LIMIT",
-        "SPONSORED_MAX_CONCURRENCY",
       ]),
     );
   });

@@ -106,7 +106,6 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
             included: t("included"),
             start: t("start"),
             model: t("model"),
-            free: t("free"),
             evaluated: t("evaluated"),
             unevaluated: t("unevaluated"),
             unevaluatedWarning: t("unevaluatedWarning"),

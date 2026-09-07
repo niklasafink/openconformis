@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { PreviewGate } from "@/components/results/preview-gate";
 import type { ResultItem, ResultStatus } from "@/components/results/analysis-results-workspace";
+import { loadAnalysisResultLabels } from "@/components/results/result-labels";
 import { ApplicationShell } from "@/components/shell/application-shell";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { aiProviderPublicDetails } from "@/domain/ai/provider";
@@ -19,6 +20,20 @@ type ResultsPageProps = Readonly<{
   params: Promise<{ locale: string }>;
   searchParams: Promise<{ draft?: string; auth_error?: string }>;
 }>;
+
+// Demo-Stati für die verschwommene Vorschau; sie stammen aus keiner Bewertung.
+const previewStatuses: ResultStatus[] = [
+  "partially_fulfilled",
+  "not_fulfilled",
+  "fulfilled",
+  "fulfilled",
+  "partially_fulfilled",
+  "not_fulfilled",
+  "partially_fulfilled",
+  "fulfilled",
+  "not_applicable",
+  "partially_fulfilled",
+];
 
 export default async function ResultsPage({ params, searchParams }: ResultsPageProps) {
   const { locale } = await params;
@@ -42,10 +57,10 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     if (startedAnalysisId) redirect(`/${locale}/analyses/${startedAnalysisId}`);
   }
 
-  const [navigation, t, resultsT, boundDraft, scope, policyPreview] = await Promise.all([
+  const [navigation, t, resultLabels, boundDraft, scope, policyPreview] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("ResultsPreview"),
-    getTranslations("AnalysisRun"),
+    loadAnalysisResultLabels(),
     getBoundActiveDraft(draft),
     getDraftScopeSelection(draft),
     getCurrentPolicyPreview(draft),
@@ -63,18 +78,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     );
   }
   const callbackUrl = `/${locale}/analyses/new/results?draft=${encodeURIComponent(boundDraft.id)}`;
-  const previewStatuses: ResultStatus[] = [
-    "partially_fulfilled",
-    "not_fulfilled",
-    "fulfilled",
-    "fulfilled",
-    "partially_fulfilled",
-    "not_fulfilled",
-    "partially_fulfilled",
-    "fulfilled",
-    "not_applicable",
-    "partially_fulfilled",
-  ];
   const includedKeys = new Set(scope.includedRequirementKeys);
   const previewItems: ResultItem[] = doraDemoRelease.requirements
     .filter((requirement) => includedKeys.has(requirement.externalKey))
@@ -116,6 +119,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           : [],
       };
     });
+  const provider = aiProviderPublicDetails[scope.modelSelection.routeProvider];
 
   return (
     <ApplicationShell
@@ -142,71 +146,20 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
         organizationContext={scope.organizationContext}
         previewItems={previewItems}
         previewDocumentBlocks={policyPreview.blocks}
-        resultLabels={{
-          checked: resultsT("results.checked"),
-          requirement: resultsT("results.requirement"),
-          subrequirements: resultsT("results.subrequirements"),
-          organizationContext: resultsT("results.organizationContext"),
-          assessment: resultsT("results.assessment"),
-          confidence: resultsT("results.confidence"),
-          missingInformation: resultsT("results.missingInformation"),
-          evidence: resultsT("results.evidence"),
-          noEvidence: resultsT("results.noEvidence"),
-          page: resultsT("results.page"),
-          paragraph: resultsT("results.paragraph"),
-          exportExcel: resultsT("results.exportExcel"),
-          confirmedCount: resultsT.raw("results.confirmedCount") as string,
-          confirmed: resultsT("results.confirmed"),
-          confirm: resultsT("results.confirm"),
-          confirming: resultsT("results.confirming"),
-          confirmationFailed: resultsT("results.confirmationFailed"),
-          aiStatus: resultsT("results.aiStatus"),
-          manualOverride: resultsT("results.manualOverride"),
-          overrideReason: resultsT("results.overrideReason"),
-          changeStatus: resultsT("results.changeStatus"),
-          statusDialogTitle: resultsT("results.statusDialogTitle"),
-          statusDialogReason: resultsT("results.statusDialogReason"),
-          statusDialogReasonPlaceholder: resultsT("results.statusDialogReasonPlaceholder"),
-          cancel: resultsT("results.cancel"),
-          save: resultsT("results.save"),
-          saving: resultsT("results.saving"),
-          overrideFailed: resultsT("results.overrideFailed"),
-          reasonTooShort: resultsT("results.reasonTooShort"),
-          policyText: resultsT("results.policyText"),
-          documentLoading: resultsT("results.documentLoading"),
-          documentFailed: resultsT("results.documentFailed"),
-          assessmentPane: resultsT("results.assessmentPane"),
-          policyPane: resultsT("results.policyPane"),
-          openEvidence: resultsT("results.openEvidence"),
-          status: {
-            fulfilled: resultsT("results.status.fulfilled"),
-            partially_fulfilled: resultsT("results.status.partially_fulfilled"),
-            not_fulfilled: resultsT("results.status.not_fulfilled"),
-            not_applicable: resultsT("results.status.not_applicable"),
-            no_assessment_possible: resultsT("results.status.no_assessment_possible"),
-          },
-        }}
+        resultLabels={resultLabels}
         selectedModel={{
           providerModelId: scope.modelSelection.providerModelId,
           routeProvider: scope.modelSelection.routeProvider,
-          routeProviderLabel: aiProviderPublicDetails[scope.modelSelection.routeProvider].label,
-          credentialHelpUrl:
-            aiProviderPublicDetails[scope.modelSelection.routeProvider].credentialHelpUrl,
-          privacyAttestationRequired:
-            aiProviderPublicDetails[scope.modelSelection.routeProvider].privacyAttestationRequired,
+          routeProviderLabel: provider.label,
+          credentialHelpUrl: provider.credentialHelpUrl,
+          privacyAttestationRequired: provider.privacyAttestationRequired,
         }}
         labels={{
           preparing: t("preparing"),
           parsing: t("parsing"),
           mapping: t("mapping"),
           checking: t("checking"),
-          complete: t("complete"),
-          starting: t("starting"),
           startFailed: t("startFailed"),
-          startFailedAuthentication: t("startFailedAuthentication"),
-          startFailedVerification: t("startFailedVerification"),
-          startFailedGeneric: t("startFailedGeneric"),
-          retry: t("retry"),
           goToSignIn: t("goToSignIn"),
           lockedTitle: t("lockedTitle"),
           lockedBody: t("lockedBody"),

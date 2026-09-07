@@ -35,7 +35,6 @@ type ScopeFormProps = {
     included: string;
     start: string;
     model: string;
-    free: string;
     evaluated: string;
     unevaluated: string;
     unevaluatedWarning: string;
@@ -124,12 +123,8 @@ export function ScopeForm({
               <optgroup key={publisher} label={publisher}>
                 {models.map((model) => (
                   <option key={model.id} value={model.id}>
-                    {model.name} · {aiProviderPublicDetails[model.routeProvider].label}
-                    {model.sponsorshipEligible
-                      ? ` · ${labels.free}`
-                      : model.evaluated
-                        ? ` · ${labels.evaluated}`
-                        : ` · ${labels.unevaluated}`}
+                    {model.name} · {aiProviderPublicDetails[model.routeProvider].label} ·{" "}
+                    {model.evaluated ? labels.evaluated : labels.unevaluated}
                   </option>
                 ))}
               </optgroup>

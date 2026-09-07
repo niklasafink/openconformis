@@ -1,6 +1,8 @@
-# Source-available, sponsored run and BYOK
+# Source-available and BYOK
 
 > Runtime note: Vercel Workflow now executes durable jobs and private Vercel Blob stores documents. References to pg-boss, Fly.io and R2 below describe the superseded implementation plan; the BYOK security and product rules remain authoritative.
+>
+> Product note (2026-09-07): the sponsored first run was withdrawn (D-025). Every analysis runs on the user's own temporary key; there is no operator analysis credential and no account grant. Remaining references to sponsorship below are history.
 
 Status: repository licence package implemented; legal review pending  
 Last updated: 2026-08-22
@@ -10,11 +12,11 @@ application, the official hosted free analysis and user-supplied AI credentials.
 
 ## 1. Distribution model
 
-| Mode                      | Credential                                   |                                                 Free run | Intended use                                       |
-| ------------------------- | -------------------------------------------- | -------------------------------------------------------: | -------------------------------------------------- |
-| Official hosted beta      | Capped operator credential once, then BYOK   | One successfully completed analysis per verified account | Public evaluation with non-confidential documents. |
-| Noncommercial self-hosted | Operator key, BYOK or deterministic fixtures |                                      Disabled by default | Uses allowed by the public noncommercial licence.  |
-| Local development         | Fixtures by default                          |                                                       No | Development and tests without paid services.       |
+| Mode                      | Credential                        | Intended use                                       |
+| ------------------------- | --------------------------------- | -------------------------------------------------- |
+| Official hosted beta      | User-supplied key per analysis    | Public evaluation with non-confidential documents. |
+| Noncommercial self-hosted | User-supplied key per analysis    | Uses allowed by the public noncommercial licence.  |
+| Local development         | User-supplied key or fixture data | Development and tests without paid services.       |
 
 Application code is licensed under PolyForm Noncommercial 1.0.0. First-party
 documentation, synthetic samples and original mappings are licensed under CC BY-NC
@@ -53,49 +55,33 @@ deletion and incident processes have passed their launch gates.
    real findings already exist.
 4. Registration is required to reveal the result. Supported methods are magic link,
    e-mail/password, Google and Microsoft.
-5. After successful account verification, the server atomically claims the signed
-   anonymous draft, freezes it and reserves the account's lifetime free grant.
-6. The real pg-boss job is enqueued. From this point the UI renders only persisted
-   worker stages and real failure/progress states.
-7. The grant is consumed only when that frozen revision completes successfully.
-8. The account can retry a failed revision within a bounded retry window and cost
-   budget. It cannot create unlimited new free drafts while a grant is reserved.
-9. Every later analysis requires a temporary user key for a compatible provider.
+5. After successful account verification, the result screen asks for the user's
+   own provider key. The server validates it against the provider, encrypts it and
+   binds it to the draft.
+6. `POST /api/analyses/start` atomically claims the signed anonymous draft,
+   freezes it together with the credential and enqueues the durable run. From this
+   point the UI renders only persisted worker stages and real failure/progress
+   states.
+7. The credential is deleted when the run ends, successfully or not, and at the
+   latest after its TTL.
 
 The preview uses skeletons or intentionally obscured layout only. It never generates
 synthetic compliance statuses, rationales or evidence and never presents a timer as
 real analysis progress.
 
-## 4. Grant state and abuse controls
+## 4. Abuse controls
 
-`sponsored_run_grants` is keyed by verified account, not IP address:
+Because every model call is paid by the user's own key, the operator carries no
+inference cost. The hosted service still uses:
 
-| State       | Meaning                                                       |
-| ----------- | ------------------------------------------------------------- |
-| `available` | Account has never completed a sponsored analysis.             |
-| `reserved`  | One frozen revision owns the grant during execution/retry.    |
-| `consumed`  | The sponsored analysis completed successfully.                |
-| `blocked`   | Fraud, abuse or operator action prevents sponsored execution. |
-
-Atomic reservation uses a unique database constraint on `account_id` and a single
-transaction. Auth callback replay, parallel browser requests and multiple devices
-must resolve to the same reservation.
-
-Account identity is necessary but insufficient for public cost control. The hosted
-service also uses:
-
-- verified e-mail/OAuth identity and Turnstile before real execution;
-- request and concurrency limits using account plus temporary IP/device risk
-  signals without browser fingerprinting as the entitlement;
-- one in-flight sponsored revision per account;
-- 40-page, 25-MB, requirement, token, output and retry ceilings;
-- a dedicated OpenRouter credential with a hard provider spend cap;
-- application-wide daily cost and concurrency circuit breakers;
-- a fixed sponsored model allowlist and kill switch;
+- verified e-mail/OAuth identity before real execution;
+- request and rate limits keyed by account plus hashed request address, without
+  browser fingerprinting as the entitlement;
+- one analysis per anonymous draft, enforced by a unique constraint and a single
+  transaction, so auth callback replay, parallel browser requests and multiple
+  devices resolve to the same run;
+- 25-MB, requirement, token, output and retry ceilings;
 - redacted usage telemetry and anomaly review.
-
-The sponsored credential pays only for the first bounded analysis. It never powers
-chat, arbitrary prompt proxying or a second analysis.
 
 ## 5. Provider-neutral BYOK
 
@@ -167,19 +153,16 @@ instant deletion from immutable backups.
 
 ## 8. API boundaries
 
-| Boundary                         | Responsibility                                                                |
-| -------------------------------- | ----------------------------------------------------------------------------- |
-| `POST /api/uploads/policy`       | Issue authorized, short-lived private upload.                                 |
-| `POST /api/auth/*`               | Register, verify and authenticate account.                                    |
-| `POST /api/drafts/:id/claim`     | Atomically bind anonymous draft to verified account.                          |
-| `POST /api/grants/reserve`       | Reserve the one account grant and frozen revision.                            |
-| `POST /api/ai-credentials`       | Validate provider/model, encrypt and return safe metadata plus credential ID. |
-| `DELETE /api/ai-credentials/:id` | Revoke temporary credential.                                                  |
-| `POST /api/analyses/:id/start`   | Freeze inputs and enqueue idempotently.                                       |
-| `POST /api/analyses/start/byok`  | Bind a validated credential and enqueue the frozen run atomically.            |
-| `GET /api/analyses/:id/status`   | Return authorized persisted worker progress.                                  |
+| Boundary                         | Responsibility                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------ |
+| `POST /api/uploads/policy`       | Issue authorized, short-lived private upload.                                  |
+| `POST /api/auth/*`               | Register, verify and authenticate account.                                     |
+| `POST /api/ai-credentials`       | Validate provider/model, encrypt and return safe metadata plus credential ID.  |
+| `DELETE /api/ai-credentials/:id` | Revoke temporary credential.                                                   |
+| `POST /api/analyses/start`       | Claim the draft, bind the validated credential, freeze and enqueue atomically. |
+| `GET /api/analyses/:id`          | Return authorized persisted worker progress.                                   |
 
-No endpoint accepts arbitrary prompts with the sponsored operator credential.
+No endpoint accepts arbitrary prompts, and no endpoint holds an operator credential.
 
 The current executable BYOK analysis route uses OpenRouter's EU endpoint with ZDR,
 denied data collection and required structured outputs. Credentials for direct
@@ -222,43 +205,32 @@ client package ships in source.
 
 ```text
 SPONSORED_RUNS_ENABLED=false
-SPONSORED_OPENROUTER_API_KEY=
-SPONSORED_DAILY_RUN_LIMIT=
-SPONSORED_MAX_CONCURRENCY=
-SPONSORED_MAX_PAGES=40
-SPONSORED_MAX_FILE_BYTES=26214400
-SPONSORED_MAX_REQUIREMENTS=
-
 BYOK_ENCRYPTION_KEY=
 BYOK_ENCRYPTION_KEY_VERSION=
 BYOK_CREDENTIAL_TTL_HOURS=24
+OPENROUTER_ZDR=true
 
 AI_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
 BYOK_PROVIDER_ALLOWLIST=openrouter,requesty,openai
-
-TURNSTILE_SECRET_KEY=
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 ```
 
-Production refuses to start sponsored execution when a required secret, budget or
-privacy profile is missing.
+Production refuses to start when the credential encryption key is missing or
+malformed; a run whose frozen privacy profile no longer matches the environment is
+rejected by the worker.
 
 ## 12. Mandatory tests
 
 | Threat or failure             | Required behaviour                                             |
 | ----------------------------- | -------------------------------------------------------------- |
-| Two starts for one account    | Exactly one grant/revision reserves.                           |
+| Two starts for one draft      | Exactly one analysis is created; the second call reuses it.    |
 | Auth callback replay          | Draft is claimed and worker enqueued once.                     |
 | Preview before registration   | No provider request and no fabricated result data.             |
-| Failed sponsored worker       | Same revision can retry within limits; no new free draft.      |
-| Successful sponsored worker   | Grant becomes permanently consumed.                            |
-| Operator key leaks            | Bundle/network assertion fails CI.                             |
+| Failed worker                 | Analysis is marked failed and the credential deleted.          |
 | User key appears in logs/job  | Canary test fails CI.                                          |
 | Cross-account credential read | Authorized lookup returns not found.                           |
 | Wrong provider binding        | Adapter rejects credential.                                    |
 | Credential survives TTL       | Cleanup integration test fails.                                |
-| Budget exhausted              | New starts offer BYOK without operator call.                   |
-| Arbitrary sponsored prompt    | Endpoint does not exist or rejects input.                      |
+| Arbitrary prompt              | Endpoint does not exist or rejects input.                      |
 | Account deletion              | Access ends immediately; lineage cleanup completes within 24h. |
 
 ## 13. Launch gates
@@ -266,8 +238,8 @@ privacy profile is missing.
 - Neura Labs UG (haftungsbeschränkt) licensor notice and noncommercial boundary
   legally reviewed;
 - public beta confidentiality warning accepted;
-- Better Auth methods and account-grant concurrency tests pass;
-- Turnstile, rate limits, spend caps and kill switch are active;
+- authentication methods and draft-claim concurrency tests pass;
+- rate limits are active;
 - Docker worker restart/idempotency tests pass;
 - temporary-key encryption, deletion and log-canary tests pass;
 - OCR subprocess isolation and malicious-file tests pass;

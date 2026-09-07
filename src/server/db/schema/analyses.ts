@@ -13,7 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { anonymousDrafts, institutionSize, sponsoredRunGrants } from "./application";
+import { anonymousDrafts, institutionSize } from "./application";
 import { aiCredentials, analysisInstructions } from "./ai";
 import { organizations, users } from "./auth";
 import { documentBlocks, policyVersions } from "./documents";
@@ -35,8 +35,6 @@ export const analysisStage = pgEnum("analysis_stage", [
   "finalizing",
   "completed",
 ]);
-
-export const analysisFundingMode = pgEnum("analysis_funding_mode", ["sponsored", "byok"]);
 
 export const analysisResultStatus = pgEnum("analysis_result_status", [
   "fulfilled",
@@ -126,9 +124,9 @@ export const analyses = pgTable(
     policyVersionId: uuid("policy_version_id")
       .notNull()
       .references(() => policyVersions.id, { onDelete: "restrict" }),
-    sponsoredGrantId: uuid("sponsored_grant_id").references(() => sponsoredRunGrants.id, {
-      onDelete: "restrict",
-    }),
+    // Jeder Lauf trägt den kurzlebigen Schlüssel seines Nutzers. Die Spalte
+    // bleibt nullable, weil Läufe aus der Zeit des Betreiber-Kontingents keinen
+    // Schlüssel haben; der Anwendungscode verlangt ihn für jeden neuen Lauf.
     aiCredentialId: uuid("ai_credential_id").references(() => aiCredentials.id, {
       onDelete: "restrict",
     }),
@@ -142,20 +140,11 @@ export const analyses = pgTable(
     status: analysisStatus("status").default("queued").notNull(),
     stage: analysisStage("stage").default("queued").notNull(),
     progressPercent: integer("progress_percent").default(0).notNull(),
-    fundingMode: analysisFundingMode("funding_mode").notNull(),
     routeProvider: text("route_provider").notNull(),
-    providerRouteAllowlist: text("provider_route_allowlist")
-      .array()
-      .default(sql`ARRAY[]::text[]`)
-      .notNull(),
     providerModelId: text("provider_model_id").notNull(),
     modelProfileId: text("model_profile_id").notNull(),
     verifierProviderModelId: text("verifier_provider_model_id").notNull(),
     verifierModelProfileId: text("verifier_model_profile_id").notNull(),
-    verifierProviderRouteAllowlist: text("verifier_provider_route_allowlist")
-      .array()
-      .default(sql`ARRAY[]::text[]`)
-      .notNull(),
     modelCatalogueVersion: text("model_catalogue_version").notNull(),
     privacyProfileId: text("privacy_profile_id").notNull(),
     promptVersion: text("prompt_version").notNull(),
@@ -466,10 +455,6 @@ export const analysisRelations = relations(analyses, ({ one, many }) => ({
   policyVersion: one(policyVersions, {
     fields: [analyses.policyVersionId],
     references: [policyVersions.id],
-  }),
-  sponsoredGrant: one(sponsoredRunGrants, {
-    fields: [analyses.sponsoredGrantId],
-    references: [sponsoredRunGrants.id],
   }),
   scopeItems: many(analysisScopeItems),
   retrievalPackets: many(analysisRetrievalPackets),

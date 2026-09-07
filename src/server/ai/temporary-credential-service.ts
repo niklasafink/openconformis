@@ -16,6 +16,7 @@ import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import { aiCredentials } from "@/server/db/schema/ai";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
+import { configuredSet } from "@/server/environment";
 import {
   activeCredentialEncryptionConfiguration,
   decryptCredentialSecret,
@@ -24,22 +25,13 @@ import {
 } from "@/server/security/credential-crypto";
 
 import { validateProviderCredential } from "./credential-validation";
-import { isStrictAnalysisProviderAvailable } from "./provider-routing";
+import { isAnalysisProviderAvailable } from "./provider-routing";
 
 export class TemporaryCredentialError extends Error {
   constructor(public readonly code: string) {
     super(code);
     this.name = "TemporaryCredentialError";
   }
-}
-
-function configuredProviders() {
-  return new Set(
-    (process.env.BYOK_PROVIDER_ALLOWLIST ?? "")
-      .split(",")
-      .map((provider) => provider.trim())
-      .filter(Boolean),
-  );
 }
 
 function credentialTtlHours() {
@@ -89,10 +81,10 @@ export async function createTemporaryCredential(input: {
   ) {
     throw new TemporaryCredentialError("BYOK_INPUT_INVALID");
   }
-  if (!configuredProviders().has(provider)) {
+  if (!configuredSet("BYOK_PROVIDER_ALLOWLIST").has(provider)) {
     throw new TemporaryCredentialError("BYOK_PROVIDER_DISABLED");
   }
-  if (purpose === "analysis" && !isStrictAnalysisProviderAvailable(provider)) {
+  if (purpose === "analysis" && !isAnalysisProviderAvailable(provider)) {
     throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");
   }
   if (

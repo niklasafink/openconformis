@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { sponsoredPrivacyProfileId, sponsoredZeroDataRetention } from "./provider-routing";
+import { openRouterPrivacyProfileId, openRouterZeroDataRetention } from "./provider-routing";
 
-const original = process.env.SPONSORED_OPENROUTER_ZDR;
+const original = process.env.OPENROUTER_ZDR;
 afterEach(() => {
-  if (original === undefined) delete process.env.SPONSORED_OPENROUTER_ZDR;
-  else process.env.SPONSORED_OPENROUTER_ZDR = original;
+  if (original === undefined) delete process.env.OPENROUTER_ZDR;
+  else process.env.OPENROUTER_ZDR = original;
 });
 
-describe("sponsoredPrivacyProfileId", () => {
+describe("openRouterPrivacyProfileId", () => {
   it("claims eu-zdr-v1 only when the route really is EU with retention off", () => {
     expect(
-      sponsoredPrivacyProfileId({
+      openRouterPrivacyProfileId({
         baseUrl: "https://eu.openrouter.ai/api/v1",
         zeroDataRetention: true,
       }),
@@ -21,19 +21,19 @@ describe("sponsoredPrivacyProfileId", () => {
   it("never claims eu-zdr-v1 for a weaker route", () => {
     // Der Nachweis darf nicht strenger aussehen als der Lauf war.
     expect(
-      sponsoredPrivacyProfileId({
+      openRouterPrivacyProfileId({
         baseUrl: "https://eu.openrouter.ai/api/v1",
         zeroDataRetention: false,
       }),
     ).toBe("openrouter-eu-no-zdr-v1");
     expect(
-      sponsoredPrivacyProfileId({
+      openRouterPrivacyProfileId({
         baseUrl: "https://openrouter.ai/api/v1",
         zeroDataRetention: true,
       }),
     ).toBe("openrouter-global-zdr-v1");
     expect(
-      sponsoredPrivacyProfileId({
+      openRouterPrivacyProfileId({
         baseUrl: "https://openrouter.ai/api/v1",
         zeroDataRetention: false,
       }),
@@ -41,23 +41,23 @@ describe("sponsoredPrivacyProfileId", () => {
   });
 
   it("treats an unusable base URL as non-EU rather than assuming the strict case", () => {
-    expect(sponsoredPrivacyProfileId({ baseUrl: "", zeroDataRetention: true })).toBe(
+    expect(openRouterPrivacyProfileId({ baseUrl: "", zeroDataRetention: true })).toBe(
       "openrouter-global-zdr-v1",
     );
   });
 });
 
-describe("sponsoredZeroDataRetention", () => {
+describe("openRouterZeroDataRetention", () => {
   it("stays on unless it is switched off explicitly", () => {
-    delete process.env.SPONSORED_OPENROUTER_ZDR;
-    expect(sponsoredZeroDataRetention()).toBe(true);
-    process.env.SPONSORED_OPENROUTER_ZDR = "true";
-    expect(sponsoredZeroDataRetention()).toBe(true);
-    process.env.SPONSORED_OPENROUTER_ZDR = "unsinn";
-    expect(sponsoredZeroDataRetention()).toBe(true);
-    process.env.SPONSORED_OPENROUTER_ZDR = "false";
-    expect(sponsoredZeroDataRetention()).toBe(false);
-    process.env.SPONSORED_OPENROUTER_ZDR = "FALSE";
-    expect(sponsoredZeroDataRetention()).toBe(false);
+    delete process.env.OPENROUTER_ZDR;
+    expect(openRouterZeroDataRetention()).toBe(true);
+    process.env.OPENROUTER_ZDR = "true";
+    expect(openRouterZeroDataRetention()).toBe(true);
+    process.env.OPENROUTER_ZDR = "unsinn";
+    expect(openRouterZeroDataRetention()).toBe(true);
+    process.env.OPENROUTER_ZDR = "false";
+    expect(openRouterZeroDataRetention()).toBe(false);
+    process.env.OPENROUTER_ZDR = "FALSE";
+    expect(openRouterZeroDataRetention()).toBe(false);
   });
 });

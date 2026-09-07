@@ -3561,29 +3561,6 @@ i[data-result-status="no_assessment_possible"] {
   padding-left: 0;
 }
 
-/* Zustand nach der Anmeldung: die Vorschau wird ersetzt, nicht freigeschaltet. */
-.preview-start-state {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  padding: 72px 24px;
-  text-align: center;
-}
-
-.preview-start-state h1 {
-  font-size: 20px;
-}
-
-.preview-start-state p {
-  max-width: 46ch;
-  color: var(--text-secondary);
-  line-height: 1.55;
-}
-
-.preview-start-actions {
-  margin-top: 8px;
-}
-
 /* Fehlgeschlagener Lauf: die Begründung des Anbieters ist der Kern der Seite,
    nicht eine Randnotiz — ohne sie ist der Fehler nicht zu beheben. */
 .analysis-run-failure {

@@ -29,16 +29,13 @@ import {
   type StructuredModelResponse,
 } from "@/server/ai/structured-model";
 import {
-  getStrictAnalysisProviderConfiguration,
-  isStrictAnalysisProviderAvailable,
+  getAnalysisProviderConfiguration,
+  isAnalysisProviderAvailable,
   requestProviderStructured,
-  sponsoredPrivacyProfileId,
-  sponsoredZeroDataRetention,
 } from "@/server/ai/provider-routing";
 import { withTemporaryCredential } from "@/server/ai/temporary-credential-service";
 import { buildVerificationPrompt } from "@/server/ai/verification-prompt";
 import { db } from "@/server/db/client";
-import { sponsoredRunGrants } from "@/server/db/schema/application";
 import {
   analyses,
   analysisAssessmentCache,
@@ -67,34 +64,12 @@ function safeErrorCode(error: unknown) {
   return "UnknownError";
 }
 
-function sponsoredProviderConfiguration() {
-  const apiKey = process.env.SPONSORED_OPENROUTER_API_KEY?.trim();
-  const baseUrl = process.env.SPONSORED_OPENROUTER_BASE_URL?.trim();
-  const maxOutputTokens = Number.parseInt(
-    process.env.SPONSORED_MAX_OUTPUT_TOKENS?.trim() || "4000",
-    10,
-  );
-  if (!apiKey || !baseUrl) throw new Error("SPONSORED_PROVIDER_CREDENTIAL_MISSING");
-  if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 16_000) {
-    throw new Error("SPONSORED_MAX_OUTPUT_TOKENS_INVALID");
-  }
-  return { apiKey, baseUrl, maxOutputTokens, zeroDataRetention: sponsoredZeroDataRetention() };
-}
-
 async function requestStructuredForAnalysis<T>(
   analysis: NonNullable<AnalysisRecord>,
   request: Omit<StructuredModelRequest<T>, "apiKey" | "baseUrl" | "maxOutputTokens">,
 ) {
-  if (analysis.fundingMode === "sponsored") {
-    return requestProviderStructured("openrouter", {
-      ...request,
-      ...sponsoredProviderConfiguration(),
-    });
-  }
-  if (!analysis.aiCredentialId) {
-    throw new Error("BYOK_ANALYSIS_CREDENTIAL_MISSING");
-  }
-  const provider = getStrictAnalysisProviderConfiguration(analysis.routeProvider);
+  if (!analysis.aiCredentialId) throw new Error("ANALYSIS_CREDENTIAL_MISSING");
+  const provider = getAnalysisProviderConfiguration(analysis.routeProvider);
   return withTemporaryCredential(
     {
       credentialId: analysis.aiCredentialId,
@@ -109,6 +84,7 @@ async function requestStructuredForAnalysis<T>(
         ...request,
         baseUrl: provider.baseUrl,
         maxOutputTokens: provider.maxOutputTokens,
+        zeroDataRetention: provider.zeroDataRetention,
         apiKey,
       }),
   );
@@ -120,27 +96,13 @@ async function loadAnalysis(analysisId: string) {
   const routeProvider = aiRouteProviderSchema.safeParse(analysis.routeProvider);
 
   // Der Lauf muss unter genau der Route ausgeführt werden, die beim Start
-  // eingefroren wurde. Zuvor stand hier ein fester Vergleich auf "eu-zdr-v1";
-  // das prüfte nicht die Unveränderlichkeit, sondern schrieb ein einzelnes
-  // Profil vor. Entscheidend ist, dass die Umgebung sich seit dem Start nicht
-  // still geändert hat — sonst entstünde ein Ergebnis unter anderen
-  // Datenschutzbedingungen als im Nachweis vermerkt.
-  const currentProfileId =
-    analysis.fundingMode === "sponsored"
-      ? sponsoredPrivacyProfileId({
-          baseUrl: process.env.SPONSORED_OPENROUTER_BASE_URL?.trim() ?? "",
-          zeroDataRetention: sponsoredZeroDataRetention(),
-        })
-      : routeProvider.success && isStrictAnalysisProviderAvailable(routeProvider.data)
-        ? getStrictAnalysisProviderConfiguration(routeProvider.data).privacyProfileId
-        : undefined;
-
+  // eingefroren wurde. Hat sich die Umgebung seither still geändert, entstünde
+  // ein Ergebnis unter anderen Datenschutzbedingungen als im Nachweis vermerkt.
   if (
     !routeProvider.success ||
-    (analysis.fundingMode === "sponsored"
-      ? analysis.routeProvider !== "openrouter"
-      : !isStrictAnalysisProviderAvailable(routeProvider.data)) ||
-    analysis.privacyProfileId !== currentProfileId
+    !isAnalysisProviderAvailable(routeProvider.data) ||
+    analysis.privacyProfileId !==
+      getAnalysisProviderConfiguration(routeProvider.data).privacyProfileId
   ) {
     throw new Error("FROZEN_ROUTE_UNSUPPORTED");
   }
@@ -375,7 +337,6 @@ async function assessItem(
   const inputHash = createContentHash({
     promptVersion: analysis.promptVersion,
     modelId: analysis.providerModelId,
-    providerRouteAllowlist: analysis.providerRouteAllowlist,
     retrievalOutputHash: item.packet.outputHash,
     system: prompt.system,
     user: prompt.user,
@@ -474,7 +435,6 @@ async function assessItem(
         schemaName: "requirement_assessment",
         jsonSchema: { ...requirementAssessmentJsonSchema },
         outputSchema: requirementAssessmentSchema,
-        providerOnly: analysis.providerRouteAllowlist,
       });
       outputHash = createContentHash(response.output);
       if (response.output.status === "not_applicable") {
@@ -566,7 +526,6 @@ async function verifyItem(
   const inputHash = createContentHash({
     promptVersion: analysis.verifierPromptVersion,
     modelId: analysis.verifierProviderModelId,
-    providerRouteAllowlist: analysis.verifierProviderRouteAllowlist,
     proposedAssessment: assessment,
     retrievalOutputHash: item.packet.outputHash,
     system: prompt.system,
@@ -594,7 +553,6 @@ async function verifyItem(
         schemaName: "assessment_verification",
         jsonSchema: { ...verificationResultJsonSchema },
         outputSchema: verificationResultSchema,
-        providerOnly: analysis.verifierProviderRouteAllowlist,
       });
       const outputHash = createContentHash(response.output);
       await finishInvocation(invocationId, startedAt, response, outputHash);
@@ -713,6 +671,15 @@ async function persistItemResult(input: {
   });
 }
 
+/** Der Schlüssel des Nutzers lebt nur so lange wie der Lauf, der ihn braucht. */
+function deleteAnalysisCredential(analysis: Pick<AnalysisRecord, "sourceDraftId" | "ownerUserId">) {
+  return deleteTemporaryCredentialsForBinding({
+    purpose: "analysis",
+    bindingId: analysis.sourceDraftId,
+    ownerUserId: analysis.ownerUserId,
+  });
+}
+
 async function claimAnalysisWorkflow(analysisId: string, workflowRunId?: string) {
   if (!workflowRunId) return true;
 
@@ -736,13 +703,7 @@ export async function prepareAnalysisExecution(job: AnalysisExecutionJob, workfl
   }
   const analysis = await loadAnalysis(job.analysisId);
   if (analysis.status === "completed") {
-    if (analysis.fundingMode === "byok") {
-      await deleteTemporaryCredentialsForBinding({
-        purpose: "analysis",
-        bindingId: analysis.sourceDraftId,
-        ownerUserId: analysis.ownerUserId,
-      });
-    }
+    await deleteAnalysisCredential(analysis);
     return { analysisId: analysis.id, status: "completed" as const, scopeItemIds: [] };
   }
   if (analysis.status !== "queued" && analysis.status !== "running") {
@@ -837,25 +798,6 @@ export async function finalizeAnalysisExecution(analysisId: string) {
       .where(and(eq(analyses.id, analysis.id), eq(analyses.status, "running")))
       .returning({ id: analyses.id });
     if (!completed) throw new Error("ANALYSIS_COMPLETION_CONFLICT");
-    if (analysis.sponsoredGrantId) {
-      const [consumed] = await transaction
-        .update(sponsoredRunGrants)
-        .set({
-          status: "consumed",
-          reservedUntil: null,
-          consumedAt: completedAt,
-          revision: sql`${sponsoredRunGrants.revision} + 1`,
-          updatedAt: completedAt,
-        })
-        .where(
-          and(
-            eq(sponsoredRunGrants.id, analysis.sponsoredGrantId),
-            eq(sponsoredRunGrants.status, "reserved"),
-          ),
-        )
-        .returning({ id: sponsoredRunGrants.id });
-      if (!consumed) throw new Error("SPONSORED_GRANT_NOT_RESERVED");
-    }
     await transaction
       .update(policyVersions)
       .set({ originalDeleteAfter: new Date(completedAt.getTime() + 24 * 60 * 60 * 1000) })
@@ -871,29 +813,6 @@ export async function finalizeAnalysisExecution(analysisId: string) {
     });
   });
 
-  if (analysis.fundingMode === "byok") {
-    await deleteTemporaryCredentialsForBinding({
-      purpose: "analysis",
-      bindingId: analysis.sourceDraftId,
-      ownerUserId: analysis.ownerUserId,
-    });
-  }
-
+  await deleteAnalysisCredential(analysis);
   return { analysisId: analysis.id, status: "completed" as const };
-}
-
-export async function executeAnalysis(job: AnalysisExecutionJob) {
-  const prepared = await prepareAnalysisExecution(job);
-  if (prepared.status === "completed") return prepared;
-  for (let index = 0; index < prepared.scopeItemIds.length; index += 1) {
-    const scopeItemId = prepared.scopeItemIds[index];
-    if (!scopeItemId) continue;
-    await executeAnalysisScopeItem({
-      analysisId: prepared.analysisId,
-      scopeItemId,
-      index,
-      total: prepared.scopeItemIds.length,
-    });
-  }
-  return finalizeAnalysisExecution(prepared.analysisId);
 }

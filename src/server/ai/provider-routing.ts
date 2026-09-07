@@ -10,7 +10,7 @@ import { requestRequestyStructured } from "./requesty";
 import type { StructuredModelRequest, StructuredModelResponse } from "./structured-model";
 
 export class ProviderRouteConfigurationError extends Error {
-  constructor(public readonly code: "STRICT_PRIVACY_ROUTE_UNAVAILABLE" | "TOKEN_LIMIT_INVALID") {
+  constructor(public readonly code: "ANALYSIS_ROUTE_UNAVAILABLE" | "TOKEN_LIMIT_INVALID") {
     super(code);
     this.name = "ProviderRouteConfigurationError";
   }
@@ -20,6 +20,7 @@ export type AnalysisProviderConfiguration = {
   provider: AiRouteProvider;
   baseUrl: string;
   maxOutputTokens: number;
+  zeroDataRetention: boolean;
   /** Beschreibt die tatsächlich verwendete Route, statt eine Zusage zu behaupten. */
   privacyProfileId: string;
 };
@@ -32,8 +33,8 @@ function maxOutputTokens() {
   return value;
 }
 
-/** Basis-URL der BYOK-Route je Anbieter; EU-Varianten bleiben die Voreinstellung. */
-function byokBaseUrl(provider: AiRouteProvider) {
+/** Basis-URL der Analyse-Route je Anbieter; EU-Varianten bleiben die Voreinstellung. */
+function analysisBaseUrl(provider: AiRouteProvider) {
   switch (provider) {
     case "openrouter":
       return (
@@ -55,26 +56,24 @@ function byokBaseUrl(provider: AiRouteProvider) {
   }
 }
 
-export function isStrictAnalysisProviderAvailable(provider: AiRouteProvider) {
-  return Boolean(byokBaseUrl(provider));
+export function isAnalysisProviderAvailable(provider: AiRouteProvider) {
+  return Boolean(analysisBaseUrl(provider));
 }
 
-export function getStrictAnalysisProviderConfiguration(
+export function getAnalysisProviderConfiguration(
   provider: AiRouteProvider,
 ): AnalysisProviderConfiguration {
-  if (!isStrictAnalysisProviderAvailable(provider)) {
-    throw new ProviderRouteConfigurationError("STRICT_PRIVACY_ROUTE_UNAVAILABLE");
-  }
-  const baseUrl = byokBaseUrl(provider);
-  if (!baseUrl) throw new ProviderRouteConfigurationError("STRICT_PRIVACY_ROUTE_UNAVAILABLE");
+  const baseUrl = analysisBaseUrl(provider);
+  if (!baseUrl) throw new ProviderRouteConfigurationError("ANALYSIS_ROUTE_UNAVAILABLE");
+  const zeroDataRetention = openRouterZeroDataRetention();
   return {
     provider,
     baseUrl,
     maxOutputTokens: maxOutputTokens(),
-    // Auch hier gilt: das Profil beschreibt die Route, es behauptet sie nicht.
+    zeroDataRetention,
     privacyProfileId:
       provider === "openrouter"
-        ? sponsoredPrivacyProfileId({ baseUrl, zeroDataRetention: sponsoredZeroDataRetention() })
+        ? openRouterPrivacyProfileId({ baseUrl, zeroDataRetention })
         : "eu-zdr-v1",
   };
 }
@@ -99,14 +98,14 @@ export function requestProviderStructured<T>(
 }
 
 /**
- * Leitet das Datenschutzprofil des gesponserten Laufs aus der tatsächlich
+ * Leitet das Datenschutzprofil einer OpenRouter-Route aus der tatsächlich
  * konfigurierten Route ab, statt es frei setzen zu lassen.
  *
  * Ein Ergebnis, das mit abgeschaltetem Zero Data Retention oder ausserhalb der
  * EU-Route entstanden ist, darf im Nachweis nicht als `eu-zdr-v1` erscheinen —
  * das wäre eine falsche Zusage in genau dem Dokument, das die Zusage belegen soll.
  */
-export function sponsoredPrivacyProfileId(input: {
+export function openRouterPrivacyProfileId(input: {
   baseUrl: string;
   zeroDataRetention: boolean;
 }): string {
@@ -120,7 +119,7 @@ export function sponsoredPrivacyProfileId(input: {
   return `openrouter-${euRoute ? "eu" : "global"}-${input.zeroDataRetention ? "zdr" : "no-zdr"}-v1`;
 }
 
-/** Gesponserte Route: EU-Host und ZDR sind Standard, Abweichung ist ausdrücklich. */
-export function sponsoredZeroDataRetention() {
-  return process.env.SPONSORED_OPENROUTER_ZDR?.trim().toLowerCase() !== "false";
+/** OpenRouter-Route: ZDR ist Standard, Abweichung ist ausdrücklich. */
+export function openRouterZeroDataRetention() {
+  return process.env.OPENROUTER_ZDR?.trim().toLowerCase() !== "false";
 }
