@@ -3,11 +3,15 @@ import "server-only";
 import { ModelProviderError } from "./structured-model";
 
 export function openRouterBaseUrl() {
-  return process.env.OPENROUTER_BASE_URL?.trim() || process.env.OPENROUTER_EU_BASE_URL?.trim();
+  return (
+    process.env.OPENROUTER_BASE_URL?.trim() ||
+    process.env.OPENROUTER_EU_BASE_URL?.trim() ||
+    "https://openrouter.ai/api/v1"
+  );
 }
 
 export function openRouterZeroDataRetention() {
-  return process.env.OPENROUTER_ZDR?.trim().toLowerCase() !== "false";
+  return process.env.OPENROUTER_ZDR?.trim().toLowerCase() === "true";
 }
 
 export function openRouterModelsUrl(
@@ -31,7 +35,7 @@ export function openRouterUrl(baseUrl: string, path: string) {
   try {
     url = new URL(baseUrl);
   } catch {
-    throw new ModelProviderError("INVALID_EU_ROUTE", false);
+    throw new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
   }
   if (
     url.protocol !== "https:" ||
@@ -41,7 +45,7 @@ export function openRouterUrl(baseUrl: string, path: string) {
     url.password ||
     url.pathname.replace(/\/$/u, "") !== "/api/v1"
   ) {
-    throw new ModelProviderError("INVALID_EU_ROUTE", false);
+    throw new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
   }
   url.pathname = `/api/v1/${path}`;
   url.search = "";

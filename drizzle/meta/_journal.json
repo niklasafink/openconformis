@@ -309,6 +309,13 @@
       "when": 1788739200000,
       "tag": "0043_byok_only",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1788908209928,
+      "tag": "0044_drop_privacy_attestation",
+      "breakpoints": true
     }
   ]
 }

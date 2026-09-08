@@ -41,8 +41,8 @@ at registration. It is not marketed as a production environment for confidential
 banking, insurance or asset-management policies.
 
 Confidential processing is enabled only in a later profile after EU storage,
-malware scanning, qualified EU/ZDR AI routes, DPA/subprocessor review, backup
-deletion and incident processes have passed their launch gates.
+malware scanning, DPA/subprocessor review, backup deletion and incident processes
+have passed their launch gates.
 
 ## 3. First-analysis journey
 
@@ -90,8 +90,7 @@ Google direct and OpenAI direct. The user chooses a model first; the app then of
 only technically compatible routes. An OpenRouter key is never mandatory for a
 model that has a supported direct route.
 
-An unevaluated model may be selected after explicit warning. A route that violates
-the active EU/ZDR policy is blocked rather than warning-only.
+An unevaluated model may be selected after explicit warning.
 
 ### Validation
 
@@ -164,10 +163,9 @@ instant deletion from immutable backups.
 
 No endpoint accepts arbitrary prompts, and no endpoint holds an operator credential.
 
-The current executable BYOK analysis route uses OpenRouter's EU endpoint with ZDR,
-denied data collection and required structured outputs. Credentials for direct
-providers use the same temporary custody contract, but a direct route is not exposed
-for analysis until its inference adapter and privacy qualification are implemented.
+The current executable BYOK analysis route uses OpenRouter's global endpoint with
+required structured outputs; zero data retention is opt-in via `OPENROUTER_ZDR`.
+Credentials for direct providers use the same temporary custody contract.
 
 ## 9. Minimum data model
 
@@ -208,7 +206,7 @@ SPONSORED_RUNS_ENABLED=false
 BYOK_ENCRYPTION_KEY=
 BYOK_ENCRYPTION_KEY_VERSION=
 BYOK_CREDENTIAL_TTL_HOURS=24
-OPENROUTER_ZDR=true
+OPENROUTER_ZDR=false
 
 AI_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
 BYOK_PROVIDER_ALLOWLIST=openrouter,requesty,openai
@@ -243,7 +241,6 @@ rejected by the worker.
 - Docker worker restart/idempotency tests pass;
 - temporary-key encryption, deletion and log-canary tests pass;
 - OCR subprocess isolation and malicious-file tests pass;
-- exact AI routes have reviewed EU/ZDR profiles;
 - the UI explains model evaluation warnings, BYOK and retention;
 - privacy notice and account deletion flow are published.
 

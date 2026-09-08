@@ -15,7 +15,7 @@ Initial provider adapters:
 | Provider   | User credential                              | Discovery / validation                        | Primary role                                                                                |
 | ---------- | -------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | OpenRouter | OpenRouter API key                           | Current-key and models APIs                   | Multi-model route; official sponsorship and preferred Gemini 3.7 Flash preprocessing route. |
-| Requesty   | Requesty API key                             | Provider-specific key/model validation        | Multi-provider routing where its exact EU/ZDR route is qualified.                           |
+| Requesty   | Requesty API key                             | Provider-specific key/model validation        | Multi-provider routing through Requesty's global endpoint.                                  |
 | Anthropic  | Claude API key                               | `GET /v1/models` with provider authentication | Direct Claude access.                                                                       |
 | Google     | Gemini API key or current supported auth key | Gemini `models.list` with `x-goog-api-key`    | Direct Gemini access.                                                                       |
 | OpenAI     | OpenAI API key                               | `GET /v1/models` with bearer authentication   | Direct OpenAI access.                                                                       |
@@ -147,9 +147,9 @@ leaderboards. If only one model passes, only one is recommended. An unevaluated
 model remains selectable with a persistent pre-start warning and a recorded consent
 flag on the analysis revision. It never receives a recommendation label.
 
-Privacy is not a soft warning. An exact route that does not satisfy the deployment's
-EU and zero-data-retention policy is unavailable even if the user accepts model
-quality risk.
+There is no EU-hosting or zero-data-retention requirement. A route is available
+whenever it is technically functional; users who want zero data retention opt in
+through their own provider account settings.
 
 Initial evaluation pool, not pre-approved recommendations:
 
@@ -167,9 +167,9 @@ parameters, retention controls, latency and cost may differ.
 The preferred inexpensive preprocessing profile is Gemini 3.7 Flash through
 OpenRouter. It performs document structure recovery, query expansion and candidate
 classification, but never makes the final compliance decision. This route is used
-for policy content only after the exact OpenRouter upstream route has passed the
-active EU/ZDR qualification. Until then it is restricted to synthetic and explicitly
-non-confidential beta data or replaced by a qualified Requesty/direct route.
+for policy content once the exact OpenRouter upstream route has passed evaluation.
+Until then it is restricted to synthetic and explicitly non-confidential beta data
+or replaced by an evaluated Requesty/direct route.
 
 The model selection is frozen into the analysis revision. Changing it after results
 exist creates a new run/revision and invalidates confirmations.
@@ -244,7 +244,7 @@ All providers use the same security invariants:
 ## 8. Analysis selector placement and behaviour
 
 The initial implementation obtains the selectable OpenRouter set from the official
-model endpoint filtered for EU region, ZDR and structured outputs. The response is
+model endpoint filtered for structured outputs. The response is
 cached for six hours and hashed into the persisted catalogue version. In a
 database-backed deployment, a model gains an evaluation label only through an
 immutable, published `ai_model_evaluations` record whose mandatory thresholds pass.
@@ -353,9 +353,7 @@ publisher, route provider and exact provider model ID as separate validated fiel
 AI_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
 BYOK_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
 
-BYOK_REQUESTY_EU_ZDR_ENABLED=false
 BYOK_REQUESTY_ANALYSIS_MODELS=
-BYOK_OPENAI_EU_ZDR_ENABLED=false
 BYOK_OPENAI_ANALYSIS_MODELS=
 BYOK_REQUESTY_CHAT_MODELS=
 BYOK_ANTHROPIC_CHAT_MODELS=
@@ -395,7 +393,6 @@ its provider, exact model and credential mode are all explicitly allowed.
 - Provider keys are absent from client bundles, logs and workflow serialization.
 - Google credentials are sent in the `x-goog-api-key` header, never query strings.
 - Unevaluated model acknowledgement is frozen into the analysis revision.
-- A quality warning cannot override an EU/ZDR route block.
 - Gold labels have two independent human reviews and adjudication when they differ.
 - A promoted configuration has zero accepted fabricated evidence and at most 5%
   false-positive `Erfüllt` on the frozen evaluation set.

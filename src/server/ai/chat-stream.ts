@@ -173,8 +173,6 @@ function providerRequest(input: StreamRequest) {
       provider: {
         only: providerOnly,
         allow_fallbacks: false,
-        data_collection: "deny",
-        zdr: true,
       },
     },
   };

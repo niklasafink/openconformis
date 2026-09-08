@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
+import { requireSessionPrincipal } from "@/server/auth/session-principal";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import {
   analyses,
@@ -13,6 +15,38 @@ import {
 } from "@/server/db/schema/analyses";
 import { documentBlocks, policies, policyVersions } from "@/server/db/schema/documents";
 import type { AnalysisExportData } from "@/server/exports/analysis-xlsx";
+
+/**
+ * Für die Sidebar: die zuletzt bearbeiteten Analysen des Nutzers, samt
+ * Policy-Name und Status, damit „Zuletzt verwendet" wie im Referenzdesign
+ * ohne zusätzlichen Klick erkennbar ist.
+ */
+export async function listRecentAnalyses() {
+  const [principal, user] = await Promise.all([
+    requireSessionPrincipal(),
+    requireAuthenticatedSessionUser(),
+  ]);
+  if (principal.userId !== user.id) return [];
+  return db
+    .select({
+      id: analyses.id,
+      frameworkSlug: analyses.frameworkSlug,
+      status: analyses.status,
+      policyName: policies.displayName,
+      updatedAt: analyses.updatedAt,
+    })
+    .from(analyses)
+    .innerJoin(policyVersions, eq(policyVersions.id, analyses.policyVersionId))
+    .innerJoin(policies, eq(policies.id, policyVersions.policyId))
+    .where(
+      and(
+        eq(analyses.organizationId, principal.organizationId),
+        eq(analyses.ownerUserId, principal.userId),
+      ),
+    )
+    .orderBy(desc(analyses.updatedAt))
+    .limit(10);
+}
 
 /**
  * Findet die Analyse, die aus einem bereits übernommenen Draft entstanden ist.

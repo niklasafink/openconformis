@@ -392,3 +392,23 @@ that is both sent with the request and recorded in the run's privacy profile.
 
 Decision: accepted. Supersedes D-014 and the sponsorship parts of D-015 and the
 model-selector decision.
+
+## D-026 Drop the EU-hosting and zero-data-retention requirement
+
+Product direction (2026-09-09): EU-region routing and zero data retention are no
+longer a product requirement for AI model calls. Requesty and OpenAI analysis
+routes are available by default through their global endpoints instead of being
+gated behind an EU/ZDR-qualified route; OpenRouter defaults to its global endpoint
+and only sends `zdr`/`data_collection: deny` when `OPENROUTER_ZDR=true` is set
+explicitly. The chat route no longer forces zero data retention either. The
+per-provider privacy attestation checkbox is removed along with the
+`ai_credentials.privacy_attestation_accepted` column and its check constraint
+(`drizzle/0044_drop_privacy_attestation.sql`); `privacyProfileId` remains as a
+truthful audit label of the route actually used, not a compliance gate.
+
+Consequences: `BYOK_REQUESTY_EU_ZDR_ENABLED` and `BYOK_OPENAI_EU_ZDR_ENABLED` are
+removed. Users who want zero data retention arrange it through their own provider
+account; the application no longer enforces or claims it.
+
+Decision: accepted. Amends the AI-routing privacy enforcement described in D-025;
+the hosted topology's own database/storage region (D-016) is unaffected.

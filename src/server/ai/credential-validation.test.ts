@@ -42,7 +42,7 @@ describe("provider credential validation", () => {
     expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("google-canary");
   });
 
-  it("requires the exact EU/ZDR OpenRouter model", async () => {
+  it("requires the exact OpenRouter model", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -71,9 +71,8 @@ describe("provider credential validation", () => {
     );
 
     const modelsUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
-    expect(modelsUrl.hostname).toBe("eu.openrouter.ai");
-    expect(modelsUrl.searchParams.get("zdr")).toBe("true");
-    expect(modelsUrl.searchParams.get("region")).toBe("eu");
+    expect(modelsUrl.hostname).toBe("openrouter.ai");
+    expect(modelsUrl.searchParams.get("zdr")).toBeNull();
     expect(result.safeLabel).toBe("Temporary analysis");
   });
 
@@ -90,7 +89,7 @@ describe("provider credential validation", () => {
     ).rejects.toEqual(new CredentialValidationError("CREDENTIAL_REJECTED", false));
   });
 
-  it("validates Requesty and OpenAI credentials only through EU endpoints", async () => {
+  it("validates Requesty and OpenAI credentials through their global endpoints", async () => {
     const requestyFetch = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response(JSON.stringify({ data: [{ id: "anthropic/claude-test" }] })));
@@ -102,9 +101,7 @@ describe("provider credential validation", () => {
       },
       requestyFetch,
     );
-    expect(String(requestyFetch.mock.calls[0]?.[0])).toBe(
-      "https://router.eu.requesty.ai/v1/models",
-    );
+    expect(String(requestyFetch.mock.calls[0]?.[0])).toBe("https://router.requesty.ai/v1/models");
 
     const openAiFetch = vi
       .fn<typeof fetch>()
@@ -114,7 +111,7 @@ describe("provider credential validation", () => {
       openAiFetch,
     );
     expect(String(openAiFetch.mock.calls[0]?.[0])).toBe(
-      "https://eu.api.openai.com/v1/models/gpt-test",
+      "https://api.openai.com/v1/models/gpt-test",
     );
   });
 });

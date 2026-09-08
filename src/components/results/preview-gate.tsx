@@ -31,7 +31,6 @@ type PreviewGateProps = {
     routeProvider: AiRouteProvider;
     routeProviderLabel: string;
     credentialHelpUrl: string;
-    privacyAttestationRequired: boolean;
   };
   labels: AuthFormLabels & {
     preparing: string;
@@ -49,7 +48,6 @@ type PreviewGateProps = {
     connecting: string;
     keyLink: string;
     keyFailed: string;
-    privacyAttestation: string;
     unlockResult: string;
     close: string;
   };
@@ -100,7 +98,6 @@ export function PreviewGate({
   const dialogOpen = dialog === "open" || (dialog === undefined && signedIn);
   const [apiKey, setApiKey] = useState("");
   const [credentialId, setCredentialId] = useState<string>();
-  const [privacyAttestationAccepted, setPrivacyAttestationAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<StartFailure | null>(null);
   const steps = [labels.parsing, labels.mapping, labels.checking];
@@ -134,7 +131,6 @@ export function PreviewGate({
           bindingId: draftId,
           requiredModelId: selectedModel.providerModelId,
           apiKey: apiKey.trim(),
-          privacyAttestationAccepted,
         });
         const credential = (await credentialResponse.json()) as { credentialId?: string };
         if (!credentialResponse.ok || !credential.credentialId) {
@@ -159,10 +155,7 @@ export function PreviewGate({
         code?: string;
       };
       if (!startResponse.ok || !analysis.analysisId) {
-        if (
-          analysis.code === "BYOK_CREDENTIAL_INVALID" ||
-          analysis.code === "BYOK_PRIVACY_ATTESTATION_REQUIRED"
-        ) {
+        if (analysis.code === "BYOK_CREDENTIAL_INVALID") {
           setCredentialId(undefined);
         }
         // Die Begründung des Servers hat Vorrang: sie benennt den konkreten
@@ -272,17 +265,6 @@ export function PreviewGate({
                         onChange={(event) => setApiKey(event.target.value)}
                       />
                     </>
-                  ) : null}
-                  {selectedModel.privacyAttestationRequired ? (
-                    <label className="preview-privacy-attestation">
-                      <input
-                        type="checkbox"
-                        required
-                        checked={privacyAttestationAccepted}
-                        onChange={(event) => setPrivacyAttestationAccepted(event.target.checked)}
-                      />
-                      <span>{labels.privacyAttestation}</span>
-                    </label>
                   ) : null}
                   {failure ? (
                     <p className="preview-key-error" role="alert">

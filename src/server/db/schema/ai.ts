@@ -242,7 +242,6 @@ export const aiCredentials = pgTable(
     encryptionKeyVersion: integer("encryption_key_version").notNull(),
     secretLastFour: text("secret_last_four").notNull(),
     safeLabel: text("safe_label"),
-    privacyAttestationAccepted: boolean("privacy_attestation_accepted").default(false).notNull(),
     accessibleModelIds: text("accessible_model_ids")
       .array()
       .default(sql`ARRAY[]::text[]`)
@@ -269,9 +268,6 @@ export const aiCredentials = pgTable(
         AND ${table.encryptionKeyVersion} > 0
         AND length(${table.secretLastFour}) = 4
         AND (${table.safeLabel} IS NULL OR length(${table.safeLabel}) <= 200)
-        AND (${table.purpose} <> 'analysis'
-          OR ${table.provider} NOT IN ('requesty', 'openai')
-          OR ${table.privacyAttestationAccepted})
         AND cardinality(${table.accessibleModelIds}) = 1
         AND length(btrim(${table.accessibleModelIds}[1])) > 0
         AND ${table.modelAccessHash} ~ '^[0-9a-f]{64}$'`,

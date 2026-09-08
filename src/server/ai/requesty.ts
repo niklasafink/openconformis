@@ -49,11 +49,11 @@ function responsesUrl(baseUrl: string) {
   const url = new URL(baseUrl);
   if (
     url.protocol !== "https:" ||
-    url.hostname !== "router.eu.requesty.ai" ||
+    url.hostname !== "router.requesty.ai" ||
     url.port ||
     url.pathname.replace(/\/$/u, "") !== "/v1"
   ) {
-    throw new ModelProviderError("INVALID_EU_ROUTE", false);
+    throw new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
   }
   url.pathname = "/v1/responses";
   url.search = "";

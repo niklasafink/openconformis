@@ -39,9 +39,8 @@ describe("consistent provider routes", () => {
   it.each(["requesty", "openai"] as const)(
     "keeps %s ZDR independent of OpenRouter settings",
     (provider) => {
-      vi.stubEnv("OPENROUTER_ZDR", "false");
-      vi.stubEnv(`BYOK_${provider.toUpperCase()}_EU_ZDR_ENABLED`, "true");
-      expect(getAnalysisProviderConfiguration(provider).zeroDataRetention).toBe(true);
+      vi.stubEnv("OPENROUTER_ZDR", "true");
+      expect(getAnalysisProviderConfiguration(provider).zeroDataRetention).toBe(false);
     },
   );
 });

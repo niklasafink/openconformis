@@ -68,7 +68,6 @@ export async function createTemporaryCredential(input: {
   bindingId: string;
   requiredModelId: string;
   secret: string;
-  privacyAttestationAccepted?: boolean;
 }) {
   const user = await requireAuthenticatedSessionUser();
   const provider = aiRouteProviderSchema.parse(input.provider);
@@ -86,13 +85,6 @@ export async function createTemporaryCredential(input: {
   }
   if (purpose === "analysis" && !isAnalysisProviderAvailable(provider)) {
     throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");
-  }
-  if (
-    purpose === "analysis" &&
-    (provider === "requesty" || provider === "openai") &&
-    !input.privacyAttestationAccepted
-  ) {
-    throw new TemporaryCredentialError("BYOK_PRIVACY_ATTESTATION_REQUIRED");
   }
 
   let bindingId = user.sessionId;
@@ -180,7 +172,6 @@ export async function createTemporaryCredential(input: {
       encryptionKeyVersion: encrypted.keyVersion,
       secretLastFour: input.secret.slice(-4),
       safeLabel,
-      privacyAttestationAccepted: Boolean(input.privacyAttestationAccepted),
       accessibleModelIds: validation.accessibleModelIds,
       modelAccessHash: createContentHash(validation.accessibleModelIds),
       validatedAt: now,
@@ -195,7 +186,6 @@ export async function createTemporaryCredential(input: {
         provider,
         purpose,
         expiresAt: expiresAt.toISOString(),
-        privacyAttestationAccepted: Boolean(input.privacyAttestationAccepted),
       },
     });
   });

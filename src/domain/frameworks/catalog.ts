@@ -23,7 +23,7 @@ export const frameworks = [
     name: "EU AML",
     region: "EU",
     requirementCount: 0,
-    availability: "included",
+    availability: "locked",
     aliases: ["Geldwäsche", "Anti-Money Laundering"],
   },
   {
@@ -31,7 +31,7 @@ export const frameworks = [
     name: "MaRisk",
     region: "DE",
     requirementCount: 0,
-    availability: "included",
+    availability: "locked",
     aliases: ["Mindestanforderungen an das Risikomanagement", "BaFin"],
   },
   {

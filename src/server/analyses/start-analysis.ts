@@ -176,10 +176,7 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
     }
 
     const [credential] = await transaction
-      .select({
-        id: aiCredentials.id,
-        privacyAttestationAccepted: aiCredentials.privacyAttestationAccepted,
-      })
+      .select({ id: aiCredentials.id })
       .from(aiCredentials)
       .where(
         and(
@@ -196,12 +193,6 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
       )
       .limit(1);
     if (!credential) throw new AnalysisStartError("BYOK_CREDENTIAL_INVALID");
-    if (
-      (modelSelection.routeProvider === "requesty" || modelSelection.routeProvider === "openai") &&
-      !credential.privacyAttestationAccepted
-    ) {
-      throw new AnalysisStartError("BYOK_PRIVACY_ATTESTATION_REQUIRED");
-    }
 
     // Der Advisory Lock oben serialisiert diesen Abschnitt je Nutzer.
     const membership = await ensurePersonalWorkspace(

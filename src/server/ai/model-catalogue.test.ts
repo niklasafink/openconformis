@@ -7,7 +7,7 @@ import { getAnalysisModelCatalogue } from "./model-catalogue";
 describe("analysis model catalogue", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("requests and retains only EU/ZDR structured text models", async () => {
+  it("requests and retains only structured text models", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -38,8 +38,7 @@ describe("analysis model catalogue", () => {
 
     const catalogue = await getAnalysisModelCatalogue(fetchMock);
     const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
-    expect(url.searchParams.get("zdr")).toBe("true");
-    expect(url.searchParams.get("region")).toBe("eu");
+    expect(url.searchParams.get("zdr")).toBeNull();
     expect(url.searchParams.get("supported_parameters")).toBe("structured_outputs");
     expect(catalogue.models).toHaveLength(1);
     expect(catalogue.models[0]).toMatchObject({
@@ -92,10 +91,40 @@ describe("analysis model catalogue", () => {
     });
   });
 
-  it("adds only direct routes explicitly qualified for the strict privacy profile", async () => {
-    vi.stubEnv("BYOK_REQUESTY_EU_ZDR_ENABLED", "true");
+  it("puts the configured default model first so the scope step preselects it", async () => {
+    // Reproduziert einen realen Fund: die Oberfläche wählt schlicht den ersten
+    // Katalogeintrag vor. Solange kein Modell als geprüft geführt wird, entschied
+    // allein die alphabetische Reihenfolge der Anbieter — „anthracite-org" schlug
+    // „anthropic" um einen Buchstaben, sodass ein Rollenspiel-Modell die
+    // Standardanalyse fuhr, obwohl DEFAULT_ANALYSIS_MODEL_PROFILE ein anderes nennt.
+    vi.stubEnv("DEFAULT_ANALYSIS_MODEL_PROFILE", "anthropic/claude-test");
+    const model = (id: string, name: string) => ({
+      id,
+      name,
+      context_length: 200000,
+      supported_parameters: ["structured_outputs"],
+      architecture: { output_modalities: ["text"] },
+    });
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            model("anthracite-org/magnum-test", "Magnum Test"),
+            model("anthropic/claude-test", "Claude Test"),
+          ],
+        }),
+      ),
+    );
+
+    const catalogue = await getAnalysisModelCatalogue(fetchMock);
+    expect(catalogue.models[0]).toMatchObject({ providerModelId: "anthropic/claude-test" });
+    expect(catalogue.models.map(({ providerModelId }) => providerModelId)).toContain(
+      "anthracite-org/magnum-test",
+    );
+  });
+
+  it("adds only direct routes configured for the model catalogue", async () => {
     vi.stubEnv("BYOK_REQUESTY_ANALYSIS_MODELS", "anthropic/claude-test");
-    vi.stubEnv("BYOK_OPENAI_EU_ZDR_ENABLED", "true");
     vi.stubEnv("BYOK_OPENAI_ANALYSIS_MODELS", "gpt-test");
     vi.stubEnv(
       "EVALUATED_ANALYSIS_MODEL_ALLOWLIST",

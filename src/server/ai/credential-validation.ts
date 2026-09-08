@@ -122,7 +122,7 @@ export async function validateProviderCredential(
         throw new CredentialValidationError("PROVIDER_RESPONSE_INVALID", false);
       }
       const modelsUrl = openRouterModelsUrl(
-        input.route ?? { baseUrl: "https://eu.openrouter.ai/api/v1", zeroDataRetention: true },
+        input.route ?? { baseUrl: "https://openrouter.ai/api/v1", zeroDataRetention: false },
         true,
       );
       modelsUrl.searchParams.set("q", input.requiredModelId);
@@ -145,7 +145,7 @@ export async function validateProviderCredential(
     case "requesty": {
       const models = modelListSchema.safeParse(
         await fetchJson(
-          "https://router.eu.requesty.ai/v1/models",
+          "https://router.requesty.ai/v1/models",
           { headers: bearer(input.secret) },
           fetchImplementation,
         ),
@@ -197,7 +197,7 @@ export async function validateProviderCredential(
     case "openai": {
       const model = directModelSchema.safeParse(
         await fetchJson(
-          `https://eu.api.openai.com/v1/models/${encodeURIComponent(input.requiredModelId)}`,
+          `https://api.openai.com/v1/models/${encodeURIComponent(input.requiredModelId)}`,
           { headers: bearer(input.secret) },
           fetchImplementation,
         ),

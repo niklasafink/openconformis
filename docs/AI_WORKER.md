@@ -28,7 +28,7 @@ Each step receives only an analysis ID and, where needed, a scope-item ID. It lo
 
 ## Model routing
 
-Every analysis runs on the user's own temporary key; there is no operator credential. Users may choose evaluated or non-evaluated models; non-evaluated choices require an explicit warning acknowledgement. For OpenRouter, zero data retention is requested unless `OPENROUTER_ZDR=false`, and the privacy profile frozen with the run records the route that was actually used. Direct Requesty, Anthropic, Google and OpenAI adapters are supported only when their configured privacy profile passes the route guard.
+Every analysis runs on the user's own temporary key; there is no operator credential. Users may choose evaluated or non-evaluated models; non-evaluated choices require an explicit warning acknowledgement. There is no EU-hosting or zero-data-retention requirement; for OpenRouter, zero data retention is only requested when `OPENROUTER_ZDR=true`, and the privacy profile frozen with the run records the route that was actually used. Direct Requesty, Anthropic, Google and OpenAI adapters are available through their global endpoints.
 
 Model approval is an admin release decision. Quality evaluation should measure at least grounding accuracy, unsupported-claim rate, status agreement with expert labels, false-negative rate, structured-output validity, latency and cost per requirement. Low hallucination and evidence fidelity outrank raw benchmark scores.
 

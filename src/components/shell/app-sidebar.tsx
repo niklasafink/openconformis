@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronRight,
   ListChecks,
-  MessageSquare,
   MessageSquarePlus,
   Settings,
 } from "lucide-react";
@@ -45,6 +44,8 @@ export type SidebarLabels = Readonly<{
   results: string;
   chat: string;
   administration: string;
+  recentProjects: string;
+  noProjects: string;
   recentChats: string;
   noChats: string;
   newChat: string;
@@ -53,12 +54,20 @@ export type SidebarLabels = Readonly<{
 
 export type SidebarThread = Readonly<{ id: string; title: string }>;
 
+export type SidebarProject = Readonly<{
+  id: string;
+  title: string;
+  frameworkSlug: string;
+  statusLabel: string;
+}>;
+
 type AppSidebarProps = Readonly<{
   activeArea: ActiveArea;
   activeStep?: WorkflowStep;
   activeThreadId?: string;
   labels: SidebarLabels;
   locale: AppLocale;
+  projects: readonly SidebarProject[];
   threads: readonly SidebarThread[];
   user: { name: string; email: string } | null;
   userLabels: NavUserLabels;
@@ -77,6 +86,7 @@ export function AppSidebar({
   activeThreadId,
   labels,
   locale,
+  projects,
   threads,
   user,
   userLabels,
@@ -112,6 +122,24 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={activeArea === "chat"} tooltip={labels.chat}>
+                  <Link
+                    href="/chat"
+                    locale={locale}
+                    aria-current={activeArea === "chat" ? "page" : undefined}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex size-4 shrink-0 items-center justify-center text-[15px] leading-none"
+                    >
+                      💬
+                    </span>
+                    <span>{labels.chat}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               <Collapsible defaultOpen={activeArea === "analysis"} className="group/collapsible">
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -153,19 +181,6 @@ export function AppSidebar({
               </Collapsible>
 
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={activeArea === "chat"} tooltip={labels.chat}>
-                  <Link
-                    href="/chat"
-                    locale={locale}
-                    aria-current={activeArea === "chat" ? "page" : undefined}
-                  >
-                    <MessageSquare className="text-blue-600" />
-                    <span>{labels.chat}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
                   isActive={activeArea === "administration"}
@@ -184,6 +199,46 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <Collapsible defaultOpen className="group/collapsible">
+          <SidebarGroup>
+            <SidebarGroupLabel asChild>
+              <CollapsibleTrigger className="text-[13px] font-semibold text-muted-foreground hover:text-foreground">
+                {labels.recentProjects}
+                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              </CollapsibleTrigger>
+            </SidebarGroupLabel>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                {projects.length === 0 ? (
+                  <p className="px-2 py-1.5 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
+                    {labels.noProjects}
+                  </p>
+                ) : (
+                  <SidebarMenu>
+                    {projects.map((project) => (
+                      <SidebarMenuItem key={project.id}>
+                        <SidebarMenuButton
+                          asChild
+                          size="lg"
+                          tooltip={project.title}
+                          className="flex-col items-start gap-0 py-1.5 leading-tight"
+                        >
+                          <Link href={`/analyses/${project.id}`} locale={locale}>
+                            <span className="w-full truncate">{project.title}</span>
+                            <span className="w-full truncate text-xs font-normal text-muted-foreground">
+                              {project.frameworkSlug} · {project.statusLabel}
+                            </span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                )}
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
 
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup className="mt-auto pb-4">

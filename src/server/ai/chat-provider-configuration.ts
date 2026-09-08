@@ -2,6 +2,8 @@ import "server-only";
 
 import type { AiRouteProvider } from "@/domain/ai/provider";
 
+import { openRouterBaseUrl } from "./openrouter-route";
+
 export type ChatProviderConfiguration = {
   provider: AiRouteProvider;
   baseUrl: string;
@@ -27,11 +29,11 @@ function maxOutputTokens() {
 export function getChatProviderConfiguration(provider: AiRouteProvider): ChatProviderConfiguration {
   const baseUrl =
     provider === "openrouter"
-      ? process.env.OPENROUTER_EU_BASE_URL?.trim()
+      ? openRouterBaseUrl()
       : provider === "requesty"
-        ? process.env.REQUESTY_CHAT_BASE_URL?.trim() || "https://router.eu.requesty.ai/v1"
+        ? process.env.REQUESTY_CHAT_BASE_URL?.trim() || "https://router.requesty.ai/v1"
         : provider === "openai"
-          ? process.env.OPENAI_CHAT_BASE_URL?.trim() || "https://eu.api.openai.com/v1"
+          ? process.env.OPENAI_CHAT_BASE_URL?.trim() || "https://api.openai.com/v1"
           : provider === "anthropic"
             ? process.env.ANTHROPIC_CHAT_BASE_URL?.trim() || "https://api.anthropic.com/v1"
             : process.env.GOOGLE_CHAT_BASE_URL?.trim() ||

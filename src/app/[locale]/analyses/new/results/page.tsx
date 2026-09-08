@@ -147,7 +147,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           routeProvider: scope.modelSelection.routeProvider,
           routeProviderLabel: provider.label,
           credentialHelpUrl: provider.credentialHelpUrl,
-          privacyAttestationRequired: provider.privacyAttestationRequired,
         }}
         labels={{
           preparing: t("preparing"),
@@ -185,7 +184,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           connecting: t("connecting"),
           keyLink: t("keyLink"),
           keyFailed: t("keyFailed"),
-          privacyAttestation: t("privacyAttestation"),
           unlockResult: t("unlockResult"),
           close: t("close"),
         }}

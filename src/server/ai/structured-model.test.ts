@@ -89,8 +89,8 @@ describe("ModelProviderError", () => {
   it("explains itself even when the provider gave no message", () => {
     // Genau dieser Fall stand im Ergebnis nur als "ANALYSIS_RETRIES_EXHAUSTED":
     // eine Basis-URL, die nicht zum gewählten Anbieter gehört.
-    const error = new ModelProviderError("INVALID_EU_ROUTE", false);
-    expect(error.detail).toContain("openrouter.ai");
+    const error = new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
+    expect(error.detail).toContain("Basis-URL");
     expect(error.message).toBe(error.detail);
   });
 

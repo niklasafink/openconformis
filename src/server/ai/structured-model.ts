@@ -37,7 +37,6 @@ export type StructuredModelResponse<T> = {
 };
 
 export type ModelProviderErrorCode =
-  | "INVALID_EU_ROUTE"
   | "INVALID_PROVIDER_ROUTE"
   | "PROVIDER_HTTP_ERROR"
   | "PROVIDER_RESPONSE_TOO_LARGE"
@@ -74,10 +73,8 @@ export class ModelProviderError extends Error {
  * ein Code, der weder die Ursache nennt noch sagt, wo sie zu beheben ist.
  */
 const defaultProviderDetail: Record<ModelProviderErrorCode, string> = {
-  INVALID_EU_ROUTE:
-    "Die konfigurierte Basis-URL gehört nicht zum gewählten Anbieter. Für OpenRouter sind https://openrouter.ai/api/v1 und https://eu.openrouter.ai/api/v1 zulässig.",
   INVALID_PROVIDER_ROUTE:
-    "Die Providerkonfiguration ist unvollständig — API-Schlüssel oder Token-Obergrenze fehlen oder sind ungültig.",
+    "Die Providerkonfiguration ist unvollständig oder die Basis-URL gehört nicht zum gewählten Anbieter.",
   PROVIDER_HTTP_ERROR: "Der Modellanbieter war nicht erreichbar.",
   PROVIDER_RESPONSE_TOO_LARGE: "Die Antwort des Modellanbieters war zu groß.",
   PROVIDER_RESPONSE_INVALID: "Die Antwort des Modellanbieters war nicht auswertbar.",

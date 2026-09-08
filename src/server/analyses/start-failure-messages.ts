@@ -30,8 +30,6 @@ const startFailureMessages: Record<string, string> = {
     "Der hinterlegte API-Schlüssel passt nicht zu diesem Entwurf oder Modell. Verbinden Sie ihn erneut.",
   BYOK_ROUTE_NOT_EXECUTABLE:
     "Die Modellroute des gewählten Anbieters ist auf dieser Instanz nicht freigeschaltet. Wählen Sie im Prüfungsumfang ein anderes Modell.",
-  BYOK_PRIVACY_ATTESTATION_REQUIRED:
-    "Für diesen Anbieter fehlt die Bestätigung zur Datenverarbeitung. Verbinden Sie den Schlüssel erneut und bestätigen Sie sie.",
   AUTHENTICATION_REQUIRED: "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
   VERIFIED_EMAIL_REQUIRED:
     "Ihre E-Mail-Adresse ist noch nicht bestätigt. Öffnen Sie den Bestätigungslink aus der E-Mail.",

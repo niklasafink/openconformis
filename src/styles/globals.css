@@ -1563,25 +1563,6 @@
   font-size: 12px;
 }
 
-.preview-privacy-attestation {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-top: 6px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-.preview-auth-card .preview-privacy-attestation input {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  margin: 1px 0 0;
-  padding: 0;
-}
-
 .preview-key-actions {
   display: flex;
   align-items: center;

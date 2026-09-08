@@ -27,7 +27,6 @@ const inputSchema = z
     bindingId: z.uuid().optional(),
     requiredModelId: z.string().trim().min(1).max(300),
     apiKey: z.string().trim().min(8).max(20_000),
-    privacyAttestationAccepted: z.boolean().optional(),
   })
   .superRefine((input, context) => {
     if (input.purpose === "analysis" && !input.bindingId) {
@@ -66,7 +65,6 @@ function errorResponse(error: unknown) {
     const status = new Map<string, number>([
       ["BYOK_PROVIDER_DISABLED", 409],
       ["BYOK_PRIVACY_ROUTE_UNAVAILABLE", 409],
-      ["BYOK_PRIVACY_ATTESTATION_REQUIRED", 409],
       ["BYOK_BINDING_NOT_FOUND", 404],
       ["BYOK_INPUT_INVALID", 400],
       ["BYOK_TTL_INVALID", 503],
@@ -95,7 +93,6 @@ export async function POST(request: Request) {
       bindingId: input.bindingId ?? "",
       requiredModelId: input.requiredModelId,
       secret: input.apiKey,
-      privacyAttestationAccepted: input.privacyAttestationAccepted,
     });
     return NextResponse.json(credential, {
       status: 201,

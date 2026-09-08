@@ -51,7 +51,6 @@ type Labels = Record<
   | "evaluated"
   | "unevaluated"
   | "unevaluatedWarning"
-  | "privacyAttestation"
   | "failed"
   | "emptyModels"
   | "disclaimer"
@@ -121,7 +120,6 @@ export function ChatWorkspace({
   const [apiKey, setApiKey] = useState("");
   const [credentials, setCredentials] = useState(initialCredentials);
   const [warningAccepted, setWarningAccepted] = useState(false);
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const pendingQuestion = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedModel = catalogue.models.find((model) => model.id === modelProfileId);
@@ -267,7 +265,6 @@ export function ChatWorkspace({
         purpose: "chat",
         requiredModelId: selectedModel.providerModelId,
         apiKey,
-        privacyAttestationAccepted: privacyAccepted,
       }),
     });
     const payload = (await response.json()) as Credential;
@@ -578,20 +575,11 @@ export function ChatWorkspace({
                 minLength={8}
               />
             </div>
-            <label className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={privacyAccepted}
-                onChange={(event) => setPrivacyAccepted(event.target.checked)}
-              />
-              {labels.privacyAttestation}
-            </label>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setKeyDialog(false)}>
                 {labels.cancel}
               </Button>
-              <Button type="submit" disabled={apiKey.length < 8 || !privacyAccepted}>
+              <Button type="submit" disabled={apiKey.length < 8}>
                 <Check /> {labels.connect}
               </Button>
             </DialogFooter>

@@ -38,7 +38,7 @@ function request(baseUrl: string) {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("direct structured-output adapters", () => {
-  it("uses the OpenAI EU Responses endpoint without persistent response state", async () => {
+  it("uses the OpenAI Responses endpoint without persistent response state", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -62,12 +62,12 @@ describe("direct structured-output adapters", () => {
     );
 
     const result = await requestOpenAiStructured(
-      { ...request("https://eu.api.openai.com/v1"), modelId: "gpt-test" },
+      { ...request("https://api.openai.com/v1"), modelId: "gpt-test" },
       fetchMock,
     );
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-    expect(String(url)).toBe("https://eu.api.openai.com/v1/responses");
+    expect(String(url)).toBe("https://api.openai.com/v1/responses");
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer secret-canary");
     expect(body.store).toBe(false);
     expect(body).not.toHaveProperty("temperature");
@@ -149,7 +149,7 @@ describe("direct structured-output adapters", () => {
     expect(result).toMatchObject({ cachedInputTokens: 30, reasoningTokens: 3 });
   });
 
-  it("uses Requesty's EU Responses endpoint and normalizes its cost", async () => {
+  it("uses Requesty's Responses endpoint and normalizes its cost", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -169,14 +169,14 @@ describe("direct structured-output adapters", () => {
 
     const result = await requestRequestyStructured(
       {
-        ...request("https://router.eu.requesty.ai/v1"),
+        ...request("https://router.requesty.ai/v1"),
         modelId: "anthropic/claude-test",
       },
       fetchMock,
     );
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-    expect(String(url)).toBe("https://router.eu.requesty.ai/v1/responses");
+    expect(String(url)).toBe("https://router.requesty.ai/v1/responses");
     expect(body.store).toBe(false);
     expect(result.costMicrounits).toBe(1_250);
   });
@@ -184,18 +184,21 @@ describe("direct structured-output adapters", () => {
   it("rejects substitute hosts before any policy content is sent", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     await expect(
-      requestOpenAiStructured(request("https://eu.api.openai.com.example/v1"), fetchMock),
-    ).rejects.toEqual(new ModelProviderError("INVALID_EU_ROUTE", false));
+      requestOpenAiStructured(request("https://api.openai.com.example/v1"), fetchMock),
+    ).rejects.toEqual(new ModelProviderError("INVALID_PROVIDER_ROUTE", false));
     await expect(
-      requestRequestyStructured(request("https://router.requesty.ai/v1"), fetchMock),
-    ).rejects.toEqual(new ModelProviderError("INVALID_EU_ROUTE", false));
+      requestOpenAiStructured(request("https://eu.api.openai.com/v1"), fetchMock),
+    ).rejects.toEqual(new ModelProviderError("INVALID_PROVIDER_ROUTE", false));
+    await expect(
+      requestRequestyStructured(request("https://router.eu.requesty.ai/v1"), fetchMock),
+    ).rejects.toEqual(new ModelProviderError("INVALID_PROVIDER_ROUTE", false));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("normalizes network failures without leaking provider details", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new Error("secret upstream detail"));
     await expect(
-      requestOpenAiStructured(request("https://eu.api.openai.com/v1"), fetchMock),
+      requestOpenAiStructured(request("https://api.openai.com/v1"), fetchMock),
     ).rejects.toEqual(new ModelProviderError("PROVIDER_HTTP_ERROR", true));
   });
 });
@@ -209,12 +212,12 @@ describe("analysis provider availability", () => {
     );
   });
 
-  it("enables only explicitly qualified Requesty and OpenAI profiles", () => {
-    vi.stubEnv("BYOK_REQUESTY_EU_ZDR_ENABLED", "true");
-    vi.stubEnv("BYOK_OPENAI_EU_ZDR_ENABLED", "true");
+  it("enables Requesty and OpenAI analysis routes by default", () => {
+    expect(isAnalysisProviderAvailable("requesty")).toBe(true);
+    expect(isAnalysisProviderAvailable("openai")).toBe(true);
     expect(getAnalysisProviderConfiguration("requesty").baseUrl).toBe(
-      "https://router.eu.requesty.ai/v1",
+      "https://router.requesty.ai/v1",
     );
-    expect(getAnalysisProviderConfiguration("openai").baseUrl).toBe("https://eu.api.openai.com/v1");
+    expect(getAnalysisProviderConfiguration("openai").baseUrl).toBe("https://api.openai.com/v1");
   });
 });

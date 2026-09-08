@@ -94,8 +94,6 @@ Purpose: process real customer policies.
 
 - Authentication, organization isolation and role checks are mandatory.
 - Private EU object storage and a malware gate are mandatory.
-- AI requests require zero-data-retention routing; EU-only processing is required
-  when contractually promised.
 - Audit events, retention, deletion and data-processing agreements are launch gates.
 - A human must confirm each assessment before it can be called completed.
 

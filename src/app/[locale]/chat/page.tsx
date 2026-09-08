@@ -82,7 +82,6 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
           evaluated: t("evaluated"),
           unevaluated: t("unevaluated"),
           unevaluatedWarning: t("unevaluatedWarning"),
-          privacyAttestation: t("privacyAttestation"),
           failed: t("failed"),
           emptyModels: t("emptyModels"),
           disclaimer: t("disclaimer"),

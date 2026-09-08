@@ -39,9 +39,9 @@ describe("provider-neutral chat streaming", () => {
         {
           configuration: {
             provider: "openrouter",
-            baseUrl: "https://eu.openrouter.ai/api/v1",
+            baseUrl: "https://openrouter.ai/api/v1",
             maxOutputTokens: 1000,
-            privacyProfileId: "eu-zdr-v1",
+            privacyProfileId: "openrouter-openrouter.ai-no-zdr-v1",
           },
           apiKey: "secret-key",
           modelId: "google/model",
@@ -52,10 +52,10 @@ describe("provider-neutral chat streaming", () => {
       ),
     );
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
-      provider: { only: string[]; allow_fallbacks: boolean; zdr: boolean };
+      provider: { only: string[]; allow_fallbacks: boolean };
     };
     expect(body.provider).toEqual(
-      expect.objectContaining({ only: ["Google"], allow_fallbacks: false, zdr: true }),
+      expect.objectContaining({ only: ["Google"], allow_fallbacks: false }),
     );
     expect(result).toEqual({
       content: "Hallo [1]",
@@ -83,9 +83,9 @@ describe("provider-neutral chat streaming", () => {
         {
           configuration: {
             provider: "openai",
-            baseUrl: "https://eu.api.openai.com/v1",
+            baseUrl: "https://api.openai.com/v1",
             maxOutputTokens: 1000,
-            privacyProfileId: "eu-zdr-v1",
+            privacyProfileId: "openai-api.openai.com-no-zdr-v1",
           },
           apiKey: "secret-key",
           modelId: "gpt-test",

@@ -36,19 +36,15 @@ function maxOutputTokens() {
   return value;
 }
 
-/** Basis-URL der Analyse-Route je Anbieter; EU-Varianten bleiben die Voreinstellung. */
+/** Basis-URL der Analyse-Route je Anbieter. */
 function analysisBaseUrl(provider: AiRouteProvider) {
   switch (provider) {
     case "openrouter":
       return openRouterBaseUrl();
     case "requesty":
-      return process.env.BYOK_REQUESTY_EU_ZDR_ENABLED === "true"
-        ? "https://router.eu.requesty.ai/v1"
-        : undefined;
+      return "https://router.requesty.ai/v1";
     case "openai":
-      return process.env.BYOK_OPENAI_EU_ZDR_ENABLED === "true"
-        ? "https://eu.api.openai.com/v1"
-        : undefined;
+      return "https://api.openai.com/v1";
     case "anthropic":
     case "google":
       return undefined;
@@ -64,16 +60,13 @@ export function getAnalysisProviderConfiguration(
 ): AnalysisProviderConfiguration {
   const baseUrl = analysisBaseUrl(provider);
   if (!baseUrl) throw new ProviderRouteConfigurationError("ANALYSIS_ROUTE_UNAVAILABLE");
-  const zeroDataRetention = provider !== "openrouter" || openRouterZeroDataRetention();
+  const zeroDataRetention = provider === "openrouter" && openRouterZeroDataRetention();
   return {
     provider,
     baseUrl,
     maxOutputTokens: maxOutputTokens(),
     zeroDataRetention,
-    privacyProfileId:
-      provider === "openrouter"
-        ? openRouterPrivacyProfileId({ baseUrl, zeroDataRetention })
-        : "eu-zdr-v1",
+    privacyProfileId: analysisRouteProfileId({ provider, baseUrl, zeroDataRetention }),
   };
 }
 
@@ -97,23 +90,23 @@ export function requestProviderStructured<T>(
 }
 
 /**
- * Leitet das Datenschutzprofil einer OpenRouter-Route aus der tatsächlich
+ * Leitet das Datenschutzprofil einer Analyse-Route aus der tatsächlich
  * konfigurierten Route ab, statt es frei setzen zu lassen.
  *
- * Ein Ergebnis, das mit abgeschaltetem Zero Data Retention oder ausserhalb der
- * EU-Route entstanden ist, darf im Nachweis nicht als `eu-zdr-v1` erscheinen —
- * das wäre eine falsche Zusage in genau dem Dokument, das die Zusage belegen soll.
+ * Ein Ergebnis, das mit abgeschaltetem Zero Data Retention entstanden ist, darf
+ * im Nachweis nicht als `zdr` erscheinen — das wäre eine falsche Zusage in genau
+ * dem Dokument, das die Zusage belegen soll.
  */
-export function openRouterPrivacyProfileId(input: {
+export function analysisRouteProfileId(input: {
+  provider: AiRouteProvider;
   baseUrl: string;
   zeroDataRetention: boolean;
 }): string {
-  let euRoute = false;
+  let host = "unknown";
   try {
-    euRoute = new URL(input.baseUrl).hostname === "eu.openrouter.ai";
+    host = new URL(input.baseUrl).hostname;
   } catch {
-    euRoute = false;
+    host = "unknown";
   }
-  if (euRoute && input.zeroDataRetention) return "eu-zdr-v1";
-  return `openrouter-${euRoute ? "eu" : "global"}-${input.zeroDataRetention ? "zdr" : "no-zdr"}-v1`;
+  return `${input.provider}-${host}-${input.zeroDataRetention ? "zdr" : "no-zdr"}-v1`;
 }

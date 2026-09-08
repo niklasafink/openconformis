@@ -121,8 +121,16 @@ function configuredChatProfiles() {
   );
 }
 
+/**
+ * Das konfigurierte Standardmodell. Es wird nicht nur als Rückfallprofil geführt,
+ * sondern entscheidet auch die Vorauswahl im Prüfungsumfang.
+ */
+function defaultAnalysisModelId() {
+  return process.env.DEFAULT_ANALYSIS_MODEL_PROFILE?.trim() || "anthropic/claude-sonnet-5";
+}
+
 function fallbackProfiles(): AnalysisModelProfile[] {
-  const modelId = process.env.DEFAULT_ANALYSIS_MODEL_PROFILE?.trim() || "anthropic/claude-sonnet-5";
+  const modelId = defaultAnalysisModelId();
   return [
     {
       id: `openrouter:${modelId}`,
@@ -178,9 +186,19 @@ function mergeCuratedProfiles(discovered: AnalysisModelProfile[], curated: Analy
   return merged;
 }
 
+/**
+ * Die Oberfläche wählt den ersten Eintrag vor. Ohne diesen Rang gewann der
+ * alphabetisch erste Anbieter, sodass ein beliebiges Modell die Standardanalyse
+ * führte, obwohl DEFAULT_ANALYSIS_MODEL_PROFILE ein anderes benennt.
+ */
+function isDefaultAnalysisModel(model: AnalysisModelProfile) {
+  return model.providerModelId === defaultAnalysisModelId();
+}
+
 function byEvaluationThenName(left: AnalysisModelProfile, right: AnalysisModelProfile) {
   return (
     Number(right.evaluated) - Number(left.evaluated) ||
+    Number(isDefaultAnalysisModel(right)) - Number(isDefaultAnalysisModel(left)) ||
     left.publisher.localeCompare(right.publisher, "en") ||
     left.name.localeCompare(right.name, "en") ||
     left.routeProvider.localeCompare(right.routeProvider, "en")
@@ -221,7 +239,7 @@ export async function getAnalysisModelCatalogue(
   if (process.env.MODEL_CATALOGUE_DISCOVERY_DISABLED === "true") return offlineCatalogue(curated);
 
   const url = openRouterModelsUrl({
-    baseUrl: openRouterBaseUrl() ?? "https://eu.openrouter.ai/api/v1",
+    baseUrl: openRouterBaseUrl(),
     zeroDataRetention: openRouterZeroDataRetention(),
   });
 

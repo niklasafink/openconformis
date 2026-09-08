@@ -37,8 +37,9 @@ Der Chat ist ein eigener sekundärer Arbeitsbereich ohne Policy-Kontext.
 - Schlüssel nur kurzlebig verschlüsselt speichern, an Nutzer, Sitzung, Zweck und Draft
   binden und nach Abschluss oder TTL löschen. Keine Secrets in URLs, Browser-Speicher,
   Logs, Audit-Metadaten oder Workflow-Payloads.
-- BYOK bleibt providerneutral. Technisch oder datenschutzrechtlich nicht verfügbare
-  Routen sind gesperrt. Nicht evaluierte Modelle benötigen einen deutlichen Warnhinweis.
+- BYOK bleibt providerneutral. Technisch nicht funktionsfähige Routen sind gesperrt.
+  Es gibt keine EU-Hosting- oder Zero-Data-Retention-Vorgabe. Nicht evaluierte
+  Modelle benötigen einen deutlichen Warnhinweis.
 - Rahmenwerk, Policy, Scope, Modellroute und Anweisungsversionen werden beim Start eingefroren.
   Wiederholungen dürfen keine zweite Analyse desselben Drafts erzeugen.
 - Bewertungen benötigen Begründungen und genaue Belege, auch beim Status „erfüllt“.

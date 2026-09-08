@@ -5,11 +5,13 @@ import type { ReactNode } from "react";
 import {
   AppSidebar,
   type ActiveArea,
+  type SidebarProject,
   type SidebarThread,
   type WorkflowStep,
 } from "@/components/shell/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import type { AppLocale } from "@/i18n/routing";
+import { listRecentAnalyses } from "@/server/analyses/read-analysis";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { listRecentChatThreads } from "@/server/chat/service";
 
@@ -42,17 +44,39 @@ export async function ApplicationShell({
   locale,
   title,
 }: ApplicationShellProps) {
-  const [t, topbar, cookieStore, user] = await Promise.all([
+  const [t, topbar, analysisRunT, cookieStore, user] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("Topbar"),
+    getTranslations("AnalysisRun"),
     cookies(),
     requireAuthenticatedSessionUser().catch(() => null),
   ]);
-  const threads: SidebarThread[] = user
-    ? await listRecentChatThreads()
-        .then((rows) => rows.map((row) => ({ id: row.id, title: row.title })))
-        .catch(() => [])
-    : [];
+  const statusLabels: Record<string, string> = {
+    queued: analysisRunT("status.queued"),
+    running: analysisRunT("status.running"),
+    completed: analysisRunT("status.completed"),
+    failed: analysisRunT("status.failed"),
+    cancelled: analysisRunT("status.cancelled"),
+  };
+  const [threads, projects] = await Promise.all([
+    user
+      ? listRecentChatThreads()
+          .then((rows) => rows.map((row) => ({ id: row.id, title: row.title })))
+          .catch(() => [])
+      : Promise.resolve<SidebarThread[]>([]),
+    user
+      ? listRecentAnalyses()
+          .then((rows) =>
+            rows.map((row) => ({
+              id: row.id,
+              title: row.policyName,
+              frameworkSlug: row.frameworkSlug,
+              statusLabel: statusLabels[row.status] ?? row.status,
+            })),
+          )
+          .catch(() => [])
+      : Promise.resolve<SidebarProject[]>([]),
+  ]);
   const sidebarCookie = cookieStore.get("sidebar_state")?.value;
   const defaultOpen = sidebarCookie === undefined ? true : sidebarCookie === "true";
 
@@ -64,6 +88,7 @@ export async function ApplicationShell({
         activeThreadId={activeThreadId}
         locale={locale}
         threads={threads}
+        projects={projects}
         user={user ? { name: user.name, email: user.email } : null}
         labels={{
           brand: t("brand"),
@@ -74,6 +99,8 @@ export async function ApplicationShell({
           results: t("results"),
           chat: t("chat"),
           administration: t("administration"),
+          recentProjects: t("recentProjects"),
+          noProjects: t("noProjects"),
           recentChats: t("recentChats"),
           noChats: t("noChats"),
           newChat: t("newChat"),
