@@ -3,6 +3,7 @@
 import {
   Asterisk,
   ChevronDown,
+  ChevronRight,
   ListChecks,
   MessageSquare,
   MessageSquarePlus,
@@ -21,6 +22,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -88,7 +90,7 @@ export function AppSidebar({
 
   return (
     <Sidebar variant="floating" collapsible="icon">
-      <SidebarHeader className="flex-row items-center justify-between px-3 pt-3 pb-1 group-data-[collapsible=icon]:px-1.5">
+      <SidebarHeader className="flex-row items-center justify-between px-3 pt-3 pb-4 group-data-[collapsible=icon]:px-1.5">
         <Link
           href="/analyses/new/framework"
           locale={locale}
@@ -110,45 +112,48 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeArea === "analysis"}
-                  tooltip={labels.gapAnalysis}
-                  className="h-9 text-[15px]"
-                >
-                  <Link href={stepPath.framework} locale={locale}>
-                    <ListChecks className="text-sky-600" />
-                    <span>{labels.gapAnalysis}</span>
-                  </Link>
-                </SidebarMenuButton>
-                <SidebarMenuSub aria-label={labels.gapAnalysis}>
-                  {steps.map((step) => {
-                    const isActive = activeArea === "analysis" && activeStep === step.id;
-                    return (
-                      <SidebarMenuSubItem key={step.id}>
-                        <SidebarMenuSubButton asChild isActive={isActive} className="h-8">
-                          <Link
-                            href={stepPath[step.id]}
-                            locale={locale}
-                            aria-current={isActive ? "step" : undefined}
-                          >
-                            <span>{step.label}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    );
-                  })}
-                </SidebarMenuSub>
-              </SidebarMenuItem>
+              <Collapsible defaultOpen={activeArea === "analysis"} className="group/collapsible">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={activeArea === "analysis"}
+                    tooltip={labels.gapAnalysis}
+                  >
+                    <Link href={stepPath.framework} locale={locale}>
+                      <ListChecks className="text-sky-600" />
+                      <span>{labels.gapAnalysis}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuAction aria-label={labels.gapAnalysis}>
+                      <ChevronRight className="transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuAction>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub aria-label={labels.gapAnalysis}>
+                      {steps.map((step) => {
+                        const isActive = activeArea === "analysis" && activeStep === step.id;
+                        return (
+                          <SidebarMenuSubItem key={step.id}>
+                            <SidebarMenuSubButton asChild isActive={isActive}>
+                              <Link
+                                href={stepPath[step.id]}
+                                locale={locale}
+                                aria-current={isActive ? "step" : undefined}
+                              >
+                                <span>{step.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
 
               <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeArea === "chat"}
-                  tooltip={labels.chat}
-                  className="h-9 text-[15px]"
-                >
+                <SidebarMenuButton asChild isActive={activeArea === "chat"} tooltip={labels.chat}>
                   <Link
                     href="/chat"
                     locale={locale}
@@ -165,7 +170,6 @@ export function AppSidebar({
                   asChild
                   isActive={activeArea === "administration"}
                   tooltip={labels.administration}
-                  className="h-9 text-[15px]"
                 >
                   <Link
                     href="/administration"
