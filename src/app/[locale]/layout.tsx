@@ -3,8 +3,10 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import "@fontsource-variable/ibm-plex-sans";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/eb-garamond";
 
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { routing } from "@/i18n/routing";
 
 import "@/styles/globals.css";
@@ -41,8 +43,10 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   return (
     <html lang={locale}>
-      <body>
-        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+      <body className="font-sans antialiased">
+        <NextIntlClientProvider messages={messages}>
+          <TooltipProvider>{children}</TooltipProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

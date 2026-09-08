@@ -1,24 +1,50 @@
 "use client";
 
-import { ArrowUp, Check, KeyRound, MessageSquarePlus, X } from "lucide-react";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { ArrowRight, Asterisk, Check, ChevronDown, Cpu, KeyRound, Plus, Zap } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 import { aiProviderPublicDetails } from "@/domain/ai/provider";
 import type { Framework } from "@/domain/frameworks/catalog";
 
 type Labels = Record<
   | "title"
+  | "greeting"
   | "placeholder"
   | "framework"
   | "noFramework"
+  | "frameworkHint"
   | "model"
+  | "modelHint"
   | "send"
   | "sources"
   | "noSources"
-  | "newChat"
-  | "history"
   | "connectKey"
+  | "noKey"
+  | "keyConnected"
+  | "changeKey"
   | "apiKey"
   | "connect"
   | "cancel"
@@ -27,9 +53,13 @@ type Labels = Record<
   | "unevaluatedWarning"
   | "privacyAttestation"
   | "failed"
-  | "emptyModels",
+  | "emptyModels"
+  | "disclaimer"
+  | "quickActions",
   string
 >;
+
+type QuickAction = { label: string; prompt: string };
 
 type Citation = {
   citationOrder: number;
@@ -65,19 +95,23 @@ export function ChatWorkspace({
   locale,
   catalogue,
   frameworks,
-  initialThreads,
+  initialThreadId,
   initialCredentials,
   labels,
+  quickActions,
+  userName,
 }: {
   locale: "de" | "en";
   catalogue: AnalysisModelCatalogue;
   frameworks: readonly Framework[];
-  initialThreads: Array<{ id: string; title: string; updatedAt: string }>;
+  initialThreadId?: string;
   initialCredentials: Credential[];
   labels: Labels;
+  quickActions: QuickAction[];
+  userName?: string;
 }) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [threadId, setThreadId] = useState<string>();
+  const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [frameworkSlug, setFrameworkSlug] = useState("");
   const [modelProfileId, setModelProfileId] = useState(catalogue.models[0]?.id ?? "");
   const [input, setInput] = useState("");
@@ -89,7 +123,9 @@ export function ChatWorkspace({
   const [warningAccepted, setWarningAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const pendingQuestion = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedModel = catalogue.models.find((model) => model.id === modelProfileId);
+  const selectedFramework = frameworks.find((framework) => framework.id === frameworkSlug);
   const activeCredential = useMemo(
     () =>
       credentials.find(
@@ -101,28 +137,30 @@ export function ChatWorkspace({
     [credentials, selectedModel],
   );
 
-  async function loadThread(id: string) {
-    setError("");
-    const response = await fetch(`/api/chat/threads/${id}`, { cache: "no-store" });
-    if (!response.ok) return setError(labels.failed);
-    const payload = (await response.json()) as {
-      messages: Array<{ id: string; role: "user" | "assistant"; content: string }>;
-      citations: Array<Citation & { messageId: string }>;
+  useEffect(() => {
+    if (!initialThreadId) return;
+    let cancelled = false;
+    (async () => {
+      const response = await fetch(`/api/chat/threads/${initialThreadId}`, { cache: "no-store" });
+      if (cancelled) return;
+      if (!response.ok) return setError(labels.failed);
+      const payload = (await response.json()) as {
+        messages: Array<{ id: string; role: "user" | "assistant"; content: string }>;
+        citations: Array<Citation & { messageId: string }>;
+      };
+      if (cancelled) return;
+      setMessages(
+        payload.messages.map((message) => ({
+          ...message,
+          citations: payload.citations.filter((citation) => citation.messageId === message.id),
+        })),
+      );
+      setThreadId(initialThreadId);
+    })().catch(() => setError(labels.failed));
+    return () => {
+      cancelled = true;
     };
-    setMessages(
-      payload.messages.map((message) => ({
-        ...message,
-        citations: payload.citations.filter((citation) => citation.messageId === message.id),
-      })),
-    );
-    setThreadId(id);
-  }
-
-  function resetChat() {
-    setThreadId(undefined);
-    setMessages([]);
-    setError("");
-  }
+  }, [initialThreadId, labels.failed]);
 
   async function streamQuestion(question: string, credentialId: string) {
     if (!selectedModel) return;
@@ -242,160 +280,295 @@ export function ChatWorkspace({
     if (question) await streamQuestion(question, payload.credentialId);
   }
 
-  return (
-    <div className="chat-workspace">
-      <aside className="chat-history-pane" aria-label={labels.history}>
-        <button type="button" className="chat-new-button" onClick={resetChat}>
-          <MessageSquarePlus size={16} /> {labels.newChat}
-        </button>
-        <p className="chat-history-heading">{labels.history}</p>
-        <nav className="chat-thread-list">
-          {initialThreads.map((thread) => (
-            <button
+  function applyQuickAction(prompt: string) {
+    setInput(prompt);
+    textareaRef.current?.focus();
+  }
+
+  const isEmpty = messages.length === 0;
+  const canSend =
+    Boolean(input.trim()) &&
+    Boolean(selectedModel) &&
+    !pending &&
+    (selectedModel?.evaluated || warningAccepted);
+
+  const composer = (
+    <form
+      className="w-full rounded-[22px] bg-white px-5 pt-4 pb-3 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.08)] ring-1 ring-black/[0.04]"
+      onSubmit={submit}
+    >
+      <Textarea
+        ref={textareaRef}
+        aria-label={labels.placeholder}
+        placeholder={labels.title}
+        value={input}
+        rows={1}
+        onChange={(event) => setInput(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        className="min-h-12 resize-none border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0 md:text-[16px]"
+      />
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
               type="button"
-              className={thread.id === threadId ? "is-active" : undefined}
-              key={thread.id}
-              onClick={() => void loadThread(thread.id)}
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
+              disabled={Boolean(threadId)}
             >
-              {thread.title}
-            </button>
-          ))}
-        </nav>
-      </aside>
-      <main className="chat-main">
-        <div className={messages.length === 0 ? "chat-stage is-empty" : "chat-stage"}>
-          {messages.length === 0 ? <h1>{labels.title}</h1> : null}
-          <div className="chat-message-list" aria-live="polite">
-            {messages.map((message) => (
-              <article className={`chat-message chat-message-${message.role}`} key={message.id}>
-                <div className="chat-message-content">{message.content}</div>
-                {message.citations.length > 0 ? (
-                  <section className="chat-citations">
-                    <h2>{labels.sources}</h2>
-                    {message.citations.map((citation) => (
-                      <details key={`${message.id}-${citation.citationOrder}`}>
-                        <summary>
-                          <span>[{citation.citationOrder}]</span> {citation.label}
-                        </summary>
-                        {citation.locator ? <p>{citation.locator}</p> : null}
-                        {citation.exactQuote ? (
-                          <blockquote>{citation.exactQuote}</blockquote>
-                        ) : null}
-                      </details>
-                    ))}
-                  </section>
-                ) : null}
-              </article>
-            ))}
-          </div>
-          <form className="chat-composer" onSubmit={submit}>
-            <textarea
-              aria-label={labels.placeholder}
-              placeholder={labels.placeholder}
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
+              <Plus className="size-4" />
+              <span className="max-w-56 truncate">
+                {selectedFramework?.name ?? labels.framework}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="bottom" className="min-w-64">
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {labels.frameworkHint}
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={frameworkSlug} onValueChange={setFrameworkSlug}>
+              <DropdownMenuRadioItem value="">{labels.noFramework}</DropdownMenuRadioItem>
+              {frameworks.map((framework) => (
+                <DropdownMenuRadioItem value={framework.id} key={framework.id}>
+                  {framework.name}
+                  <span className="ml-auto text-xs text-muted-foreground">{framework.region}</span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
+              disabled={pending || catalogue.models.length === 0}
+            >
+              <Cpu className="size-4" />
+              <span className="max-w-64 truncate">{selectedModel?.name ?? labels.model}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="bottom" className="min-w-72">
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {labels.modelHint}
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={modelProfileId}
+              onValueChange={(value) => {
+                setModelProfileId(value);
+                setWarningAccepted(false);
               }}
-            />
-            <div className="chat-composer-footer">
-              <div className="chat-composer-selectors">
-                <label>
-                  <span>{labels.framework}</span>
-                  <select
-                    value={frameworkSlug}
-                    onChange={(event) => {
-                      setFrameworkSlug(event.target.value);
-                      resetChat();
-                    }}
-                    disabled={Boolean(threadId)}
-                  >
-                    <option value="">{labels.noFramework}</option>
-                    {frameworks.map((framework) => (
-                      <option value={framework.id} key={framework.id}>
-                        {framework.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>{labels.model}</span>
-                  <select
-                    value={modelProfileId}
-                    onChange={(event) => {
-                      setModelProfileId(event.target.value);
-                      setWarningAccepted(false);
-                    }}
-                    disabled={pending}
-                  >
-                    {catalogue.models.map((model) => (
-                      <option value={model.id} key={model.id}>
-                        {model.publisher} · {model.name}
-                        {model.evaluated ? ` · ${labels.evaluated}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <button
-                type="submit"
-                className="icon-button"
-                aria-label={labels.send}
-                disabled={
-                  !input.trim() ||
-                  !selectedModel ||
-                  pending ||
-                  (!selectedModel.evaluated && !warningAccepted)
-                }
+            >
+              {catalogue.models.map((model) => (
+                <DropdownMenuRadioItem value={model.id} key={model.id}>
+                  <span className="truncate">
+                    {model.publisher} · {model.name}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {model.evaluated ? labels.evaluated : labels.unevaluated}
+                  </span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="ml-auto flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
               >
-                <ArrowUp size={18} />
-              </button>
-            </div>
-            {selectedModel && !selectedModel.evaluated ? (
-              <label className="chat-model-warning">
-                <input
-                  type="checkbox"
-                  checked={warningAccepted}
-                  onChange={(event) => setWarningAccepted(event.target.checked)}
-                />
-                {labels.unevaluatedWarning}
-              </label>
-            ) : null}
-          </form>
-          {catalogue.models.length === 0 ? (
-            <p className="form-error">{labels.emptyModels}</p>
-          ) : null}
-          {error ? <p className="form-error">{error}</p> : null}
-        </div>
-      </main>
-      {keyDialog && selectedModel ? (
-        <div className="dialog-backdrop" role="presentation">
-          <section
-            className="chat-key-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-key-title"
+                <span>
+                  {activeCredential
+                    ? labels.keyConnected.replace("{lastFour}", activeCredential.lastFour)
+                    : labels.noKey}
+                </span>
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="bottom" className="min-w-56">
+              {selectedModel ? (
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  {aiProviderPublicDetails[selectedModel.routeProvider].label} ·{" "}
+                  {selectedModel.name}
+                </DropdownMenuLabel>
+              ) : null}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setKeyDialog(true)} disabled={!selectedModel}>
+                <KeyRound />
+                {activeCredential ? labels.changeKey : labels.connectKey}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            type="submit"
+            size="icon"
+            aria-label={labels.send}
+            disabled={!canSend}
+            className="rounded-xl"
           >
-            <header>
-              <div>
-                <KeyRound size={18} />
-                <h2 id="chat-key-title">{labels.connectKey}</h2>
+            <ArrowRight className="size-5" />
+          </Button>
+        </div>
+      </div>
+      {selectedModel && !selectedModel.evaluated ? (
+        <label className="mt-3 flex items-start gap-2 border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={warningAccepted}
+            onChange={(event) => setWarningAccepted(event.target.checked)}
+          />
+          {labels.unevaluatedWarning}
+        </label>
+      ) : null}
+    </form>
+  );
+
+  return (
+    <div className="flex min-h-[calc(100dvh-56px)] flex-col">
+      {isEmpty ? (
+        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[10vh]">
+          <h1 className="mb-8 flex items-center gap-3 font-serif text-[40px] leading-none font-normal tracking-tight">
+            <Asterisk aria-hidden="true" className="size-9" strokeWidth={2.2} />
+            <span>{userName ? labels.greeting.replace("{name}", userName) : labels.title}</span>
+          </h1>
+          <div className="w-full max-w-[880px]">{composer}</div>
+          <p className="mt-4 text-sm text-muted-foreground">{labels.disclaimer}</p>
+          {catalogue.models.length === 0 ? (
+            <p className="mt-2 text-sm text-destructive" role="alert">
+              {labels.emptyModels}
+            </p>
+          ) : null}
+          {error ? (
+            <p className="mt-2 text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          {quickActions.length > 0 ? (
+            <section
+              className="mt-16 flex flex-col items-center gap-4"
+              aria-label={labels.quickActions}
+            >
+              <h2 className="flex items-center gap-1.5 text-sm font-medium">
+                <Zap aria-hidden="true" className="size-4 text-blue-600" />
+                {labels.quickActions}
+              </h2>
+              <div className="flex flex-wrap justify-center gap-2">
+                {quickActions.map((action) => (
+                  <Button
+                    key={action.label}
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-full bg-card px-4 text-[15px] font-normal shadow-none"
+                    onClick={() => applyQuickAction(action.prompt)}
+                  >
+                    {action.label}
+                  </Button>
+                ))}
               </div>
-              <button type="button" aria-label={labels.cancel} onClick={() => setKeyDialog(false)}>
-                <X size={18} />
-              </button>
-            </header>
-            <form onSubmit={connectCredential}>
-              <p>
-                {aiProviderPublicDetails[selectedModel.routeProvider].label} · {selectedModel.name}
-              </p>
-              <label className="field-label" htmlFor="chat-api-key">
-                {labels.apiKey}
-              </label>
-              <input
+            </section>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <div className="mx-auto w-full max-w-[880px] flex-1 px-4 py-8">
+            <div className="grid gap-7" aria-live="polite">
+              {messages.map((message) => (
+                <article
+                  key={message.id}
+                  className={
+                    message.role === "user"
+                      ? "ml-auto w-fit max-w-[72%] rounded-2xl bg-muted px-4 py-2.5 leading-relaxed whitespace-pre-wrap"
+                      : "flex gap-3 leading-relaxed whitespace-pre-wrap"
+                  }
+                >
+                  {message.role === "assistant" ? (
+                    <Asterisk
+                      aria-hidden="true"
+                      className="mt-1 size-5 shrink-0"
+                      strokeWidth={2.2}
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div>{message.content}</div>
+                    {message.citations.length > 0 ? (
+                      <section className="mt-4 border-t pt-3 text-[13px] whitespace-normal">
+                        <h2 className="mb-1 text-[13px] font-medium">{labels.sources}</h2>
+                        {message.citations.map((citation) => (
+                          <details
+                            key={`${message.id}-${citation.citationOrder}`}
+                            className="border-b"
+                          >
+                            <summary className="cursor-pointer py-2 font-medium">
+                              <span className="mr-1 text-muted-foreground">
+                                [{citation.citationOrder}]
+                              </span>
+                              {citation.label}
+                            </summary>
+                            {citation.locator ? (
+                              <p className="mb-2 text-muted-foreground">{citation.locator}</p>
+                            ) : null}
+                            {citation.exactQuote ? (
+                              <blockquote className="mb-2 border-l-2 pl-2.5 text-muted-foreground">
+                                {citation.exactQuote}
+                              </blockquote>
+                            ) : null}
+                          </details>
+                        ))}
+                      </section>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="sticky bottom-0 bg-gradient-to-t from-background via-background to-transparent px-4 pt-6 pb-4">
+            <div className="mx-auto w-full max-w-[880px]">
+              {composer}
+              <p className="mt-2 text-center text-xs text-muted-foreground">{labels.disclaimer}</p>
+              {error ? (
+                <p className="mt-1 text-center text-sm text-destructive" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
+
+      <Dialog open={keyDialog && Boolean(selectedModel)} onOpenChange={setKeyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={connectCredential} className="grid gap-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <KeyRound className="size-4" />
+                {labels.connectKey}
+              </DialogTitle>
+              {selectedModel ? (
+                <DialogDescription>
+                  {aiProviderPublicDetails[selectedModel.routeProvider].label} ·{" "}
+                  {selectedModel.name}
+                </DialogDescription>
+              ) : null}
+            </DialogHeader>
+            <div className="grid gap-2">
+              <Label htmlFor="chat-api-key">{labels.apiKey}</Label>
+              <Input
                 id="chat-api-key"
                 type="password"
                 value={apiKey}
@@ -404,30 +577,27 @@ export function ChatWorkspace({
                 required
                 minLength={8}
               />
-              <label className="chat-privacy-check">
-                <input
-                  type="checkbox"
-                  checked={privacyAccepted}
-                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
-                />
-                {labels.privacyAttestation}
-              </label>
-              <footer>
-                <button type="button" className="button" onClick={() => setKeyDialog(false)}>
-                  {labels.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  disabled={apiKey.length < 8 || !privacyAccepted}
-                >
-                  <Check size={16} /> {labels.connect}
-                </button>
-              </footer>
-            </form>
-          </section>
-        </div>
-      ) : null}
+            </div>
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={privacyAccepted}
+                onChange={(event) => setPrivacyAccepted(event.target.checked)}
+              />
+              {labels.privacyAttestation}
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setKeyDialog(false)}>
+                {labels.cancel}
+              </Button>
+              <Button type="submit" disabled={apiKey.length < 8 || !privacyAccepted}>
+                <Check /> {labels.connect}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

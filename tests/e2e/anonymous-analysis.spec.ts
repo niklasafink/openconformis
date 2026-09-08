@@ -24,9 +24,7 @@ test.describe("anonymous analysis setup", () => {
   test("keeps unavailable frameworks locked and searchable", async ({ page }) => {
     await page.goto("/de/analyses/new/framework");
 
-    const lockedFramework = page.locator('.framework-card[data-locked="true"]', {
-      hasText: "ISO 27001",
-    });
+    const lockedFramework = page.getByRole("row").filter({ hasText: "ISO 27001" });
     await expect(lockedFramework).toHaveAttribute("aria-disabled", "true");
 
     await page.getByRole("searchbox", { name: "Rahmenwerke durchsuchen" }).fill("ISO 27001");
@@ -89,7 +87,8 @@ test.describe("anonymous analysis setup", () => {
     expect(response?.headers()["x-content-type-options"]).toBe("nosniff");
     expect(response?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
     await expect(page.getByRole("heading", { name: "Select regulatory framework" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Chat" })).toBeVisible();
+    // Die Sidebar trägt zusätzlich die Aktion „New chat"; nur der Bereichslink zählt.
+    await expect(page.getByRole("link", { name: "Chat", exact: true })).toBeVisible();
   });
 });
 

@@ -1,6 +1,15 @@
-import { ChevronDown } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+"use client";
 
+import { Check, ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Link } from "@/i18n/navigation";
 import type { AppLocale } from "@/i18n/routing";
 
@@ -9,39 +18,43 @@ type LanguageMenuProps = Readonly<{
   pathname: string;
 }>;
 
-export async function LanguageMenu({ locale, pathname }: LanguageMenuProps) {
-  const t = await getTranslations("Topbar");
-  const currentFlag = locale === "de" ? "🇩🇪" : "🇺🇸";
+type Language = { locale: AppLocale; flag: string; labelKey: "german" | "english" };
+
+const german: Language = { locale: "de", flag: "🇩🇪", labelKey: "german" };
+const languages: readonly Language[] = [german, { locale: "en", flag: "🇺🇸", labelKey: "english" }];
+
+export function LanguageMenu({ locale, pathname }: LanguageMenuProps) {
+  const t = useTranslations("Topbar");
+  const current = languages.find((language) => language.locale === locale) ?? german;
 
   return (
-    <details className="language-menu">
-      <summary
-        className="language-trigger"
-        aria-label={`${t("language")}: ${locale === "de" ? t("german") : t("english")}`}
-      >
-        <span aria-hidden="true">{currentFlag}</span>
-        <ChevronDown size={14} aria-hidden="true" />
-      </summary>
-      <div className="language-options">
-        <Link
-          href={pathname}
-          locale="de"
-          className="language-option"
-          aria-current={locale === "de" ? "true" : undefined}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={`${t("language")}: ${t(current.labelKey)}`}
+          className="gap-1 px-2"
         >
-          <span aria-hidden="true">🇩🇪</span>
-          <span>{t("german")}</span>
-        </Link>
-        <Link
-          href={pathname}
-          locale="en"
-          className="language-option"
-          aria-current={locale === "en" ? "true" : undefined}
-        >
-          <span aria-hidden="true">🇺🇸</span>
-          <span>{t("english")}</span>
-        </Link>
-      </div>
-    </details>
+          <span aria-hidden="true">{current.flag}</span>
+          <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40">
+        {languages.map((language) => (
+          <DropdownMenuItem key={language.locale} asChild>
+            <Link
+              href={pathname}
+              locale={language.locale}
+              aria-current={language.locale === locale ? "true" : undefined}
+            >
+              <span aria-hidden="true">{language.flag}</span>
+              <span className="flex-1">{t(language.labelKey)}</span>
+              {language.locale === locale ? <Check aria-hidden="true" /> : null}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

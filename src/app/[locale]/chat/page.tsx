@@ -8,64 +8,74 @@ import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
 import { getChatModelCatalogue } from "@/server/ai/model-catalogue";
 import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { listFrameworkCatalogue } from "@/server/catalogue/service";
-import { listRecentChatThreads } from "@/server/chat/service";
 
-type ChatPageProps = Readonly<{ params: Promise<{ locale: string }> }>;
+type ChatPageProps = Readonly<{
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ thread?: string }>;
+}>;
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage({ params }: ChatPageProps) {
-  const { locale } = await params;
+function firstName(user: { name: string; email: string }) {
+  const name = user.name.trim();
+  if (name) return name.split(/\s+/u)[0] ?? name;
+  return user.email.split("@")[0] ?? user.email;
+}
+
+export default async function ChatPage({ params, searchParams }: ChatPageProps) {
+  const [{ locale }, { thread }] = await Promise.all([params, searchParams]);
 
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  const [navigation, t, catalogue, frameworks, threads, credentials] = await Promise.all([
-    getTranslations("Navigation"),
+  const [t, catalogue, frameworks, credentials, user] = await Promise.all([
     getTranslations("Chat"),
     getChatModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
     listFrameworkCatalogue(locale).catch(() => []),
-    listRecentChatThreads().catch(() => []),
     listActiveTemporaryCredentials("chat").catch(() => []),
+    requireAuthenticatedSessionUser().catch(() => null),
   ]);
 
   return (
     <ApplicationShell
       activeArea="chat"
+      activeThreadId={thread}
       locale={locale}
-      topbar={
-        <>
-          <strong className="topbar-title">{navigation("chat")}</strong>
-          <div className="topbar-actions">
-            <LanguageMenu locale={locale} pathname="/chat" />
-          </div>
-        </>
-      }
+      actions={<LanguageMenu locale={locale} pathname="/chat" />}
     >
       <ChatWorkspace
+        key={thread ?? "new"}
         locale={locale}
         catalogue={catalogue}
         frameworks={frameworks.filter((framework) => framework.availability === "included")}
-        initialThreads={threads.map((thread) => ({
-          ...thread,
-          updatedAt: thread.updatedAt.toISOString(),
-        }))}
+        initialThreadId={thread}
+        userName={user ? firstName(user) : undefined}
         initialCredentials={credentials.map((credential) => ({
           ...credential,
           expiresAt: credential.expiresAt.toISOString(),
         }))}
+        quickActions={[
+          { label: t("quickSummary"), prompt: t("quickSummaryPrompt") },
+          { label: t("quickDefinition"), prompt: t("quickDefinitionPrompt") },
+          { label: t("quickDeadline"), prompt: t("quickDeadlinePrompt") },
+        ]}
         labels={{
           title: t("title"),
+          greeting: t("greeting", { name: "{name}" }),
           placeholder: t("placeholder"),
           framework: t("framework"),
           noFramework: t("noFramework"),
+          frameworkHint: t("frameworkHint"),
           model: t("model"),
+          modelHint: t("modelHint"),
           send: t("send"),
           sources: t("sources"),
           noSources: t("noSources"),
-          newChat: t("newChat"),
-          history: t("history"),
           connectKey: t("connectKey"),
+          noKey: t("noKey"),
+          keyConnected: t("keyConnected", { lastFour: "{lastFour}" }),
+          changeKey: t("changeKey"),
           apiKey: t("apiKey"),
           connect: t("connect"),
           cancel: t("cancel"),
@@ -75,6 +85,8 @@ export default async function ChatPage({ params }: ChatPageProps) {
           privacyAttestation: t("privacyAttestation"),
           failed: t("failed"),
           emptyModels: t("emptyModels"),
+          disclaimer: t("disclaimer"),
+          quickActions: t("quickActions"),
         }}
       />
     </ApplicationShell>

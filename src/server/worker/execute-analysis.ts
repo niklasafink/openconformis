@@ -663,7 +663,7 @@ async function claimAnalysisWorkflow(analysisId: string, workflowRunId?: string)
 export async function prepareAnalysisExecution(analysisId: string, workflowRunId: string) {
   const claimed = await claimAnalysisWorkflow(analysisId, workflowRunId);
   if (!claimed) {
-    return { analysisId: analysisId, status: "duplicate" as const, scopeItemIds: [] };
+    return { analysisId, status: "duplicate" as const, scopeItemIds: [] };
   }
   const analysis = await loadAnalysis(analysisId);
   if (analysis.status === "completed") {

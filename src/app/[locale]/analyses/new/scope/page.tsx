@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { ApplicationShell } from "@/components/shell/application-shell";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { ScopeForm } from "@/components/scope/scope-form";
+import { Input } from "@/components/ui/input";
 import { routing } from "@/i18n/routing";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
@@ -27,8 +28,7 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [navigation, t, boundDraft, selection, savedScope, modelCatalogue] = await Promise.all([
-    getTranslations("Navigation"),
+  const [t, boundDraft, selection, savedScope, modelCatalogue] = await Promise.all([
     getTranslations("Scope"),
     getBoundActiveDraft(draft),
     getCurrentPolicySelection(draft),
@@ -47,32 +47,35 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
       activeArea="analysis"
       activeStep="scope"
       locale={locale}
-      topbar={
+      title={t("title")}
+      eyebrow={t("step")}
+      actions={
         <>
-          <strong className="topbar-title">{navigation("scope")}</strong>
-          <div className="topbar-actions">
-            <form className="topbar-search" action={`/${locale}/analyses/new/scope`}>
-              <Search size={15} aria-hidden="true" />
-              <input
-                name="q"
-                type="search"
-                defaultValue={q}
-                placeholder={t("search")}
-                aria-label={t("search")}
-              />
-              <input type="hidden" name="draft" value={boundDraft.id} />
-            </form>
-            <LanguageMenu locale={locale} pathname="/analyses/new/scope" />
-          </div>
+          <form
+            role="search"
+            className="relative hidden sm:block"
+            action={`/${locale}/analyses/new/scope`}
+          >
+            <Search
+              size={15}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder={t("search")}
+              aria-label={t("search")}
+              className="h-8 w-60 rounded-full bg-card pl-8"
+            />
+            <input type="hidden" name="draft" value={boundDraft.id} />
+          </form>
+          <LanguageMenu locale={locale} pathname="/analyses/new/scope" />
         </>
       }
     >
       <div className="setup-page scope-setup-page">
-        <div className="setup-heading">
-          <p>{t("step")}</p>
-          <h1>{t("title")}</h1>
-        </div>
-
         <div className="scope-page-meta">
           <span>{release.frameworkSlug.toLocaleUpperCase(locale)}</span>
           <span aria-hidden="true">·</span>

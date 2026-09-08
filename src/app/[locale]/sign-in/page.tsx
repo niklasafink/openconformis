@@ -35,14 +35,7 @@ export default async function SignInPage({ params, searchParams }: SignInPagePro
     <ApplicationShell
       activeArea="analysis"
       locale={locale}
-      topbar={
-        <>
-          <strong className="topbar-title">{t("title")}</strong>
-          <div className="topbar-actions">
-            <LanguageMenu locale={locale} pathname="/sign-in" />
-          </div>
-        </>
-      }
+      actions={<LanguageMenu locale={locale} pathname="/sign-in" />}
     >
       <div className="auth-page">
         <section className="auth-card" aria-labelledby="sign-in-title">

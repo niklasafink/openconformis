@@ -56,14 +56,8 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
       activeArea="analysis"
       activeStep="results"
       locale={locale}
-      topbar={
-        <>
-          <strong className="topbar-title">{navigation("results")}</strong>
-          <div className="topbar-actions">
-            <LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />
-          </div>
-        </>
-      }
+      title={navigation("results")}
+      actions={<LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />}
     >
       {results ? (
         <AnalysisResultsWorkspace

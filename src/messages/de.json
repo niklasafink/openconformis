@@ -10,7 +10,17 @@
     "scope": "Prüfungsumfang",
     "results": "Ergebnis",
     "chat": "Chat",
-    "administration": "Administration"
+    "administration": "Administration",
+    "brand": "OpenConformis",
+    "recentChats": "Chat-Verlauf",
+    "noChats": "Noch keine Chats",
+    "newChat": "Neuer Chat",
+    "toggleSidebar": "Seitenleiste umschalten",
+    "account": "Konto",
+    "anonymous": "Nicht angemeldet",
+    "anonymousHint": "Anmelden für Analyse und Chat",
+    "signIn": "Anmelden",
+    "signOut": "Abmelden"
   },
   "Administration": {
     "title": "Administration",
@@ -87,7 +97,16 @@
     "locked": "Nicht verfügbar",
     "noResults": "Keine Rahmenwerke gefunden",
     "continue": "Weiter",
-    "chooseToContinue": "Rahmenwerk auswählen"
+    "chooseToContinue": "Rahmenwerk auswählen",
+    "all": "Alle",
+    "available": "Verfügbar",
+    "unavailable": "Nicht verfügbar",
+    "columnName": "Name",
+    "columnRegion": "Region",
+    "columnRequirements": "Anforderungen",
+    "columnStatus": "Status",
+    "availableStatus": "Verfügbar",
+    "select": "Auswählen"
   },
   "Policy": {
     "step": "Schritt 2 von 4",
@@ -157,7 +176,22 @@
     "unevaluatedWarning": "Dieses Modell wurde nicht mit dem regulatorischen Evaluationsdatensatz geprüft. Trotzdem verwenden.",
     "privacyAttestation": "Ich habe die Datenschutz- und Aufbewahrungseinstellungen des Providerkontos geprüft und akzeptiere die Übertragung der Frage und der ausgewählten Quellen.",
     "failed": "Die Anfrage konnte nicht sicher verarbeitet werden.",
-    "emptyModels": "Derzeit ist kein kompatibles Chatmodell konfiguriert."
+    "emptyModels": "Derzeit ist kein kompatibles Chatmodell konfiguriert.",
+    "greeting": "Hi, {name}",
+    "disclaimer": "KI kann Fehler machen. Antworten sind keine Rechtsberatung.",
+    "quickActions": "Schnellaktionen",
+    "quickSummary": "Anforderungen zusammenfassen",
+    "quickDefinition": "Begriff erklären",
+    "quickDeadline": "Fristen und Meldepflichten",
+    "quickSummaryPrompt": "Fasse die zentralen Anforderungen des ausgewählten Rahmenwerks zusammen.",
+    "quickDefinitionPrompt": "Erkläre den Begriff „IKT-Drittdienstleister“ im Sinne des Rahmenwerks.",
+    "quickDeadlinePrompt": "Welche Fristen und Meldepflichten sieht das Rahmenwerk bei schwerwiegenden Vorfällen vor?",
+    "noKey": "Kein API-Key",
+    "keyConnected": "Key ••••{lastFour}",
+    "keyExpires": "Gültig bis {time}",
+    "changeKey": "Anderen Key verbinden",
+    "frameworkHint": "Quellen des Rahmenwerks werden als Belege herangezogen.",
+    "modelHint": "Modell wählen"
   },
   "ResultsPreview": {
     "preparing": "Analyse wird vorbereitet",
@@ -197,7 +231,8 @@
     "accountExists": "Für diese E-Mail-Adresse gibt es bereits ein Konto. Melden Sie sich stattdessen an.",
     "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
     "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
-    "tooManyAttempts": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut."
+    "tooManyAttempts": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "step": "Schritt 4 von 4"
   },
   "AnalysisRun": {
     "title": "Analyse Ihrer Policy",

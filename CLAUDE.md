@@ -55,8 +55,13 @@ Der Chat ist ein eigener sekundärer Arbeitsbereich ohne Policy-Kontext.
 ## Gestaltung
 
 `DESIGN.md` und `src/styles/globals.css` bestimmen das bestehende Design.
-IBM Plex Sans, ruhige weiße und graue Flächen, dunkles Navy für Aktionen,
-semantische Statusfarben. Kein Dark Mode und kein Produktname im App-Chrome.
+Oberfläche auf Basis von shadcn/ui (`src/components/ui/`, `components.json`, Basisfarbe
+neutral): Neue Bedienelemente kommen aus dieser Bibliothek statt aus Nachbauten.
+Inter für Fließtext und Bedienelemente, EB Garamond nur für Seitentitel, Chat-Begrüßung
+und Wortmarke in der Sidebar. Ruhige weiße und graue Flächen, fast schwarzes Neutral
+für Primäraktionen, semantische Statusfarben. Kein Dark Mode.
+Die Sidebar ist eine schwebende shadcn-Sidebar: Gap-Analyse, Chat und Administration
+sind Hauptpunkte; die vier Workflow-Schritte hängen als Unterpunkte an der Gap-Analyse.
 Keine dekorativen Verläufe, redundanten Hinweise oder übermäßigen Karten und Badges.
 Der Scope ist eine Tabelle: Einschlägigkeit, Anforderung, Subanforderungen, Best Practice,
 Bearbeiten. Im Ergebnis scrollen Anforderungsliste, Bewertungsdetail und Originaldokument

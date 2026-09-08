@@ -10,7 +10,17 @@
     "scope": "Review scope",
     "results": "Results",
     "chat": "Chat",
-    "administration": "Administration"
+    "administration": "Administration",
+    "brand": "OpenConformis",
+    "recentChats": "Chat history",
+    "noChats": "No chats yet",
+    "newChat": "New chat",
+    "toggleSidebar": "Toggle sidebar",
+    "account": "Account",
+    "anonymous": "Not signed in",
+    "anonymousHint": "Sign in for analysis and chat",
+    "signIn": "Sign in",
+    "signOut": "Sign out"
   },
   "Administration": {
     "title": "Administration",
@@ -87,7 +97,16 @@
     "locked": "Unavailable",
     "noResults": "No frameworks found",
     "continue": "Continue",
-    "chooseToContinue": "Select framework"
+    "chooseToContinue": "Select framework",
+    "all": "All",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "columnName": "Name",
+    "columnRegion": "Region",
+    "columnRequirements": "Requirements",
+    "columnStatus": "Status",
+    "availableStatus": "Available",
+    "select": "Select"
   },
   "Policy": {
     "step": "Step 2 of 4",
@@ -157,7 +176,22 @@
     "unevaluatedWarning": "This model has not been tested against the regulatory evaluation set. Use it anyway.",
     "privacyAttestation": "I have reviewed the provider account's privacy and retention settings and accept transmission of the question and selected sources.",
     "failed": "The request could not be processed safely.",
-    "emptyModels": "No compatible chat model is currently configured."
+    "emptyModels": "No compatible chat model is currently configured.",
+    "greeting": "Hi, {name}",
+    "disclaimer": "AI can make mistakes. Answers are not legal advice.",
+    "quickActions": "Quick actions",
+    "quickSummary": "Summarise requirements",
+    "quickDefinition": "Explain a term",
+    "quickDeadline": "Deadlines and reporting duties",
+    "quickSummaryPrompt": "Summarise the central requirements of the selected framework.",
+    "quickDefinitionPrompt": "Explain the term “ICT third-party service provider” as used in the framework.",
+    "quickDeadlinePrompt": "Which deadlines and reporting duties does the framework set for major incidents?",
+    "noKey": "No API key",
+    "keyConnected": "Key ••••{lastFour}",
+    "keyExpires": "Valid until {time}",
+    "changeKey": "Connect a different key",
+    "frameworkHint": "Sources of the framework are used as evidence.",
+    "modelHint": "Choose model"
   },
   "ResultsPreview": {
     "preparing": "Preparing analysis",
@@ -197,7 +231,8 @@
     "accountExists": "An account already exists for this email address. Sign in instead.",
     "invalidCredentials": "The email address or password is incorrect.",
     "passwordTooShort": "The password must be at least 8 characters long.",
-    "tooManyAttempts": "Too many attempts. Please wait a moment and try again."
+    "tooManyAttempts": "Too many attempts. Please wait a moment and try again.",
+    "step": "Step 4 of 4"
   },
   "AnalysisRun": {
     "title": "Analysis of your policy",

@@ -36,3 +36,4 @@ certificates/
 # TypeScript
 *.tsbuildinfo
 /.swc
+.scratch-e2e/

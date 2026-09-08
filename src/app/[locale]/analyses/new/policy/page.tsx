@@ -18,15 +18,12 @@ type PolicyPageProps = Readonly<{
 
 export default async function PolicyPage({ params, searchParams }: PolicyPageProps) {
   const { locale } = await params;
-  const { draft, framework } = await searchParams;
+  const { draft } = await searchParams;
 
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [navigation, t] = await Promise.all([
-    getTranslations("Navigation"),
-    getTranslations("Policy"),
-  ]);
+  const t = await getTranslations("Policy");
   const currentSelection = await getCurrentPolicySelection(draft);
 
   return (
@@ -34,23 +31,11 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
       activeArea="analysis"
       activeStep="policy"
       locale={locale}
-      topbar={
-        <>
-          <strong className="topbar-title">
-            {framework?.toUpperCase() || navigation("policy")}
-          </strong>
-          <div className="topbar-actions">
-            <LanguageMenu locale={locale} pathname="/analyses/new/policy" />
-          </div>
-        </>
-      }
+      title={t("title")}
+      eyebrow={t("step")}
+      actions={<LanguageMenu locale={locale} pathname="/analyses/new/policy" />}
     >
       <div className="setup-page">
-        <div className="setup-heading">
-          <p>{t("step")}</p>
-          <h1>{t("title")}</h1>
-        </div>
-
         <div className="beta-notice" role="note">
           <strong>{t("betaTitle")}</strong>
           <span>{t("betaBody")}</span>

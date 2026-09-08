@@ -1,7 +1,7 @@
 # Design system and interaction specification
 
 Status: binding baseline for the Next.js implementation  
-Last updated: 2026-08-21
+Last updated: 2026-09-08
 
 This document replaces the sibling-project design reference mentioned by the old
 wireframe. When the implementation and this file disagree, first decide whether the
@@ -48,21 +48,23 @@ such as DORA, EU and RTS remain uppercase because they are proper abbreviations.
 
 ### Typography
 
-Use IBM Plex Sans through the pinned `@fontsource-variable/ibm-plex-sans` package.
-Local, self-hosted and Vercel builds must not depend on Google Fonts. Runtime font
-requests to external services are not allowed.
+Use Inter (body, controls, tables) and EB Garamond (page titles, greeting, wordmark)
+through the pinned `@fontsource-variable/inter` and `@fontsource-variable/eb-garamond`
+packages. Local, self-hosted and Vercel builds must not depend on Google Fonts. Runtime
+font requests to external services are not allowed.
+
+Both families are exposed as `--font-inter` and `--font-eb-garamond` in
+`src/styles/globals.css` and mapped to the Tailwind utilities `font-sans` and
+`font-serif`. Serif is reserved for one page title per screen, the chat greeting and
+the sidebar wordmark; everything else stays in Inter.
 
 Fallback:
 
 ```css
-font-family:
-  "IBM Plex Sans Variable",
-  "IBM Plex Sans",
-  ui-sans-serif,
-  -apple-system,
-  BlinkMacSystemFont,
-  "Segoe UI",
+--font-inter:
+  "Inter Variable", "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
   sans-serif;
+--font-eb-garamond: "EB Garamond Variable", "EB Garamond", Georgia, "Times New Roman", serif;
 ```
 
 Type scale:
@@ -170,36 +172,41 @@ shadow: `0 12px 32px rgb(15 23 42 / 12%)`.
 
 ## 4. Application shell
 
+The shell is built from shadcn/ui components (`src/components/ui/`, style `radix-vega`,
+base colour neutral, `components.json`). Colour and radius tokens follow the shadcn
+schema (`--background`, `--card`, `--primary`, `--muted`, `--sidebar-*`, `--radius`);
+the historical semantic tokens remain as aliases for the domain surfaces. New chrome
+and controls use these components instead of hand-built look-alikes.
+
 ### Desktop
 
-- Sidebar width: 232 px.
-- Top bar height: 56 px.
-- Canvas fills the remaining viewport height.
-- Page content uses 24–32 px horizontal padding outside dense result mode.
+- Sidebar: shadcn `Sidebar` with `variant="floating"` and `collapsible="icon"`
+  (16 rem wide, 0.5 rem inset, rounded, hairline ring). State persists in the
+  `sidebar_state` cookie; ⌘/Ctrl+B toggles.
+- Header height: 56 px. Canvas fills the remaining viewport height.
+- Page content uses 16–24 px horizontal padding outside dense result mode.
 - Main shell itself does not horizontally scroll at 1280 px and above.
 
 ### Sidebar
 
-- The top-level Gap-Analyse row and Chat row use the same 18 px icon column, 12 px
-  gap and label start.
-- Gap-Analyse owns the four indented workflow steps.
-- The vertical guide begins at the visual centre of the first step and ends at the
-  visual centre of the last step. It does not extend into the gap above or below.
-- Steps are 36–40 px tall with compact 4–6 px vertical separation.
-- Chat has at least 20 px separation from the final workflow step and opens the
-  full-page chat workspace.
-- Administration remains separated at the bottom by a hairline.
-- Removed brand, workspace and profile blocks must not reappear unless product
-  identity and account navigation are intentionally redesigned.
+- Header: asterisk mark plus the serif wordmark, and the collapse trigger.
+- Primary menu: Gap-Analyse, Chat, Administration as `SidebarMenuButton` rows with
+  a 16 px icon column; the icon may carry a single accent colour.
+- Gap-Analyse owns the four workflow steps as a `SidebarMenuSub` (indented, guided
+  by the sub-menu hairline). Steps are 32 px tall. They never sit on the same level
+  as the top-level areas.
+- Below the menu a collapsible "Chat-Verlauf" group lists the user's recent chat
+  threads with a "new chat" group action; empty state says "Noch keine Chats".
+- Footer: account row (avatar initial, display name, email) opening a dropdown with
+  the language switch and sign-in or sign-out.
 
-### Top bar
+### Header
 
-- Left: current workflow or page name, not an obsolete breadcrumb.
-- Right: page-specific search, then language control, then optional account menu.
-- Search is 240–320 px, 36 px high and never competes with the page title.
-- Language control uses a flag plus accessible language name in its menu. A flag
-  alone is not sufficient for screen readers.
-- Destructive or primary workflow actions do not live in the global top bar unless
+- Left: the page title in serif (26 px) with the workflow step as small muted text.
+  Pages that carry their own heading (sign-in, administration) leave the title out.
+- Right: page-specific search (rounded, 32 px high, 240 px wide, shadcn `Input`),
+  then the language control (shadcn `DropdownMenu` with flag plus accessible name).
+- Destructive or primary workflow actions do not live in the header unless
   their scope is unambiguous.
 
 ### Routing and continuity

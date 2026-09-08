@@ -1,5 +1,5 @@
 import { hasLocale } from "next-intl";
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { AdminWorkspace } from "@/components/admin/admin-workspace";
@@ -19,8 +19,7 @@ export default async function AdministrationPage({ params }: AdministrationPageP
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [navigation, catalogue, instructions, operations] = await Promise.all([
-    getTranslations("Navigation"),
+  const [catalogue, instructions, operations] = await Promise.all([
     listAdminCatalogue().catch(() => null),
     listAnalysisInstructions().catch(() => null),
     getAdminOperationsSnapshot().catch(() => null),
@@ -31,14 +30,7 @@ export default async function AdministrationPage({ params }: AdministrationPageP
     <ApplicationShell
       activeArea="administration"
       locale={locale}
-      topbar={
-        <>
-          <strong className="topbar-title">{navigation("administration")}</strong>
-          <div className="topbar-actions">
-            <LanguageMenu locale={locale} pathname="/administration" />
-          </div>
-        </>
-      }
+      actions={<LanguageMenu locale={locale} pathname="/administration" />}
     >
       <AdminWorkspace
         initialCatalogue={JSON.parse(JSON.stringify(catalogue))}

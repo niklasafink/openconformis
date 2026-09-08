@@ -126,14 +126,9 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
       activeArea="analysis"
       activeStep="results"
       locale={locale}
-      topbar={
-        <>
-          <strong className="topbar-title">{navigation("results")}</strong>
-          <div className="topbar-actions">
-            <LanguageMenu locale={locale} pathname="/analyses/new/results" />
-          </div>
-        </>
-      }
+      title={navigation("results")}
+      eyebrow={t("step")}
+      actions={<LanguageMenu locale={locale} pathname="/analyses/new/results" />}
     >
       <PreviewGate
         callbackUrl={callbackUrl}
