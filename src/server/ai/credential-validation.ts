@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { openRouterModelsUrl } from "./openrouter-route";
+
 import type { AiRouteProvider } from "@/domain/ai/provider";
 
 const modelListSchema = z.object({
@@ -95,7 +97,12 @@ function requireModel(modelIds: string[], requiredModelId: string) {
 }
 
 export async function validateProviderCredential(
-  input: { provider: AiRouteProvider; secret: string; requiredModelId: string },
+  input: {
+    provider: AiRouteProvider;
+    secret: string;
+    requiredModelId: string;
+    route?: { baseUrl: string; zeroDataRetention: boolean };
+  },
   fetchImplementation: typeof fetch = fetch,
 ): Promise<ValidationResult> {
   if (!input.secret.trim() || !input.requiredModelId.trim()) {
@@ -114,9 +121,10 @@ export async function validateProviderCredential(
       if (!key.success) {
         throw new CredentialValidationError("PROVIDER_RESPONSE_INVALID", false);
       }
-      const modelsUrl = new URL("https://eu.openrouter.ai/api/v1/models/user");
-      modelsUrl.searchParams.set("zdr", "true");
-      modelsUrl.searchParams.set("region", "eu");
+      const modelsUrl = openRouterModelsUrl(
+        input.route ?? { baseUrl: "https://eu.openrouter.ai/api/v1", zeroDataRetention: true },
+        true,
+      );
       modelsUrl.searchParams.set("q", input.requiredModelId);
       const models = modelListSchema.safeParse(
         await fetchJson(modelsUrl, { headers: bearer(input.secret) }, fetchImplementation),

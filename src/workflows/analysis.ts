@@ -4,6 +4,8 @@ import {
   prepareAnalysisExecution,
 } from "@/server/worker/execute-analysis";
 import { markAnalysisRetriesExhausted } from "@/server/worker/fail-analysis";
+import { TemporaryCredentialError } from "@/server/ai/temporary-credential-service";
+import { ProviderRouteConfigurationError } from "@/server/ai/provider-routing";
 import { ModelProviderError } from "@/server/ai/structured-model";
 import { FatalError, getWorkflowMetadata } from "workflow";
 
@@ -15,7 +17,11 @@ import { FatalError, getWorkflowMetadata } from "workflow";
  * verdeckte.
  */
 function terminalIfPermanent(error: unknown): never {
-  if (error instanceof ModelProviderError && !error.retryable) {
+  if (
+    error instanceof TemporaryCredentialError ||
+    error instanceof ProviderRouteConfigurationError ||
+    (error instanceof ModelProviderError && !error.retryable)
+  ) {
     throw new FatalError(error.message);
   }
   throw error;
@@ -24,10 +30,7 @@ function terminalIfPermanent(error: unknown): never {
 async function prepareAnalysisStep(analysisId: string, workflowRunId: string) {
   "use step";
   try {
-    return await prepareAnalysisExecution(
-      { kind: "analysis_execution", analysisId },
-      workflowRunId,
-    );
+    return await prepareAnalysisExecution(analysisId, workflowRunId);
   } catch (error) {
     terminalIfPermanent(error);
   }

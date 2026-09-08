@@ -144,7 +144,7 @@ Verification: a clean clone contains the planning baseline and no untracked secr
 - Resolve and record current stable package versions at scaffold time.
 - Use App Router, strict TypeScript, Tailwind, ESLint, `src/` and `@/*` alias.
 - Pin Node and pnpm through `package.json`, Corepack and the lockfile.
-- Keep `enterprise-wireframe/` outside the production import graph.
+- Completed: removed the unused static prototype after checking runtime imports.
 - Add `dev`, `build`, `start`, `lint`, `typecheck`, `test` and `test:e2e` scripts.
 - Set `package.json` licence metadata according to the approved legal decision.
 
@@ -359,7 +359,7 @@ Exit: authenticated and anonymous principals can access only their own draft dat
 
 ### M5.2 Import typed fixture data
 
-- Convert `enterprise-wireframe/data.js` to validated seed input.
+- Completed: validated release input lives in `src/domain/frameworks/`.
 - Separate first-party mappings from quoted regulatory source material.
 - Verify every requirement ID is unique within a release.
 - Verify subrequirements point to the correct parent.

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { analysisStartInputSchema } from "@/domain/analysis/start-input";
 
 import { AnalysisStartError, startAnalysis } from "@/server/analyses/start-analysis";
 import { describeStartFailure } from "@/server/analyses/start-failure-messages";
@@ -13,8 +14,6 @@ import {
 } from "@/server/security/request-protection";
 
 export const runtime = "nodejs";
-
-const inputSchema = z.object({ draftId: z.uuid(), credentialId: z.uuid() });
 
 const statusByCode: Record<string, number> = {
   DATABASE_UNAVAILABLE: 503,
@@ -45,7 +44,7 @@ export async function POST(request: Request) {
       limit: 10,
       windowSeconds: 3600,
     });
-    const result = await startAnalysis(inputSchema.parse(await request.json()));
+    const result = await startAnalysis(analysisStartInputSchema.parse(await request.json()));
     return NextResponse.json(result, { status: result.reused ? 200 : 202 });
   } catch (error) {
     const protectedResponse = requestProtectionResponse(error);

@@ -2,6 +2,9 @@ import "server-only";
 
 import type { AiRouteProvider } from "@/domain/ai/provider";
 
+import { openRouterBaseUrl, openRouterZeroDataRetention } from "./openrouter-route";
+export { openRouterZeroDataRetention } from "./openrouter-route";
+
 import { requestAnthropicStructured } from "./anthropic";
 import { requestGoogleStructured } from "./google";
 import { requestOpenAiStructured } from "./openai";
@@ -37,11 +40,7 @@ function maxOutputTokens() {
 function analysisBaseUrl(provider: AiRouteProvider) {
   switch (provider) {
     case "openrouter":
-      return (
-        process.env.OPENROUTER_BASE_URL?.trim() ||
-        process.env.OPENROUTER_EU_BASE_URL?.trim() ||
-        undefined
-      );
+      return openRouterBaseUrl();
     case "requesty":
       return process.env.BYOK_REQUESTY_EU_ZDR_ENABLED === "true"
         ? "https://router.eu.requesty.ai/v1"
@@ -65,7 +64,7 @@ export function getAnalysisProviderConfiguration(
 ): AnalysisProviderConfiguration {
   const baseUrl = analysisBaseUrl(provider);
   if (!baseUrl) throw new ProviderRouteConfigurationError("ANALYSIS_ROUTE_UNAVAILABLE");
-  const zeroDataRetention = openRouterZeroDataRetention();
+  const zeroDataRetention = provider !== "openrouter" || openRouterZeroDataRetention();
   return {
     provider,
     baseUrl,
@@ -117,9 +116,4 @@ export function openRouterPrivacyProfileId(input: {
   }
   if (euRoute && input.zeroDataRetention) return "eu-zdr-v1";
   return `openrouter-${euRoute ? "eu" : "global"}-${input.zeroDataRetention ? "zdr" : "no-zdr"}-v1`;
-}
-
-/** OpenRouter-Route: ZDR ist Standard, Abweichung ist ausdrücklich. */
-export function openRouterZeroDataRetention() {
-  return process.env.OPENROUTER_ZDR?.trim().toLowerCase() !== "false";
 }

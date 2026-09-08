@@ -25,7 +25,7 @@ import {
 } from "@/server/security/credential-crypto";
 
 import { validateProviderCredential } from "./credential-validation";
-import { isAnalysisProviderAvailable } from "./provider-routing";
+import { getAnalysisProviderConfiguration, isAnalysisProviderAvailable } from "./provider-routing";
 
 export class TemporaryCredentialError extends Error {
   constructor(public readonly code: string) {
@@ -108,6 +108,7 @@ export async function createTemporaryCredential(input: {
     provider,
     secret: input.secret,
     requiredModelId: input.requiredModelId,
+    route: purpose === "analysis" ? getAnalysisProviderConfiguration(provider) : undefined,
   });
   const credentialId = randomUUID();
   const now = new Date();

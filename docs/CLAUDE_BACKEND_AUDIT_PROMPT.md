@@ -178,6 +178,6 @@ Schließe den Bericht mit einer priorisierten Behebungsliste. Trenne zwingende G
 
 Formuliere präzise und in vollständigen Sätzen. Behaupte nichts allein aufgrund eines Dateinamens, eines Kommentars oder einer UI-Beschriftung. Belege positive und negative Aussagen mit Code, Tests, Konfiguration oder aktueller Primärdokumentation. Kopiere keine Secrets, Tokens, vollständigen Policy-Texte oder personenbezogenen Daten in den Bericht.
 
-Ignoriere das statische Verzeichnis `enterprise-wireframe/`, sofern es nicht von der produktiven Next.js-Anwendung importiert oder zur Laufzeit verwendet wird. Das Audit gilt dem produktiven Backend im Repository-Root. Ändere keine Designentscheidungen und führe keinen visuellen Frontend-Review durch, außer wenn eine Oberfläche fälschlich als einzige Sicherheitskontrolle verwendet wird.
+Das Audit gilt dem produktiven Backend im Repository-Root. Ändere keine Designentscheidungen und führe keinen visuellen Frontend-Review durch, außer wenn eine Oberfläche fälschlich als einzige Sicherheitskontrolle verwendet wird.
 
 Wenn du eine Unsicherheit durch lokale, sichere und reversible Prüfung beseitigen kannst, führe diese Prüfung aus. Wenn dafür externe Zugangsdaten, ein Deployment, eine kostenpflichtige KI-Anfrage oder eine irreversible Änderung erforderlich wäre, stoppe an dieser Stelle, dokumentiere den fehlenden Nachweis und frage den Nutzer gezielt um Erlaubnis. Liefere erst dann ein finales Urteil, wenn du den gesamten beschriebenen Prüfbereich bearbeitet und alle Befunde gegeneinander auf Konsistenz geprüft hast.

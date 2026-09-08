@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { openRouterUrl } from "./openrouter-route";
 
 import {
   assertStructuredRequest,
@@ -50,32 +51,11 @@ const openRouterResponseSchema = z.object({
     .optional(),
 });
 
-// Nur die beiden echten OpenRouter-Hosts. Die Liste bleibt geschlossen, damit die
-// Basis-URL nicht auf einen beliebigen Host zeigen kann; welcher der beiden
-// zulässig ist, entscheidet der Betreiber über die Konfiguration.
-const openRouterHosts = new Set(["eu.openrouter.ai", "openrouter.ai"]);
-
-function chatCompletionsUrl(baseUrl: string) {
-  const url = new URL(baseUrl);
-  if (
-    url.protocol !== "https:" ||
-    !openRouterHosts.has(url.hostname) ||
-    url.port ||
-    url.pathname.replace(/\/$/u, "") !== "/api/v1"
-  ) {
-    throw new ModelProviderError("INVALID_EU_ROUTE", false);
-  }
-  url.pathname = "/api/v1/chat/completions";
-  url.search = "";
-  url.hash = "";
-  return url;
-}
-
 export async function requestOpenRouterStructured<T>(
   request: StructuredModelRequest<T>,
   fetchImplementation: typeof fetch = fetch,
 ): Promise<StructuredModelResponse<T>> {
-  const endpoint = chatCompletionsUrl(request.baseUrl);
+  const endpoint = openRouterUrl(request.baseUrl, "chat/completions");
   assertStructuredRequest(request);
   // Eine Anbieterfestlegung ist optional. Sie war zuvor Pflicht, was BYOK über
   // OpenRouter unmöglich machte: die Datenbank verlangt dort eine leere Liste

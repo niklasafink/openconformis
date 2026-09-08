@@ -48,7 +48,7 @@ The static wireframe remains available until phase 7 reaches parity.
   directory, ESLint and `@/*` alias.
 - Pin Node `24.x` and pnpm `9.x`.
 - Commit the lockfile.
-- Keep `enterprise-wireframe/` as a reference-only folder.
+- Completed: migrated the static prototype into the Next.js app; the prototype was removed.
 - Add the unmodified PolyForm Noncommercial 1.0.0 text, exact required notice and
   ownership metadata before making any repository public.
 - Mark package metadata as `SEE LICENSE IN LICENSE` unless a verified SPDX identifier
@@ -120,7 +120,7 @@ The static wireframe remains available until phase 7 reaches parity.
 - Create data-access helpers requiring `AuthContext`.
 - Implement Better Auth with magic link, e-mail/password, Google and Microsoft.
 - Seed one demo organization, roles, DORA framework release and sample policy.
-- Convert `enterprise-wireframe/data.js` into typed fixtures.
+- Completed: typed fixtures live in `src/domain/frameworks/` and `src/domain/policies/`.
 - Preserve current evidence mappings during conversion.
 - Add framework-release immutability service.
 - Add append-only audit service.

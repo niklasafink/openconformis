@@ -99,48 +99,72 @@ export function PreviewGate({
   );
   const dialogOpen = dialog === "open" || (dialog === undefined && signedIn);
   const [apiKey, setApiKey] = useState("");
+  const [credentialId, setCredentialId] = useState<string>();
   const [privacyAttestationAccepted, setPrivacyAttestationAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<StartFailure | null>(null);
   const steps = [labels.parsing, labels.mapping, labels.checking];
 
   useEffect(() => {
-    if (step >= steps.length) return;
+    if (signedIn || step >= steps.length) return;
     const timer = window.setTimeout(
       () => setStep((current) => current + 1),
       animationStepMilliseconds,
     );
     return () => window.clearTimeout(timer);
-  }, [step, steps.length]);
+  }, [signedIn, step, steps.length]);
+
+  function closeDialog() {
+    if (pending) return;
+    setApiKey("");
+    setDialog("closed");
+  }
 
   async function connectCredentialAndStart(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
     setFailure(null);
     try {
-      const credentialResponse = await postJson("/api/ai-credentials", {
-        provider: selectedModel.routeProvider,
-        purpose: "analysis",
-        bindingId: draftId,
-        requiredModelId: selectedModel.providerModelId,
-        apiKey,
-        privacyAttestationAccepted,
-      });
-      const credential = (await credentialResponse.json()) as { credentialId?: string };
-      if (!credentialResponse.ok || !credential.credentialId) {
-        setFailure({
-          message: labels.keyFailed,
-          signInRequired: credentialResponse.status === 401,
+      let connectedCredentialId = credentialId;
+      if (!connectedCredentialId) {
+        const credentialResponse = await postJson("/api/ai-credentials", {
+          provider: selectedModel.routeProvider,
+          purpose: "analysis",
+          bindingId: draftId,
+          requiredModelId: selectedModel.providerModelId,
+          apiKey: apiKey.trim(),
+          privacyAttestationAccepted,
         });
-        return;
+        const credential = (await credentialResponse.json()) as { credentialId?: string };
+        if (!credentialResponse.ok || !credential.credentialId) {
+          setFailure({
+            message: labels.keyFailed,
+            signInRequired: credentialResponse.status === 401,
+          });
+          return;
+        }
+        connectedCredentialId = credential.credentialId;
+        setCredentialId(connectedCredentialId);
+        setApiKey("");
       }
 
       const startResponse = await postJson("/api/analyses/start", {
         draftId,
-        credentialId: credential.credentialId,
+        credentialId: connectedCredentialId,
       });
-      const analysis = (await startResponse.json()) as { analysisId?: string; message?: string };
+      const analysis = (await startResponse.json()) as {
+        analysisId?: string;
+        message?: string;
+        code?: string;
+      };
       if (!startResponse.ok || !analysis.analysisId) {
+        if (
+          analysis.code === "BYOK_CREDENTIAL_INVALID" ||
+          analysis.code === "BYOK_PRIVACY_ATTESTATION_REQUIRED"
+        ) {
+          setCredentialId(undefined);
+        }
         // Die Begründung des Servers hat Vorrang: sie benennt den konkreten
         // Zustand, der lokale Text kennt nur die Fallgruppe.
         setFailure({
@@ -158,7 +182,7 @@ export function PreviewGate({
     }
   }
 
-  if (step < steps.length) {
+  if (!signedIn && step < steps.length) {
     return (
       <div className="preview-progress" role="status" aria-live="polite">
         <LoaderCircle className="preview-spinner" size={24} aria-hidden="true" />
@@ -202,7 +226,7 @@ export function PreviewGate({
           className="preview-auth-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setDialog("closed");
+            if (event.target === event.currentTarget) closeDialog();
           }}
         >
           <section
@@ -215,7 +239,8 @@ export function PreviewGate({
               type="button"
               className="preview-auth-close"
               aria-label={labels.close}
-              onClick={() => setDialog("closed")}
+              onClick={closeDialog}
+              disabled={pending}
             >
               <X size={18} aria-hidden="true" />
             </button>
@@ -230,19 +255,24 @@ export function PreviewGate({
                   </div>
                 </dl>
                 <form onSubmit={connectCredentialAndStart}>
-                  <label htmlFor="preview-api-key">
-                    {selectedModel.routeProviderLabel} API-Key
-                  </label>
-                  <input
-                    id="preview-api-key"
-                    type="password"
-                    required
-                    minLength={8}
-                    maxLength={20_000}
-                    autoComplete="off"
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                  />
+                  {!credentialId ? (
+                    <>
+                      <label htmlFor="preview-api-key">
+                        {selectedModel.routeProviderLabel} API-Key
+                      </label>
+                      <input
+                        id="preview-api-key"
+                        type="password"
+                        required
+                        minLength={8}
+                        maxLength={20_000}
+                        autoComplete="off"
+                        disabled={pending}
+                        value={apiKey}
+                        onChange={(event) => setApiKey(event.target.value)}
+                      />
+                    </>
+                  ) : null}
                   {selectedModel.privacyAttestationRequired ? (
                     <label className="preview-privacy-attestation">
                       <input

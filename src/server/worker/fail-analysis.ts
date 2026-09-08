@@ -40,7 +40,7 @@ export async function markAnalysisRetriesExhausted(
       // dann nicht, wenn dieser Aufruf ihn nicht selbst beendet hat.
       return {
         changed: false as const,
-        cleanupCredential: analysis.status === "failed" || analysis.status === "cancelled",
+        cleanupCredential: true,
         sourceDraftId: analysis.sourceDraftId,
         ownerUserId: analysis.ownerUserId,
       };

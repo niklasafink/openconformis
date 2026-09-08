@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { aiCredentialPurposeSchema, aiRouteProviderSchema } from "@/domain/ai/provider";
+import {
+  assertRequestSize,
+  enforceRequestRateLimit,
+  requestProtectionResponse,
+} from "@/server/security/request-protection";
 
 import { CredentialValidationError } from "@/server/ai/credential-validation";
 import {
@@ -16,11 +22,11 @@ export const dynamic = "force-dynamic";
 
 const inputSchema = z
   .object({
-    provider: z.enum(["openrouter", "requesty", "anthropic", "google", "openai"]),
-    purpose: z.enum(["analysis", "chat"]),
+    provider: aiRouteProviderSchema,
+    purpose: aiCredentialPurposeSchema,
     bindingId: z.uuid().optional(),
     requiredModelId: z.string().trim().min(1).max(300),
-    apiKey: z.string().min(8).max(20_000),
+    apiKey: z.string().trim().min(8).max(20_000),
     privacyAttestationAccepted: z.boolean().optional(),
   })
   .superRefine((input, context) => {
@@ -41,6 +47,8 @@ const inputSchema = z
   });
 
 function errorResponse(error: unknown) {
+  const protectedResponse = requestProtectionResponse(error);
+  if (protectedResponse) return protectedResponse;
   if (error instanceof z.ZodError) {
     return NextResponse.json({ code: "INVALID_CREDENTIAL_INPUT" }, { status: 400 });
   }
@@ -74,6 +82,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    assertRequestSize(request, 131_072);
+    await enforceRequestRateLimit(request, {
+      bucket: "credential-connect",
+      limit: 30,
+      windowSeconds: 3600,
+    });
     const input = inputSchema.parse(await request.json());
     const credential = await createTemporaryCredential({
       provider: input.provider,
@@ -94,9 +108,9 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const purpose = z
-      .enum(["analysis", "chat"])
-      .parse(new URL(request.url).searchParams.get("purpose"));
+    const purpose = aiCredentialPurposeSchema.parse(
+      new URL(request.url).searchParams.get("purpose"),
+    );
     const credentials = await listActiveTemporaryCredentials(purpose);
     return NextResponse.json(
       { credentials },

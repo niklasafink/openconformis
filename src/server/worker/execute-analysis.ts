@@ -23,17 +23,12 @@ import { appendAuditEvent } from "@/server/audit/event";
 import { getFrozenAnalysisInstruction } from "@/server/ai/analysis-instruction-service";
 import { buildAssessmentPrompt } from "@/server/ai/assessment-prompt";
 import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
-import {
-  ModelProviderError,
-  type StructuredModelRequest,
-  type StructuredModelResponse,
-} from "@/server/ai/structured-model";
+import { ModelProviderError, type StructuredModelResponse } from "@/server/ai/structured-model";
 import {
   getAnalysisProviderConfiguration,
   isAnalysisProviderAvailable,
-  requestProviderStructured,
 } from "@/server/ai/provider-routing";
-import { withTemporaryCredential } from "@/server/ai/temporary-credential-service";
+import { requestStructuredForAnalysis } from "@/server/ai/analysis-provider";
 import { buildVerificationPrompt } from "@/server/ai/verification-prompt";
 import { db } from "@/server/db/client";
 import {
@@ -50,11 +45,6 @@ import { documentBlocks, policyVersions } from "@/server/db/schema/documents";
 
 import { prepareAnalysisRetrieval } from "./retrieve-analysis";
 
-export type AnalysisExecutionJob = {
-  kind: "analysis_execution";
-  analysisId: string;
-};
-
 type AnalysisRecord = Awaited<ReturnType<typeof loadAnalysis>>;
 type ScopeRecord = Awaited<ReturnType<typeof loadAnalysisItems>>[number];
 
@@ -62,32 +52,6 @@ function safeErrorCode(error: unknown) {
   if (error instanceof ModelProviderError) return error.code;
   if (error instanceof Error) return error.name.replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 80);
   return "UnknownError";
-}
-
-async function requestStructuredForAnalysis<T>(
-  analysis: NonNullable<AnalysisRecord>,
-  request: Omit<StructuredModelRequest<T>, "apiKey" | "baseUrl" | "maxOutputTokens">,
-) {
-  if (!analysis.aiCredentialId) throw new Error("ANALYSIS_CREDENTIAL_MISSING");
-  const provider = getAnalysisProviderConfiguration(analysis.routeProvider);
-  return withTemporaryCredential(
-    {
-      credentialId: analysis.aiCredentialId,
-      ownerUserId: analysis.ownerUserId,
-      provider: analysis.routeProvider,
-      purpose: "analysis",
-      bindingId: analysis.sourceDraftId,
-      requiredModelId: request.modelId,
-    },
-    (apiKey) =>
-      requestProviderStructured(analysis.routeProvider, {
-        ...request,
-        baseUrl: provider.baseUrl,
-        maxOutputTokens: provider.maxOutputTokens,
-        zeroDataRetention: provider.zeroDataRetention,
-        apiKey,
-      }),
-  );
 }
 
 async function loadAnalysis(analysisId: string) {
@@ -159,7 +123,7 @@ async function loadAnalysisItem(analysisId: string, scopeItemId: string) {
   return item;
 }
 
-async function loadCandidates(analysis: NonNullable<AnalysisRecord>, item: ScopeRecord) {
+async function loadCandidates(analysis: AnalysisRecord, item: ScopeRecord) {
   const candidateIds = item.packet.candidates.map(({ documentBlockId }) => documentBlockId);
   if (candidateIds.length === 0) return [];
 
@@ -294,7 +258,7 @@ function requirementFromScope(scope: ScopeRecord["scope"]) {
 }
 
 async function assessItem(
-  analysis: NonNullable<AnalysisRecord>,
+  analysis: AnalysisRecord,
   item: ScopeRecord,
   candidates: RetrievalCandidate[],
 ): Promise<{
@@ -509,7 +473,7 @@ async function assessItem(
 }
 
 async function verifyItem(
-  analysis: NonNullable<AnalysisRecord>,
+  analysis: AnalysisRecord,
   item: ScopeRecord,
   candidates: RetrievalCandidate[],
   assessment: RequirementAssessment,
@@ -583,7 +547,7 @@ async function verifyItem(
 }
 
 async function persistItemResult(input: {
-  analysis: NonNullable<AnalysisRecord>;
+  analysis: AnalysisRecord;
   item: ScopeRecord;
   proposed: Awaited<ReturnType<typeof assessItem>>;
   verification?: Awaited<ReturnType<typeof verifyItem>>;
@@ -696,12 +660,12 @@ async function claimAnalysisWorkflow(analysisId: string, workflowRunId?: string)
   return Boolean(claimed);
 }
 
-export async function prepareAnalysisExecution(job: AnalysisExecutionJob, workflowRunId?: string) {
-  const claimed = await claimAnalysisWorkflow(job.analysisId, workflowRunId);
+export async function prepareAnalysisExecution(analysisId: string, workflowRunId: string) {
+  const claimed = await claimAnalysisWorkflow(analysisId, workflowRunId);
   if (!claimed) {
-    return { analysisId: job.analysisId, status: "duplicate" as const, scopeItemIds: [] };
+    return { analysisId: analysisId, status: "duplicate" as const, scopeItemIds: [] };
   }
-  const analysis = await loadAnalysis(job.analysisId);
+  const analysis = await loadAnalysis(analysisId);
   if (analysis.status === "completed") {
     await deleteAnalysisCredential(analysis);
     return { analysisId: analysis.id, status: "completed" as const, scopeItemIds: [] };
@@ -773,7 +737,10 @@ export async function executeAnalysisScopeItem(input: {
 
 export async function finalizeAnalysisExecution(analysisId: string) {
   const analysis = await loadAnalysis(analysisId);
-  if (analysis.status === "completed") return { analysisId, status: "completed" as const };
+  if (analysis.status === "completed") {
+    await deleteAnalysisCredential(analysis);
+    return { analysisId, status: "completed" as const };
+  }
   if (analysis.status !== "running") throw new Error("ANALYSIS_NOT_RUNNING");
 
   await db.transaction(async (transaction) => {

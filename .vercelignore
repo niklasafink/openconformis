@@ -1,7 +1,6 @@
 .github/
 docs/
 drizzle/
-enterprise-wireframe/
 tests/
 coverage/
 playwright-report/
@@ -9,3 +8,4 @@ test-results/
 blob-report/
 *.log
 *.tsbuildinfo
+.next-e2e/

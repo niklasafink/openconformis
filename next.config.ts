@@ -21,6 +21,7 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  distDir: process.env.APP_ENV === "test" ? ".next-e2e" : ".next",
   serverExternalPackages: ["@napi-rs/canvas", "tesseract.js"],
   outputFileTracingIncludes: {
     "/*": [

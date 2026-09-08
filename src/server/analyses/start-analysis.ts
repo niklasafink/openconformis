@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { analysisStartInputSchema, type AnalysisStartInput } from "@/domain/analysis/start-input";
 
 import { createCatalogueItemHash } from "@/domain/frameworks/release-content";
 import { createContentHash } from "@/domain/frameworks/content-hash";
@@ -46,14 +47,27 @@ export type StartAnalysisResult = {
  * Anweisungsversionen. Jeder Lauf läuft über den eigenen, kurzlebig hinterlegten
  * Schlüssel des Nutzers — einen Betreiber-Schlüssel gibt es nicht.
  */
-export async function startAnalysis(input: {
-  draftId: string;
-  credentialId: string;
-}): Promise<StartAnalysisResult> {
+export async function startAnalysis(input: AnalysisStartInput): Promise<StartAnalysisResult> {
+  analysisStartInputSchema.parse(input);
   if (!isDatabaseConfigured) throw new AnalysisStartError("DATABASE_UNAVAILABLE");
 
-  const [user, boundDraft, instructions] = await Promise.all([
-    requireAuthenticatedSessionUser(),
+  const user = await requireAuthenticatedSessionUser();
+  // A successful claim makes the draft inactive. Recover a lost start response
+  // using the authenticated owner before requiring an active draft again.
+  const [existing] = await db
+    .select({ id: analyses.id, status: analyses.status })
+    .from(analyses)
+    .where(and(eq(analyses.sourceDraftId, input.draftId), eq(analyses.ownerUserId, user.id)))
+    .limit(1);
+  if (existing) {
+    return launchPendingAnalysis({
+      analysisId: existing.id,
+      status: existing.status,
+      reused: true,
+    });
+  }
+
+  const [boundDraft, instructions] = await Promise.all([
     getBoundActiveDraft(input.draftId),
     getActiveAnalysisInstructionPair(),
   ]);
@@ -341,7 +355,11 @@ export async function startAnalysis(input: {
     return { analysisId: analysis.id, status: analysis.status, reused: false };
   });
 
-  if (result.status === "queued" || result.status === "running") {
+  return launchPendingAnalysis(result);
+}
+
+async function launchPendingAnalysis(result: StartAnalysisResult): Promise<StartAnalysisResult> {
+  if (result.status === "queued") {
     await launchAnalysisWorkflow(result.analysisId);
   }
   return result;

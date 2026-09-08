@@ -9,6 +9,12 @@ import { db, isDatabaseConfigured } from "@/server/db/client";
 import { aiModelProfiles } from "@/server/db/schema/ai";
 import { configuredSet } from "@/server/environment";
 
+import {
+  openRouterBaseUrl,
+  openRouterModelsUrl,
+  openRouterZeroDataRetention,
+} from "./openrouter-route";
+
 import { isAnalysisProviderAvailable } from "./provider-routing";
 
 const openRouterModelsSchema = z.object({
@@ -214,10 +220,10 @@ export async function getAnalysisModelCatalogue(
   const curated = await curatedProfiles();
   if (process.env.MODEL_CATALOGUE_DISCOVERY_DISABLED === "true") return offlineCatalogue(curated);
 
-  const url = new URL("https://openrouter.ai/api/v1/models");
-  url.searchParams.set("zdr", "true");
-  url.searchParams.set("region", "eu");
-  url.searchParams.set("supported_parameters", "structured_outputs");
+  const url = openRouterModelsUrl({
+    baseUrl: openRouterBaseUrl() ?? "https://eu.openrouter.ai/api/v1",
+    zeroDataRetention: openRouterZeroDataRetention(),
+  });
 
   let payload: unknown;
   try {

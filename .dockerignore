@@ -10,4 +10,4 @@ coverage
 assets
 drizzle
 docs
-enterprise-wireframe
+.next-e2e/

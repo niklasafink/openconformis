@@ -29,7 +29,7 @@ deployment profile with separate security and contractual gates.
 ## D-002 Application location
 
 Recommended: scaffold Next.js at the repository root and keep
-`enterprise-wireframe/` as a temporary reference.
+the original static prototype as a temporary reference (removed after migration to Next.js).
 
 Alternative: place Next.js in `app/` and configure the Vercel root directory.
 
@@ -37,7 +37,7 @@ Why the root is preferred: simpler scripts, dependency updates, Vercel detection
 documentation. There is no existing package structure requiring a monorepo.
 
 Decision: accepted. Scaffold the Next.js application at the repository root and keep
-`enterprise-wireframe/` as a reference until feature parity.
+the original static prototype as a reference until feature parity (now removed).
 
 ## D-003 Authentication
 
