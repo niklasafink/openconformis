@@ -23,7 +23,7 @@ const openRouterModelsSchema = z.object({
       z.object({
         id: z.string().min(1),
         name: z.string().min(1),
-        context_length: z.number().int().positive().optional(),
+        context_length: z.number().int().nonnegative().optional(),
         pricing: z
           .object({
             prompt: z.string().optional(),
@@ -256,7 +256,7 @@ export async function getAnalysisModelCatalogue(
       name: model.name,
       routeProvider: "openrouter",
       providerModelId: model.id,
-      contextLength: model.context_length,
+      contextLength: model.context_length || undefined,
       promptPricePerMillion: pricePerMillion(model.pricing?.prompt),
       completionPricePerMillion: pricePerMillion(model.pricing?.completion),
       evaluated: isEvaluated(evaluated, "openrouter", model.id),

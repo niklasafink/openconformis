@@ -50,6 +50,41 @@ describe("analysis model catalogue", () => {
     });
   });
 
+  it("tolerates OpenRouter listing a model with context_length 0 instead of failing the whole catalogue", async () => {
+    // Reproduziert einen realen Fund gegen die Live-API: einzelne Einträge kamen
+    // mit `context_length: 0` statt `null` oder fehlendem Feld, was die vorherige
+    // `.positive()`-Prüfung für die gesamte Antwort scheitern ließ — nicht nur für
+    // den betroffenen Eintrag.
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "anthropic/claude-test",
+              name: "Claude Test",
+              context_length: 200000,
+              pricing: { prompt: "0.000003", completion: "0.000015" },
+              supported_parameters: ["structured_outputs"],
+              architecture: { output_modalities: ["text"] },
+            },
+            {
+              id: "vendor/broken-context",
+              name: "Broken Context",
+              context_length: 0,
+              supported_parameters: ["structured_outputs"],
+              architecture: { output_modalities: ["text"] },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const catalogue = await getAnalysisModelCatalogue(fetchMock);
+    expect(catalogue.models).toHaveLength(2);
+    const broken = catalogue.models.find(({ id }) => id === "openrouter:vendor/broken-context");
+    expect(broken?.contextLength).toBeUndefined();
+  });
+
   it("fails closed for invalid injected responses", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response("not-json"));
     await expect(getAnalysisModelCatalogue(fetchMock)).rejects.toMatchObject({

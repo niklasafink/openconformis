@@ -304,7 +304,7 @@
     },
     "failureTitle": "Der Lauf ist fehlgeschlagen",
     "failureUnknown": "Die Ursache wurde nicht festgehalten.",
-    "failureHint": "Konfigurations- und Zugangsfehler werden in der Umgebung oder der Administration behoben. Der Gratislauf wurde wieder freigegeben."
+    "failureHint": "Konfigurations- und Zugangsfehler werden in der Umgebung oder der Administration behoben. Ihr Schlüssel wurde nicht verbraucht — starten Sie die Analyse danach erneut."
   },
   "Auth": {
     "title": "Anmelden oder Konto erstellen",

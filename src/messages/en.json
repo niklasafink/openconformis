@@ -304,7 +304,7 @@
     },
     "failureTitle": "The run failed",
     "failureUnknown": "The cause was not recorded.",
-    "failureHint": "Configuration and access errors are resolved in the environment or in administration. The free run has been released again."
+    "failureHint": "Configuration and access errors are resolved in the environment or in administration. Your key was not consumed — start the analysis again afterwards."
   },
   "Auth": {
     "title": "Sign in or create an account",
