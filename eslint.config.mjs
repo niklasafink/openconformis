@@ -10,7 +10,11 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     "coverage/**",
-    "enterprise-wireframe/**",
+    ".next-e2e/**",
+    // Testartefakte von Playwright: erzeugter Fremdcode, der sonst hunderte
+    // Regelverstoesse meldet und echte Befunde im Rauschen untergehen laesst.
+    "playwright-report/**",
+    "test-results/**",
     "src/app/.well-known/workflow/**",
   ]),
 ]);
