@@ -10,17 +10,23 @@ const verifier = "neon_auth_session_verifier=expired-token";
  * echter Verifier lässt sich ohne Provider nicht erzeugen.
  */
 test.describe("authentication routing", () => {
-  test("gives the application an entry point", async ({ page }) => {
+  test("sends an unauthenticated visitor to sign-in before any app step", async ({ page }) => {
+    // Die App ist kein anonymer Trichter mehr: jede Route landet vor der ersten
+    // Interaktion auf der Anmeldefläche, mit `next` als Rücksprungziel.
     await page.goto("/");
-    await expect(page).toHaveURL(/\/de\/analyses\/new\/framework$/);
+    await expect(page).toHaveURL(/\/de\/sign-in\?next=/);
 
     const german = await page.goto("/de");
     expect(german?.status()).toBeLessThan(400);
-    await expect(page).toHaveURL(/\/de\/analyses\/new\/framework$/);
+    await expect(page).toHaveURL(/\/de\/sign-in\?next=/);
 
     const english = await page.goto("/en");
     expect(english?.status()).toBeLessThan(400);
-    await expect(page).toHaveURL(/\/en\/analyses\/new\/framework$/);
+    await expect(page).toHaveURL(/\/en\/sign-in\?next=/);
+
+    const framework = await page.goto("/de/analyses/new/framework");
+    expect(framework?.status()).toBeLessThan(400);
+    await expect(page).toHaveURL(/\/de\/sign-in\?next=%2Fde%2Fanalyses%2Fnew%2Fframework/);
   });
 
   test("serves a standalone sign-in page in both locales", async ({ page }) => {

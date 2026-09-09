@@ -1,8 +1,25 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test.describe("anonymous analysis setup", () => {
+/**
+ * Die App ist kein anonymer Trichter mehr: jede Route verlangt vorab eine
+ * Sitzung (siehe `src/proxy.ts`). Diese Suite registriert deshalb vor jedem
+ * Durchlauf ein frisches Konto über das Passwort-Formular und landet danach
+ * auf dem angegebenen Ziel, bevor der eigentliche Ablauf beginnt.
+ */
+async function signUpAndLandOn(page: Page, target: string) {
+  const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.invalid`;
+  await page.goto(`/de/sign-in?next=${encodeURIComponent(target)}`);
+  await page.getByRole("tab", { name: "Passwort" }).click();
+  await page.getByRole("button", { name: "Noch kein Konto? Registrieren" }).click();
+  await page.getByLabel("E-Mail-Adresse").fill(email);
+  await page.getByLabel("Passwort", { exact: true }).fill("e2e-test-password-123!");
+  await page.getByRole("button", { name: "Konto erstellen" }).click();
+  await page.waitForURL(new RegExp(target.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")));
+}
+
+test.describe("authenticated analysis setup", () => {
   test("moves from DORA to the persisted scope without an AI call", async ({ page }) => {
-    await page.goto("/de/analyses/new/framework");
+    await signUpAndLandOn(page, "/de/analyses/new/framework");
 
     await expect(
       page.getByRole("heading", { name: "Regulatorisches Rahmenwerk wählen" }),
@@ -22,7 +39,7 @@ test.describe("anonymous analysis setup", () => {
   });
 
   test("keeps unavailable frameworks locked and searchable", async ({ page }) => {
-    await page.goto("/de/analyses/new/framework");
+    await signUpAndLandOn(page, "/de/analyses/new/framework");
 
     const lockedFramework = page.getByRole("row").filter({ hasText: "ISO 27001" });
     await expect(lockedFramework).toHaveAttribute("aria-disabled", "true");
@@ -34,8 +51,10 @@ test.describe("anonymous analysis setup", () => {
     await expect(page.getByRole("link", { name: /^DORA/ })).toHaveCount(0);
   });
 
-  test("allows the embedded sample policy in an independent anonymous draft", async ({ page }) => {
-    await page.goto("/de/analyses/new/framework?framework=dora");
+  test("allows the embedded sample policy in an independent authenticated draft", async ({
+    page,
+  }) => {
+    await signUpAndLandOn(page, "/de/analyses/new/framework?framework=dora");
     await page.getByRole("button", { name: "Weiter" }).click();
     await page.getByRole("button", { name: "Auswählen", exact: true }).click();
 
@@ -43,10 +62,13 @@ test.describe("anonymous analysis setup", () => {
     await expect(page.getByRole("heading", { name: "Prüfungsumfang und Kontext" })).toBeVisible();
   });
 
-  test("shows an interactive locked result before opening registration", async ({ page }) => {
+  test("shows the interactive locked result and the BYOK connect card", async ({ page }) => {
+    // Wer die Ergebnis-Vorschau erreicht, ist bereits angemeldet (die App lässt
+    // niemanden anders bis hierhin) — es gibt keine Registrierung mehr an
+    // dieser Stelle, sondern direkt den eigenen Modellzugang.
     const pageErrors: Error[] = [];
     page.on("pageerror", (error) => pageErrors.push(error));
-    await page.goto("/de/analyses/new/framework?framework=dora");
+    await signUpAndLandOn(page, "/de/analyses/new/framework?framework=dora");
     await page.getByRole("button", { name: "Weiter" }).click();
     await page.getByRole("button", { name: "Auswählen", exact: true }).click();
     const unevaluatedWarning = page.locator(".scope-model-warning input");
@@ -56,6 +78,18 @@ test.describe("anonymous analysis setup", () => {
 
     await expect(page).toHaveURL(/\/de\/analyses\/new\/results\?/u);
     await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toHaveCount(0);
+
+    // Wer bereits angemeldet ist, sieht sofort den eigenen Modellzugang statt
+    // einer Registrierung — der Dialog öffnet sich automatisch.
+    await expect(
+      page.getByRole("heading", { name: "Eigenen Modellzugang verbinden" }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/API-Key$/u)).toBeVisible();
+    await page.getByRole("button", { name: "Dialog schließen" }).click();
+    await expect(page.getByRole("heading", { name: "Eigenen Modellzugang verbinden" })).toHaveCount(
+      0,
+    );
+
     await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible({
       timeout: 10_000,
     });
@@ -63,24 +97,11 @@ test.describe("anonymous analysis setup", () => {
     await expect(
       page.getByRole("heading", { name: "Schulung des Leitungsorgans zu IKT-Risiken" }),
     ).toBeVisible();
-
-    await page.getByRole("button", { name: "Für Ergebnis registrieren" }).first().click();
-    await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toBeVisible();
-    await page.getByRole("tab", { name: "Passwort" }).click();
-    await page.getByLabel("E-Mail-Adresse").fill("origin-check-nobody@example.invalid");
-    await page.getByLabel("Passwort", { exact: true }).fill("not-a-real-password-123");
-    await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-    // Auf die Fehlerfläche prüfen, nicht auf den Wortlaut: der hängt davon ab, ob
-    // die Authentifizierung konfiguriert ist. In CI antwortet sie 503 und damit
-    // generisch, lokal 401 und damit „E-Mail-Adresse oder Passwort ist falsch".
-    // Die Absicht des Tests ist, dass der Fehlschlag sichtbar und ohne Absturz endet.
-    await expect(page.locator("p.auth-error")).toBeVisible();
     expect(pageErrors).toEqual([]);
-    await page.getByRole("button", { name: "Dialog schließen" }).click();
-    await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toHaveCount(0);
   });
 
   test("serves the English workflow and production security headers", async ({ page }) => {
+    await signUpAndLandOn(page, "/en/analyses/new/framework");
     const response = await page.goto("/en/analyses/new/framework");
 
     expect(response?.status()).toBe(200);
@@ -88,7 +109,7 @@ test.describe("anonymous analysis setup", () => {
     expect(response?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
     await expect(page.getByRole("heading", { name: "Select regulatory framework" })).toBeVisible();
     // Die Sidebar trägt zusätzlich die Aktion „New chat"; nur der Bereichslink zählt.
-    await expect(page.getByRole("link", { name: "Chat", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Assistant", exact: true })).toBeVisible();
   });
 });
 

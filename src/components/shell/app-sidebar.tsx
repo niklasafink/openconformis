@@ -68,6 +68,7 @@ type AppSidebarProps = Readonly<{
   labels: SidebarLabels;
   locale: AppLocale;
   projects: readonly SidebarProject[];
+  showAdministration: boolean;
   threads: readonly SidebarThread[];
   user: { name: string; email: string } | null;
   userLabels: NavUserLabels;
@@ -87,6 +88,7 @@ export function AppSidebar({
   labels,
   locale,
   projects,
+  showAdministration,
   threads,
   user,
   userLabels,
@@ -180,22 +182,24 @@ export function AppSidebar({
                 </SidebarMenuItem>
               </Collapsible>
 
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeArea === "administration"}
-                  tooltip={labels.administration}
-                >
-                  <Link
-                    href="/administration"
-                    locale={locale}
-                    aria-current={activeArea === "administration" ? "page" : undefined}
+              {showAdministration ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={activeArea === "administration"}
+                    tooltip={labels.administration}
                   >
-                    <Settings className="text-muted-foreground" />
-                    <span>{labels.administration}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+                    <Link
+                      href="/administration"
+                      locale={locale}
+                      aria-current={activeArea === "administration" ? "page" : undefined}
+                    >
+                      <Settings className="text-muted-foreground" />
+                      <span>{labels.administration}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

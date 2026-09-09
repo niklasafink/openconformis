@@ -19,11 +19,14 @@ Der frühere statische Wireframe wurde nach Prüfung seiner Referenzen entfernt.
 
 ## Produkt und Workflow
 
+0. Anmeldung oder Registrierung vor jedem Schritt. `src/proxy.ts` erzwingt eine
+   bestehende Sitzung für die gesamte App außer der Anmeldefläche selbst; ohne
+   Konto kommt niemand hinein.
 1. Rahmenwerk wählen. Nur veröffentlichte, verfügbare Rahmenwerke sind auswählbar.
 2. Eigene Policy hochladen oder Beispiel-Policy wählen; die Auswahl ist exklusiv.
 3. Prüfungsumfang und Unternehmenskontext festlegen, Modell auswählen.
-4. Vor Anmeldung ist das Ergebnis eine gesperrte Vorschau ohne Modellaufruf.
-   Nach Anmeldung verbindet der Nutzer seinen eigenen Schlüssel und startet die Analyse.
+4. Das Ergebnis ist zunächst eine gesperrte Vorschau ohne Modellaufruf; der Nutzer
+   verbindet seinen eigenen Schlüssel und startet erst dann die echte Analyse.
 5. Persistierten Fortschritt anzeigen, Ergebnisse und Belege prüfen, menschlich bestätigen,
    bei Bedarf Status begründet überschreiben und nach Excel exportieren.
 

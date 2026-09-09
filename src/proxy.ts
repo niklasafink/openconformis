@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { routing } from "@/i18n/routing";
-import { auth } from "@/server/auth";
+import { auth, isAuthenticationConfigured } from "@/server/auth";
 
 const handleInternationalization = createMiddleware(routing);
 const verifierParameter = "neon_auth_session_verifier";
@@ -20,11 +20,11 @@ function localeOf(pathname: string) {
   return routing.locales.find((locale) => locale === firstSegment) ?? routing.defaultLocale;
 }
 
-function signInRedirect(request: NextRequest, authError: string, next?: string) {
+function signInRedirect(request: NextRequest, authError?: string, next?: string) {
   const signIn = request.nextUrl.clone();
   signIn.pathname = `/${localeOf(request.nextUrl.pathname)}/sign-in`;
   signIn.search = "";
-  signIn.searchParams.set("auth_error", authError);
+  if (authError) signIn.searchParams.set("auth_error", authError);
   if (next) signIn.searchParams.set("next", next);
   return NextResponse.redirect(signIn);
 }
@@ -110,6 +110,37 @@ async function completeAuthCallback(request: NextRequest) {
   return copySetCookies(authResponse, NextResponse.redirect(target));
 }
 
+/**
+ * Erzwingt eine bestehende Sitzung, bevor irgendein Anwendungsschritt erreichbar
+ * ist. Die Analyse-Vorschau (Rahmenwerk, Policy, Umfang, Ergebnis) ist bewusst
+ * kein anonymer Trichter: nur registrierte Kundinnen und Kunden kommen in die
+ * App hinein. `auth.middleware()` wird pro Anfrage neu mit der erkannten
+ * Sprache instanziiert, weil ihre Erkennung „bin ich schon die Anmeldefläche"
+ * am konfigurierten `loginUrl` hängt — eine feste Instanz für `/de/sign-in`
+ * würde `/en/sign-in` selbst wieder zur Anmeldung umleiten.
+ */
+async function requireSession(request: NextRequest) {
+  const loginUrl = `/${localeOf(request.nextUrl.pathname)}/sign-in`;
+  const gate = auth.middleware({ loginUrl });
+  const originalTarget = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+
+  let result: NextResponse;
+  try {
+    result = await gate(request);
+  } catch {
+    // Ein nicht erreichbarer Auth-Dienst darf keinen 500 auf jeder Seite der
+    // Anwendung erzeugen; ohne bestätigte Sitzung geht es zurück zur Anmeldung.
+    return signInRedirect(request, undefined, originalTarget);
+  }
+
+  if (!result.headers.get("location")) return result;
+
+  // Die Bibliothek kopiert beim Umleiten nur die vorhandenen Suchparameter,
+  // nicht den ursprünglichen Pfad. Ohne `next` wüsste die Anmeldefläche nach
+  // erfolgreichem Login nicht, wohin sie zurückspringen soll.
+  return copySetCookies(result, signInRedirect(request, undefined, originalTarget));
+}
+
 export default async function proxy(request: NextRequest) {
   const canonicalRedirect = canonicalDevelopmentOriginRedirect(request);
   if (canonicalRedirect) return canonicalRedirect;
@@ -122,6 +153,21 @@ export default async function proxy(request: NextRequest) {
   // worden. Die Bibliothek entscheidet selbst, ob der Verifier trägt.
   if (request.nextUrl.searchParams.has(verifierParameter)) {
     return completeAuthCallback(request);
+  }
+
+  const pathname = request.nextUrl.pathname;
+  const isSignInPage = pathname === `/${localeOf(pathname)}/sign-in`;
+
+  // Derselbe Entwicklungs-Umgehungspfad wie `requireAuthenticatedSessionUser`
+  // (siehe `src/server/auth/session-user.ts`): lokal ohne konfigurierten
+  // Auth-Anbieter arbeiten können, ohne die Prüfung in Produktion aufzuweichen.
+  const isLocalAuthBypassEnabled =
+    process.env.NODE_ENV !== "production" && process.env.LOCAL_AUTH_BYPASS === "true";
+
+  if (isAuthenticationConfigured && !isSignInPage && !isLocalAuthBypassEnabled) {
+    const sessionCheck = await requireSession(request);
+    if (sessionCheck.headers.get("location")) return sessionCheck;
+    return copySetCookies(sessionCheck, await handleInternationalization(request));
   }
 
   return handleInternationalization(request);

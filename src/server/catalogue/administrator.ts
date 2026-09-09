@@ -33,3 +33,14 @@ export async function requireCatalogueAdministrator() {
 
   throw new AuthorizationDeniedError();
 }
+
+/**
+ * Nicht werfende Variante für die Sidebar: der Administration-Eintrag darf nur
+ * für berechtigte Nutzer erscheinen, sonst führt er für alle anderen in einen
+ * 404 statt gar nicht erst sichtbar zu sein.
+ */
+export async function isCatalogueAdministrator(): Promise<boolean> {
+  return requireCatalogueAdministrator()
+    .then(() => true)
+    .catch(() => false);
+}

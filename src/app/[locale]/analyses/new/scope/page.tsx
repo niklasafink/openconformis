@@ -1,7 +1,7 @@
 import { Search } from "lucide-react";
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ApplicationShell } from "@/components/shell/application-shell";
 import { LanguageMenu } from "@/components/shell/language-menu";
@@ -35,7 +35,11 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
     getDraftScopeSelection(draft),
     getAnalysisModelCatalogue(),
   ]);
-  if (!boundDraft?.frameworkSlug || !selection) notFound();
+  // Ohne aktiven Draft (kein Rahmenwerk oder keine Policy gewählt) lässt sich der
+  // Umfang nicht rekonstruieren. Der Sidebar-Schritt ist immer sichtbar, auch
+  // bevor der Ablauf begonnen wurde — ein 404 wäre eine Sackgasse statt eines
+  // Wegs zurück zum Anfang des Ablaufs.
+  if (!boundDraft?.frameworkSlug || !selection) redirect(`/${locale}/analyses/new/framework`);
   const release = await getPublishedFrameworkRelease(boundDraft.frameworkSlug);
   if (!release) notFound();
   const initialIncludedKeys =

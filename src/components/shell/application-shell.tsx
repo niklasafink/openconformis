@@ -13,6 +13,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import type { AppLocale } from "@/i18n/routing";
 import { listRecentAnalyses } from "@/server/analyses/read-analysis";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
+import { isCatalogueAdministrator } from "@/server/catalogue/administrator";
 import { listRecentChatThreads } from "@/server/chat/service";
 
 type ApplicationShellProps = Readonly<{
@@ -58,7 +59,7 @@ export async function ApplicationShell({
     failed: analysisRunT("status.failed"),
     cancelled: analysisRunT("status.cancelled"),
   };
-  const [threads, projects] = await Promise.all([
+  const [threads, projects, isAdmin] = await Promise.all([
     user
       ? listRecentChatThreads()
           .then((rows) => rows.map((row) => ({ id: row.id, title: row.title })))
@@ -76,6 +77,7 @@ export async function ApplicationShell({
           )
           .catch(() => [])
       : Promise.resolve<SidebarProject[]>([]),
+    user ? isCatalogueAdministrator() : Promise.resolve(false),
   ]);
   const sidebarCookie = cookieStore.get("sidebar_state")?.value;
   const defaultOpen = sidebarCookie === undefined ? true : sidebarCookie === "true";
@@ -89,6 +91,7 @@ export async function ApplicationShell({
         locale={locale}
         threads={threads}
         projects={projects}
+        showAdministration={isAdmin}
         user={user ? { name: user.name, email: user.email } : null}
         labels={{
           brand: t("brand"),
