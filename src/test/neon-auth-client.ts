@@ -12,5 +12,7 @@ export function createAuthClient() {
       email: async () => noSession,
     },
     signOut: async () => noSession,
+    requestPasswordReset: async () => ({ data: { status: true, message: "" }, error: null }),
+    resetPassword: async () => ({ data: { status: true }, error: null }),
   };
 }

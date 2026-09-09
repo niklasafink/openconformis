@@ -8,11 +8,11 @@ import { expect, test, type Page } from "@playwright/test";
  */
 async function signUpAndLandOn(page: Page, target: string) {
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.invalid`;
-  await page.goto(`/de/sign-in?next=${encodeURIComponent(target)}`);
-  await page.getByRole("tab", { name: "Passwort" }).click();
-  await page.getByRole("button", { name: "Noch kein Konto? Registrieren" }).click();
+  const password = "e2e-test-password-123!";
+  await page.goto(`/de/sign-up?next=${encodeURIComponent(target)}`);
   await page.getByLabel("E-Mail-Adresse").fill(email);
-  await page.getByLabel("Passwort", { exact: true }).fill("e2e-test-password-123!");
+  await page.getByLabel("Passwort", { exact: true }).fill(password);
+  await page.getByLabel("Passwort bestätigen").fill(password);
   await page.getByRole("button", { name: "Konto erstellen" }).click();
   await page.waitForURL(new RegExp(target.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")));
 }

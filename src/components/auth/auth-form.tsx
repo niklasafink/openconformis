@@ -1,88 +1,48 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
+import { classifyAuthFailure } from "@/components/auth/classify-auth-failure";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Link } from "@/i18n/navigation";
+import type { AppLocale } from "@/i18n/routing";
 import { authClient } from "@/lib/auth-client";
 
-export type AuthFormLabels = {
-  email: string;
-  magicLink: string;
-  magicLinkResend: string;
-  emailSent: string;
-  magicLinkBrowserHint: string;
-  magicLinkMode: string;
-  passwordMode: string;
-  password: string;
-  signIn: string;
-  signUp: string;
-  switchToSignIn: string;
-  switchToSignUp: string;
-  authFailed: string;
-  accountExists: string;
-  invalidCredentials: string;
-  passwordTooShort: string;
-  tooManyAttempts: string;
-  google: string;
-  microsoft: string;
-  or: string;
-};
+export type AuthFormMode = "sign-in" | "sign-up";
 
 export type AuthFormProps = {
+  mode: AuthFormMode;
+  locale: AppLocale;
   /** Absolutes oder relatives Ziel, auf das der Provider nach Erfolg zurückspringt. */
   callbackUrl: string;
   initialError?: boolean;
-  labels: AuthFormLabels;
+  /**
+   * Ziel für den Umschalter zwischen Anmeldung und Registrierung. Gesetzt auf
+   * den eigenständigen Seiten, die den jeweils anderen Modus über eine eigene
+   * URL abbilden. Fehlt er (eingebettete Vorschau-Anmeldung), wechselt der
+   * Umschalter stattdessen den lokalen Zustand, ohne die Seite zu verlassen.
+   */
+  switchHref?: string;
 };
 
-type AuthFailure =
-  "generic" | "accountExists" | "invalidCredentials" | "passwordTooShort" | "tooManyAttempts";
+type LocalFailure = ReturnType<typeof classifyAuthFailure> | "passwordMismatch";
 
-/**
- * Übersetzt den Fehler des Anbieters in einen Fall, den der Nutzer selbst
- * auflösen kann. Ohne diese Zuordnung sah jemand, der sich mit einer bereits
- * registrierten Adresse anmelden wollte, nur „Die Anmeldung konnte nicht
- * abgeschlossen werden." — ohne den einen Hinweis, der weitergeholfen hätte.
- *
- * Der Client wirft `AuthApiError` und führt dort nur einen groben `code`
- * ("validation_failed"); der genaue Grund steht ausschließlich in der Meldung.
- * Deshalb wird beides ausgewertet. Die Meldungen sind englische Anbietertexte —
- * `classifyAuthFailure` ist exportiert, damit diese Abhängigkeit getestet ist und
- * ein Formulierungswechsel beim Anbieter nicht still zur Sackgasse zurückführt.
- */
-export function classifyAuthFailure(error: unknown): AuthFailure {
-  const shape = (error ?? {}) as { code?: unknown; message?: unknown; status?: unknown };
-  const code = typeof shape.code === "string" ? shape.code.toUpperCase() : "";
-  const message = typeof shape.message === "string" ? shape.message.toLowerCase() : "";
-  const status = typeof shape.status === "number" ? shape.status : undefined;
-
-  if (code.includes("USER_ALREADY_EXISTS") || message.includes("already exists")) {
-    return "accountExists";
-  }
-  if (
-    code.includes("INVALID_EMAIL_OR_PASSWORD") ||
-    message.includes("invalid email or password") ||
-    message.includes("invalid password")
-  ) {
-    return "invalidCredentials";
-  }
-  if (
-    message.includes("password") &&
-    (message.includes("too short") || message.includes("at least") || message.includes("too long"))
-  ) {
-    return "passwordTooShort";
-  }
-  if (status === 429 || message.includes("too many")) return "tooManyAttempts";
-  if (status === 401) return "invalidCredentials";
-  return "generic";
-}
-
-export function AuthForm({ callbackUrl, initialError = false, labels }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  locale,
+  callbackUrl,
+  initialError = false,
+  switchHref,
+}: AuthFormProps) {
+  const t = useTranslations("Auth");
+  const [currentMode, setCurrentMode] = useState<AuthFormMode>(mode);
   const [email, setEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
-  const [mode, setMode] = useState<"magic-link" | "password">("magic-link");
-  const [passwordAction, setPasswordAction] = useState<"sign-in" | "sign-up">("sign-in");
   const [password, setPassword] = useState("");
-  const [failure, setFailure] = useState<AuthFailure | null>(initialError ? "generic" : null);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [failure, setFailure] = useState<LocalFailure | null>(initialError ? "generic" : null);
   const [pending, setPending] = useState(false);
 
   function absoluteCallbackUrl() {
@@ -92,32 +52,18 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
     ).toString();
   }
 
-  async function sendMagicLink(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
-    setFailure(null);
-    try {
-      const result = await authClient.signIn.magicLink({
-        email,
-        callbackURL: absoluteCallbackUrl(),
-      });
-      if (result.error) setFailure(classifyAuthFailure(result.error));
-      else setEmailSent(true);
-    } catch (thrown) {
-      setFailure(classifyAuthFailure(thrown));
-    } finally {
-      setPending(false);
+    if (currentMode === "sign-up" && password !== confirmPassword) {
+      setFailure("passwordMismatch");
+      return;
     }
-  }
-
-  async function submitPassword(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
     setPending(true);
     setFailure(null);
     try {
       const callbackURL = absoluteCallbackUrl();
       const result =
-        passwordAction === "sign-in"
+        currentMode === "sign-in"
           ? await authClient.signIn.email({ email, password, callbackURL })
           : await authClient.signUp.email({
               email,
@@ -130,7 +76,7 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
         setFailure(classified);
         // Wer bereits ein Konto hat, will sich anmelden, nicht registrieren.
         // Den Umschalter selbst zu finden ist eine unnötige Hürde.
-        if (classified === "accountExists") setPasswordAction("sign-in");
+        if (classified === "accountExists") setCurrentMode("sign-in");
         return;
       }
 
@@ -141,73 +87,44 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
     } catch (thrown) {
       const classified = classifyAuthFailure(thrown);
       setFailure(classified);
-      if (classified === "accountExists") setPasswordAction("sign-in");
+      if (classified === "accountExists") setCurrentMode("sign-in");
     } finally {
       setPending(false);
       setPassword("");
+      setConfirmPassword("");
     }
   }
 
-  async function signInSocial(provider: "google" | "microsoft") {
-    setFailure(null);
-    try {
-      const result = await authClient.signIn.social({
-        provider,
-        callbackURL: absoluteCallbackUrl(),
-      });
-      if (result.error) setFailure(classifyAuthFailure(result.error));
-    } catch (thrown) {
-      setFailure(classifyAuthFailure(thrown));
-    }
-  }
+  const failureMessage =
+    failure === "accountExists"
+      ? t("accountExists")
+      : failure === "invalidCredentials"
+        ? t("invalidCredentials")
+        : failure === "passwordTooShort"
+          ? t("passwordTooShort")
+          : failure === "tooManyAttempts"
+            ? t("tooManyAttempts")
+            : failure === "passwordMismatch"
+              ? t("passwordMismatch")
+              : failure === "generic"
+                ? t("authFailed")
+                : null;
 
   return (
     <>
-      <div className="auth-modes" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "magic-link"}
-          onClick={() => setMode("magic-link")}
+      {failureMessage ? (
+        <p
+          className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
         >
-          {labels.magicLinkMode}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "password"}
-          onClick={() => setMode("password")}
-        >
-          {labels.passwordMode}
-        </button>
-      </div>
-
-      {failure ? (
-        <p className="auth-error" role="alert">
-          {failure === "accountExists"
-            ? labels.accountExists
-            : failure === "invalidCredentials"
-              ? labels.invalidCredentials
-              : failure === "passwordTooShort"
-                ? labels.passwordTooShort
-                : failure === "tooManyAttempts"
-                  ? labels.tooManyAttempts
-                  : labels.authFailed}
+          {failureMessage}
         </p>
       ) : null}
 
-      {emailSent && mode === "magic-link" ? (
-        <div className="auth-email-sent" role="status">
-          {labels.emailSent}
-          <small>{labels.magicLinkBrowserHint}</small>
-          <button type="button" className="auth-switch" onClick={() => setEmailSent(false)}>
-            {labels.magicLinkResend}
-          </button>
-        </div>
-      ) : mode === "magic-link" ? (
-        <form onSubmit={sendMagicLink}>
-          <label htmlFor="auth-email">{labels.email}</label>
-          <input
+      <form className="grid gap-4" onSubmit={submit}>
+        <div className="grid gap-1.5">
+          <Label htmlFor="auth-email">{t("email")}</Label>
+          <Input
             id="auth-email"
             name="email"
             type="email"
@@ -216,59 +133,101 @@ export function AuthForm({ callbackUrl, initialError = false, labels }: AuthForm
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <button className="button button-primary" type="submit" disabled={pending}>
-            {labels.magicLink}
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={submitPassword}>
-          <label htmlFor="auth-password-email">{labels.email}</label>
-          <input
-            id="auth-password-email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <label htmlFor="auth-password">{labels.password}</label>
-          <input
+        </div>
+
+        <div className="grid gap-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="auth-password">{t("password")}</Label>
+            {currentMode === "sign-in" ? (
+              <Link
+                href="/forgot-password"
+                locale={locale}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {t("forgotPassword")}
+              </Link>
+            ) : null}
+          </div>
+          <Input
             id="auth-password"
             name="password"
             type="password"
             required
             minLength={8}
-            autoComplete={passwordAction === "sign-in" ? "current-password" : "new-password"}
+            autoComplete={currentMode === "sign-in" ? "current-password" : "new-password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <button className="button button-primary" type="submit" disabled={pending}>
-            {passwordAction === "sign-in" ? labels.signIn : labels.signUp}
-          </button>
+        </div>
+
+        {currentMode === "sign-up" ? (
+          <div className="grid gap-1.5">
+            <Label htmlFor="auth-confirm-password">{t("confirmPassword")}</Label>
+            <Input
+              id="auth-confirm-password"
+              name="confirmPassword"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </div>
+        ) : null}
+
+        {currentMode === "sign-up" ? (
+          <p className="text-sm text-muted-foreground">
+            {t.rich("termsAgreement", {
+              terms: (chunks) => (
+                <Link
+                  href="/terms"
+                  locale={locale}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {chunks}
+                </Link>
+              ),
+              privacy: (chunks) => (
+                <Link
+                  href="/privacy"
+                  locale={locale}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
+        ) : null}
+
+        <Button type="submit" disabled={pending} className="mt-1 w-full rounded-full">
+          {currentMode === "sign-in" ? t("signIn") : t("signUp")}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        {currentMode === "sign-in" ? t("dontHaveAccount") : t("alreadyHaveAccount")}{" "}
+        {switchHref ? (
+          <Link
+            href={switchHref}
+            locale={locale}
+            className="font-medium text-foreground hover:underline"
+          >
+            {currentMode === "sign-in" ? t("signUpLink") : t("signInLink")}
+          </Link>
+        ) : (
           <button
-            className="auth-switch"
             type="button"
+            className="font-medium text-foreground hover:underline"
             onClick={() =>
-              setPasswordAction((current) => (current === "sign-in" ? "sign-up" : "sign-in"))
+              setCurrentMode((current) => (current === "sign-in" ? "sign-up" : "sign-in"))
             }
           >
-            {passwordAction === "sign-in" ? labels.switchToSignUp : labels.switchToSignIn}
+            {currentMode === "sign-in" ? t("signUpLink") : t("signInLink")}
           </button>
-        </form>
-      )}
-
-      <div className="auth-divider">
-        <span>{labels.or}</span>
-      </div>
-      <div className="auth-social-actions">
-        <button type="button" onClick={() => void signInSocial("google")}>
-          {labels.google}
-        </button>
-        <button type="button" onClick={() => void signInSocial("microsoft")}>
-          {labels.microsoft}
-        </button>
-      </div>
+        )}
+      </p>
     </>
   );
 }

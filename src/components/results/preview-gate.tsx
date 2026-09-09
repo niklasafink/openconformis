@@ -4,9 +4,10 @@ import { Check, LoaderCircle, LockKeyhole, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { AuthForm, type AuthFormLabels } from "@/components/auth/auth-form";
+import { AuthForm } from "@/components/auth/auth-form";
 import { authClient } from "@/lib/auth-client";
 import type { AiRouteProvider } from "@/domain/ai/provider";
+import type { AppLocale } from "@/i18n/routing";
 import {
   AnalysisResultsWorkspace,
   type AnalysisResultLabels,
@@ -19,7 +20,7 @@ type PreviewGateProps = {
   authCallbackError?: string;
   localAuthBypass?: boolean;
   draftId: string;
-  locale: string;
+  locale: AppLocale;
   frameworkSlug: string;
   policyName: string;
   organizationContext: string;
@@ -32,7 +33,7 @@ type PreviewGateProps = {
     routeProviderLabel: string;
     credentialHelpUrl: string;
   };
-  labels: AuthFormLabels & {
+  labels: {
     preparing: string;
     parsing: string;
     mapping: string;
@@ -297,9 +298,10 @@ export function PreviewGate({
                 <h1 id="preview-dialog-title">{labels.lockedTitle}</h1>
                 <p>{labels.lockedBody}</p>
                 <AuthForm
+                  mode="sign-in"
+                  locale={locale}
                   callbackUrl={callbackUrl}
                   initialError={Boolean(authCallbackError)}
-                  labels={labels}
                 />
               </>
             )}

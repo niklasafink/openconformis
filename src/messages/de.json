@@ -202,21 +202,6 @@
     "startFailed": "Die Analyse konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
     "lockedTitle": "Ergebnis freischalten",
     "lockedBody": "Registrieren Sie sich kostenlos. Die echte Analyse läuft danach über Ihren eigenen API-Schlüssel; der Vorschaulauf ruft kein Modell auf.",
-    "email": "E-Mail-Adresse",
-    "magicLink": "Anmeldelink senden",
-    "emailSent": "Der Anmeldelink wurde gesendet.",
-    "magicLinkBrowserHint": "Lassen Sie diesen Tab geöffnet und öffnen Sie den Link im selben Browserprofil.",
-    "magicLinkMode": "Anmeldelink",
-    "passwordMode": "Passwort",
-    "password": "Passwort",
-    "signIn": "Anmelden",
-    "signUp": "Konto erstellen",
-    "switchToSignIn": "Bereits registriert? Anmelden",
-    "switchToSignUp": "Noch kein Konto? Registrieren",
-    "authFailed": "Die Anmeldung konnte nicht abgeschlossen werden.",
-    "google": "Mit Google fortfahren",
-    "microsoft": "Mit Microsoft fortfahren",
-    "or": "oder",
     "byokTitle": "Eigenen Modellzugang verbinden",
     "byokBody": "Die Analyse läuft über Ihren eigenen API-Schlüssel. Er wird nur für diesen Lauf verschlüsselt gespeichert und spätestens nach 24 Stunden gelöscht.",
     "selectedModel": "Ausgewähltes Modell",
@@ -227,11 +212,6 @@
     "unlockResult": "Für Ergebnis registrieren",
     "close": "Dialog schließen",
     "goToSignIn": "Zur Anmeldung",
-    "magicLinkResend": "Link erneut senden",
-    "accountExists": "Für diese E-Mail-Adresse gibt es bereits ein Konto. Melden Sie sich stattdessen an.",
-    "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
-    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
-    "tooManyAttempts": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
     "step": "Schritt 4 von 4"
   },
   "AnalysisRun": {
@@ -307,28 +287,122 @@
     "failureHint": "Konfigurations- und Zugangsfehler werden in der Umgebung oder der Administration behoben. Ihr Schlüssel wurde nicht verbraucht — starten Sie die Analyse danach erneut."
   },
   "Auth": {
-    "title": "Anmelden oder Konto erstellen",
-    "body": "Melden Sie sich an, um eine Analyse zu starten und Ergebnisse einzusehen. Die Registrierung ist kostenlos.",
+    "signInTitle": "Anmelden",
+    "signUpTitle": "Konto erstellen",
     "linkInvalid": "Der Anmeldelink ist abgelaufen oder wurde bereits verwendet. Fordern Sie einen neuen Link an.",
     "email": "E-Mail-Adresse",
-    "magicLink": "Anmeldelink senden",
-    "magicLinkResend": "Link erneut senden",
-    "emailSent": "Der Anmeldelink wurde gesendet.",
-    "magicLinkBrowserHint": "Lassen Sie diesen Tab geöffnet und öffnen Sie den Link im selben Browserprofil.",
-    "magicLinkMode": "Anmeldelink",
-    "passwordMode": "Passwort",
     "password": "Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "forgotPassword": "Passwort vergessen?",
     "signIn": "Anmelden",
     "signUp": "Konto erstellen",
-    "switchToSignIn": "Bereits registriert? Anmelden",
-    "switchToSignUp": "Noch kein Konto? Registrieren",
+    "dontHaveAccount": "Noch kein Konto?",
+    "signUpLink": "Registrieren",
+    "alreadyHaveAccount": "Bereits registriert?",
+    "signInLink": "Anmelden",
+    "termsAgreement": "Mit der Registrierung stimmen Sie unseren <terms>Nutzungsbedingungen</terms> und unserer <privacy>Datenschutzerklärung</privacy> zu.",
     "authFailed": "Die Anmeldung konnte nicht abgeschlossen werden.",
-    "google": "Mit Google fortfahren",
-    "microsoft": "Mit Microsoft fortfahren",
-    "or": "oder",
     "accountExists": "Für diese E-Mail-Adresse gibt es bereits ein Konto. Melden Sie sich stattdessen an.",
     "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
     "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+    "passwordMismatch": "Die Passwörter stimmen nicht überein.",
     "tooManyAttempts": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut."
+  },
+  "ForgotPassword": {
+    "title": "Passwort vergessen?",
+    "body": "Geben Sie Ihre E-Mail-Adresse ein. Wenn dazu ein Konto besteht, senden wir Ihnen einen Link zum Zurücksetzen des Passworts.",
+    "submit": "Link senden",
+    "sent": "Wenn ein Konto mit dieser E-Mail-Adresse besteht, wurde ein Link zum Zurücksetzen des Passworts gesendet.",
+    "backToSignIn": "Zurück zur Anmeldung"
+  },
+  "ResetPassword": {
+    "title": "Neues Passwort festlegen",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "submit": "Passwort speichern",
+    "success": "Ihr Passwort wurde geändert. Sie können sich jetzt anmelden.",
+    "invalidToken": "Dieser Link ist ungültig oder abgelaufen.",
+    "requestNewLink": "Neuen Link anfordern",
+    "backToSignIn": "Zurück zur Anmeldung"
+  },
+  "Terms": {
+    "title": "Nutzungsbedingungen",
+    "intro": "Diese Nutzungsbedingungen gelten für die Nutzung von OpenConformis, bereitgestellt von der Neura Labs UG (haftungsbeschränkt). Mit der Registrierung erkennen Sie sie an.",
+    "sections": [
+      {
+        "heading": "Leistungsbeschreibung",
+        "body": "OpenConformis vergleicht eine hochgeladene PDF- oder DOCX-Policy mit einem versionierten regulatorischen Rahmenwerk und erstellt eine Vorbewertung mit Belegen aus dem Originaldokument. Die Anwendung ersetzt keine Rechts- oder Compliance-Beratung und liefert keine verbindliche regulatorische Aussage."
+      },
+      {
+        "heading": "Konto und Zugang",
+        "body": "Jeder Analyse- und Chat-Schritt setzt ein bestehendes Konto voraus. Sie sind für die Vertraulichkeit Ihrer Zugangsdaten verantwortlich und melden einen Missbrauchsverdacht unverzüglich."
+      },
+      {
+        "heading": "Eigener KI-Schlüssel (BYOK)",
+        "body": "Jede echte Analyse und jeder Chat-Aufruf läuft ausschließlich über einen eigenen API-Schlüssel bei einem von Ihnen gewählten Anbieter. Es gibt keinen Betreiber-Schlüssel und keinen kostenlosen Lauf. Nicht evaluierte Modelle sind vor der Auswahl deutlich gekennzeichnet."
+      },
+      {
+        "heading": "Kein automatisches Ergebnis",
+        "body": "Die KI entscheidet nicht endgültig. Jede Bewertung braucht eine menschliche Bestätigung; ein begründeter Override bleibt jederzeit möglich. Nicht einschlägige Anforderungen benötigen eine Begründung im Ergebnis und im Export."
+      },
+      {
+        "heading": "Grenzen und Gewährleistung",
+        "body": "Für den von Ihnen gewählten KI-Anbieter gibt es keine Zusicherung zu EU-Hosting oder Zero-Data-Retention; dessen eigene Bedingungen gelten zusätzlich. Der Testbetrieb ist ausschließlich für Test- und nicht vertrauliche Dokumente vorgesehen und stellt keine Rechtsberatung dar."
+      },
+      {
+        "heading": "Lizenz und kommerzielle Nutzung",
+        "body": "Der Anwendungscode steht unter der PolyForm Noncommercial 1.0.0-Lizenz, keine OSI-Open-Source-Lizenz. Eigene Dokumentation und Beispieldaten stehen unter CC BY-NC 4.0. Kommerzielle Nutzung erfordert eine gesonderte schriftliche Lizenz der Neura Labs UG (haftungsbeschränkt)."
+      },
+      {
+        "heading": "Verfügbarkeit und Änderungen",
+        "body": "Als Evaluierungsangebot kann sich der Funktionsumfang ändern; einzelne Modellrouten können gesperrt werden, wenn sie technisch nicht funktionsfähig sind. Diese Bedingungen können bei Weiterentwicklung angepasst werden; die fortgesetzte Nutzung nach einer Änderung gilt als Zustimmung."
+      },
+      {
+        "heading": "Kontakt",
+        "body": "Fragen zu diesen Bedingungen richten Sie an info@conformisgrc.com."
+      }
+    ]
+  },
+  "Privacy": {
+    "title": "Datenschutzerklärung",
+    "intro": "Diese Erklärung beschreibt, welche Daten OpenConformis verarbeitet, betrieben von der Neura Labs UG (haftungsbeschränkt), und wie lange sie aufbewahrt werden.",
+    "sections": [
+      {
+        "heading": "Verantwortliche Stelle",
+        "body": "Neura Labs UG (haftungsbeschränkt), erreichbar über info@conformisgrc.com."
+      },
+      {
+        "heading": "Kontodaten",
+        "body": "E-Mail-Adresse, Name und Sitzungsdaten für Anmeldung und Registrierung."
+      },
+      {
+        "heading": "Policy-Inhalte",
+        "body": "Hochgeladene Original-Policies, daraus abgeleiteter Analysetext, Bewertungen, Belege und der von Ihnen eingegebene Unternehmenskontext. Originaldokumente werden spätestens 24 Stunden nach Abschluss der Analyse gelöscht, verwaiste anonyme Uploads nach 24 Stunden. Voller Text und Embeddings werden nach 7 Tagen ohne Aktivität gelöscht, spätestens nach 30 Tagen."
+      },
+      {
+        "heading": "Eigener KI-Schlüssel",
+        "body": "Ihr Schlüssel wird verschlüsselt und nur kurzlebig gespeichert, gebunden an Nutzer, Sitzung, Zweck und Entwurf. Er wird nach Abschluss des Laufs oder spätestens nach 24 Stunden gelöscht und erscheint nie in URLs, Browser-Speicher, Protokollen, Audit-Metadaten oder Workflow-Nutzlasten."
+      },
+      {
+        "heading": "Weitergabe an Dritte",
+        "body": "Analyseinhalte werden ausschließlich an den von Ihnen gewählten KI-Anbieter und das von Ihnen gewählte Modell übermittelt, mit Ihrem eigenen Schlüssel. OpenConformis betreibt kein eigenes Modell und ist anbieterneutral; für diesen Anbieter gibt es keine Zusicherung zu EU-Hosting oder Zero-Data-Retention — dessen eigene Datenschutzerklärung gilt zusätzlich."
+      },
+      {
+        "heading": "Infrastruktur",
+        "body": "Die Anwendung selbst läuft auf Vercel in Frankfurt; Datenbank und Authentifizierung laufen über Neon, ebenfalls in Frankfurt."
+      },
+      {
+        "heading": "Aufbewahrung und Löschung",
+        "body": "Ergebnisse, Belege und Prüfverlauf bleiben mit Ihrem Konto verknüpft, bis Sie sie oder das Konto löschen. Eine Kontolöschung beendet den Zugriff sofort; die Löschung verknüpfter Policy-Daten wird innerhalb von 24 Stunden abgeschlossen."
+      },
+      {
+        "heading": "Ihre Rechte",
+        "body": "Auskunft, Berichtigung und Löschung Ihrer Kontodaten auf Anfrage an info@conformisgrc.com."
+      },
+      {
+        "heading": "Cookies",
+        "body": "Für die Sitzung ist ein technisch notwendiges Cookie erforderlich. Es gibt keine Marketing- oder Tracking-Cookies."
+      }
+    ]
   }
 }

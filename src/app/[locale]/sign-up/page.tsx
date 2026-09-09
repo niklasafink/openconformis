@@ -8,15 +8,15 @@ import { routing } from "@/i18n/routing";
 import { safeInternalPath } from "@/lib/safe-redirect";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 
-type SignInPageProps = Readonly<{
+type SignUpPageProps = Readonly<{
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ next?: string; auth_error?: string }>;
+  searchParams: Promise<{ next?: string }>;
 }>;
 
 export const dynamic = "force-dynamic";
 
-export default async function SignInPage({ params, searchParams }: SignInPageProps) {
-  const [{ locale }, { next, auth_error: authError }] = await Promise.all([params, searchParams]);
+export default async function SignUpPage({ params, searchParams }: SignUpPageProps) {
+  const [{ locale }, { next }] = await Promise.all([params, searchParams]);
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
@@ -27,21 +27,12 @@ export default async function SignInPage({ params, searchParams }: SignInPagePro
   const t = await getTranslations("Auth");
 
   return (
-    <AuthPageShell locale={locale} pathname="/sign-in" title={t("signInTitle")}>
-      {authError ? (
-        <p
-          className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-          role="alert"
-        >
-          {t("linkInvalid")}
-        </p>
-      ) : null}
-
+    <AuthPageShell locale={locale} pathname="/sign-up" title={t("signUpTitle")}>
       <AuthForm
-        mode="sign-in"
+        mode="sign-up"
         locale={locale}
         callbackUrl={target}
-        switchHref={`/sign-up?next=${encodeURIComponent(target)}`}
+        switchHref={`/sign-in?next=${encodeURIComponent(target)}`}
       />
     </AuthPageShell>
   );

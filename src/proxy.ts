@@ -156,7 +156,19 @@ export default async function proxy(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname;
-  const isSignInPage = pathname === `/${localeOf(pathname)}/sign-in`;
+  // Anmeldung, Registrierung, Passwort-Wiederherstellung sowie die rechtlichen
+  // Seiten müssen ohne bestehende Sitzung erreichbar sein — die Registrierung
+  // verlinkt vor Kontoerstellung auf Nutzungsbedingungen und Datenschutz.
+  const publicAuthPages = new Set([
+    "sign-in",
+    "sign-up",
+    "forgot-password",
+    "reset-password",
+    "terms",
+    "privacy",
+  ]);
+  const [, , secondSegment] = pathname.split("/");
+  const isPublicAuthPage = publicAuthPages.has(secondSegment ?? "");
 
   // Derselbe Entwicklungs-Umgehungspfad wie `requireAuthenticatedSessionUser`
   // (siehe `src/server/auth/session-user.ts`): lokal ohne konfigurierten
@@ -164,7 +176,7 @@ export default async function proxy(request: NextRequest) {
   const isLocalAuthBypassEnabled =
     process.env.NODE_ENV !== "production" && process.env.LOCAL_AUTH_BYPASS === "true";
 
-  if (isAuthenticationConfigured && !isSignInPage && !isLocalAuthBypassEnabled) {
+  if (isAuthenticationConfigured && !isPublicAuthPage && !isLocalAuthBypassEnabled) {
     const sessionCheck = await requireSession(request);
     if (sessionCheck.headers.get("location")) return sessionCheck;
     return copySetCookies(sessionCheck, await handleInternationalization(request));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyAuthFailure } from "./auth-form";
+import { classifyAuthFailure } from "./classify-auth-failure";
 
 /**
  * Die Fälle unten sind echte Antworten von Neon Auth, mitgeschnitten im Browser.

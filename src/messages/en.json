@@ -202,21 +202,6 @@
     "startFailed": "The analysis could not be started. Please try again.",
     "lockedTitle": "Unlock result",
     "lockedBody": "Register for free. The real analysis then runs on your own API key; the preview does not call any model.",
-    "email": "Email address",
-    "magicLink": "Send sign-in link",
-    "emailSent": "The sign-in link has been sent.",
-    "magicLinkBrowserHint": "Keep this tab open and open the link in the same browser profile.",
-    "magicLinkMode": "Sign-in link",
-    "passwordMode": "Password",
-    "password": "Password",
-    "signIn": "Sign in",
-    "signUp": "Create account",
-    "switchToSignIn": "Already registered? Sign in",
-    "switchToSignUp": "No account yet? Register",
-    "authFailed": "Authentication could not be completed.",
-    "google": "Continue with Google",
-    "microsoft": "Continue with Microsoft",
-    "or": "or",
     "byokTitle": "Connect your model access",
     "byokBody": "The analysis runs on your own API key. It is stored encrypted for this run only and deleted within 24 hours at the latest.",
     "selectedModel": "Selected model",
@@ -227,11 +212,6 @@
     "unlockResult": "Register to view result",
     "close": "Close dialog",
     "goToSignIn": "Go to sign-in",
-    "magicLinkResend": "Send the link again",
-    "accountExists": "An account already exists for this email address. Sign in instead.",
-    "invalidCredentials": "The email address or password is incorrect.",
-    "passwordTooShort": "The password must be at least 8 characters long.",
-    "tooManyAttempts": "Too many attempts. Please wait a moment and try again.",
     "step": "Step 4 of 4"
   },
   "AnalysisRun": {
@@ -307,28 +287,122 @@
     "failureHint": "Configuration and access errors are resolved in the environment or in administration. Your key was not consumed — start the analysis again afterwards."
   },
   "Auth": {
-    "title": "Sign in or create an account",
-    "body": "Sign in to start an analysis and view results. Registration is free.",
+    "signInTitle": "Log in",
+    "signUpTitle": "Sign up",
     "linkInvalid": "The sign-in link has expired or was already used. Request a new link.",
-    "email": "Email address",
-    "magicLink": "Send sign-in link",
-    "magicLinkResend": "Send the link again",
-    "emailSent": "The sign-in link has been sent.",
-    "magicLinkBrowserHint": "Keep this tab open and open the link in the same browser profile.",
-    "magicLinkMode": "Sign-in link",
-    "passwordMode": "Password",
+    "email": "Email",
     "password": "Password",
-    "signIn": "Sign in",
-    "signUp": "Create account",
-    "switchToSignIn": "Already registered? Sign in",
-    "switchToSignUp": "No account yet? Register",
+    "confirmPassword": "Confirm password",
+    "forgotPassword": "Forgot password?",
+    "signIn": "Log in",
+    "signUp": "Sign up",
+    "dontHaveAccount": "Don't have an account?",
+    "signUpLink": "Sign up",
+    "alreadyHaveAccount": "Have an account?",
+    "signInLink": "Log in",
+    "termsAgreement": "By signing up, you agree to our <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
     "authFailed": "Sign-in could not be completed.",
-    "google": "Continue with Google",
-    "microsoft": "Continue with Microsoft",
-    "or": "or",
     "accountExists": "An account already exists for this email address. Sign in instead.",
     "invalidCredentials": "The email address or password is incorrect.",
     "passwordTooShort": "The password must be at least 8 characters long.",
+    "passwordMismatch": "The passwords do not match.",
     "tooManyAttempts": "Too many attempts. Please wait a moment and try again."
+  },
+  "ForgotPassword": {
+    "title": "Forgot password?",
+    "body": "Enter your email address. If an account exists for it, we'll send you a link to reset your password.",
+    "submit": "Send reset link",
+    "sent": "If an account exists for this email address, a password reset link has been sent.",
+    "backToSignIn": "Back to sign in"
+  },
+  "ResetPassword": {
+    "title": "Set a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "submit": "Save password",
+    "success": "Your password has been changed. You can now sign in.",
+    "invalidToken": "This link is invalid or has expired.",
+    "requestNewLink": "Request a new link",
+    "backToSignIn": "Back to sign in"
+  },
+  "Terms": {
+    "title": "Terms of Use",
+    "intro": "These terms of use govern the use of OpenConformis, provided by Neura Labs UG (haftungsbeschränkt). By registering, you accept them.",
+    "sections": [
+      {
+        "heading": "Description of service",
+        "body": "OpenConformis compares an uploaded PDF or DOCX policy against a versioned regulatory framework and produces a preliminary assessment grounded in evidence from the original document. The application does not replace legal or compliance advice and does not provide a binding regulatory determination."
+      },
+      {
+        "heading": "Account and access",
+        "body": "Every analysis and chat step requires an existing account. You are responsible for keeping your credentials confidential and must report any suspected misuse without delay."
+      },
+      {
+        "heading": "Bring your own AI key (BYOK)",
+        "body": "Every real analysis and chat call runs exclusively on your own API key with a provider of your choosing. There is no operator key and no free run. Unevaluated models are clearly flagged before you select them."
+      },
+      {
+        "heading": "No automatic outcome",
+        "body": "The AI does not make the final determination. Every assessment requires human confirmation; a justified override remains possible at any time. Requirements found not applicable still require a reasoned explanation in the result and in the export."
+      },
+      {
+        "heading": "Limits and warranty",
+        "body": "There is no guarantee of EU hosting or zero data retention at the AI provider you choose; that provider's own terms apply in addition. The evaluation service is intended only for test and non-confidential documents and does not constitute legal advice."
+      },
+      {
+        "heading": "License and commercial use",
+        "body": "The application code is licensed under PolyForm Noncommercial 1.0.0, not an OSI open-source license. Original documentation and sample data are licensed under CC BY-NC 4.0. Commercial use requires a separate written license from Neura Labs UG (haftungsbeschränkt)."
+      },
+      {
+        "heading": "Availability and changes",
+        "body": "As an evaluation offering, the feature set may change; individual model routes may be locked if they are not technically functional. These terms may be updated as the product evolves; continued use after a change constitutes acceptance."
+      },
+      {
+        "heading": "Contact",
+        "body": "Questions about these terms go to info@conformisgrc.com."
+      }
+    ]
+  },
+  "Privacy": {
+    "title": "Privacy Policy",
+    "intro": "This notice describes what data OpenConformis, operated by Neura Labs UG (haftungsbeschränkt), processes and for how long it is retained.",
+    "sections": [
+      {
+        "heading": "Controller",
+        "body": "Neura Labs UG (haftungsbeschränkt), reachable at info@conformisgrc.com."
+      },
+      {
+        "heading": "Account data",
+        "body": "Email address, name and session data for sign-in and registration."
+      },
+      {
+        "heading": "Policy content",
+        "body": "Uploaded original policies, the analysis text derived from them, assessments, evidence, and the organizational context you enter. Original documents are deleted no later than 24 hours after the analysis completes; orphaned anonymous uploads after 24 hours. Full parsed text and embeddings are deleted after 7 days without activity, and after 30 days at the latest."
+      },
+      {
+        "heading": "Your own AI key",
+        "body": "Your key is stored encrypted and only for a short time, bound to your user, session, purpose and draft. It is deleted when the run ends, or after 24 hours at the latest, and never appears in URLs, browser storage, logs, audit metadata or workflow payloads."
+      },
+      {
+        "heading": "Sharing with third parties",
+        "body": "Analysis content is sent only to the AI provider and model you chose, using your own key. OpenConformis does not operate its own model and is provider-neutral; there is no guarantee of EU hosting or zero data retention at that provider — its own privacy policy applies in addition."
+      },
+      {
+        "heading": "Infrastructure",
+        "body": "The application itself runs on Vercel in Frankfurt; database and authentication run on Neon, also in Frankfurt."
+      },
+      {
+        "heading": "Retention and deletion",
+        "body": "Results, evidence and the review trail stay tied to your account until you delete them or the account. Deleting an account ends access immediately; deletion of linked policy data completes within 24 hours."
+      },
+      {
+        "heading": "Your rights",
+        "body": "Access, correction and deletion of your account data on request to info@conformisgrc.com."
+      },
+      {
+        "heading": "Cookies",
+        "body": "A technically necessary cookie is required for the session. There are no marketing or tracking cookies."
+      }
+    ]
   }
 }
