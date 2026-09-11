@@ -37,10 +37,6 @@ function protectedMutation(
       });
       return handler(request, awaitableNeonContext(context));
     } catch (error) {
-      console.error(
-        "DIAG protectedMutation caught",
-        error instanceof Error ? error.stack : error,
-      );
       return requestProtectionResponse(error) ?? authenticationUnavailable();
     }
   };
