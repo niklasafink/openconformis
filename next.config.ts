@@ -21,7 +21,10 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  distDir: process.env.APP_ENV === "test" ? ".next-e2e" : ".next",
+  // Zwei parallele E2E-Server (siehe `playwright.config.ts`) dürfen sich nicht
+  // dasselbe Build-Verzeichnis teilen — Next lässt sonst nur den ersten zu.
+  distDir:
+    process.env.APP_ENV === "test" ? `.next-e2e${process.env.E2E_DIST_SUFFIX ?? ""}` : ".next",
   serverExternalPackages: ["@napi-rs/canvas", "tesseract.js"],
   outputFileTracingIncludes: {
     "/*": [

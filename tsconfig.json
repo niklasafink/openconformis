@@ -33,7 +33,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     ".next-e2e/types/**/*.ts",
-    ".next-e2e/dev/types/**/*.ts"
+    ".next-e2e/dev/types/**/*.ts",
+    ".next-e2e-bypass/types/**/*.ts",
+    ".next-e2e-bypass/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

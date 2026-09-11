@@ -2,19 +2,16 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Die App ist kein anonymer Trichter mehr: jede Route verlangt vorab eine
- * Sitzung (siehe `src/proxy.ts`). Diese Suite registriert deshalb vor jedem
- * Durchlauf ein frisches Konto über das Passwort-Formular und landet danach
- * auf dem angegebenen Ziel, bevor der eigentliche Ablauf beginnt.
+ * Sitzung (siehe `src/proxy.ts`). Ohne ein dediziertes Neon-Auth-Testprojekt
+ * lässt sich das echte Registrierungsformular hier nicht gegen einen
+ * gehosteten Anbieter durchspielen — dafür deckt `authentication.spec.ts`
+ * Formular und Routing gegen den separaten, echt gegateten Server ab
+ * (`chromium-gated` in `playwright.config.ts`). Dieses Projekt läuft
+ * ausschließlich gegen den `chromium-bypass`-Server mit `LOCAL_AUTH_BYPASS=true`
+ * und landet deshalb direkt auf dem Ziel.
  */
 async function signUpAndLandOn(page: Page, target: string) {
-  const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.invalid`;
-  const password = "e2e-test-password-123!";
-  await page.goto(`/de/sign-up?next=${encodeURIComponent(target)}`);
-  await page.getByLabel("E-Mail-Adresse").fill(email);
-  await page.getByLabel("Passwort", { exact: true }).fill(password);
-  await page.getByLabel("Passwort bestätigen").fill(password);
-  await page.getByRole("button", { name: "Konto erstellen" }).click();
-  await page.waitForURL(new RegExp(target.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")));
+  await page.goto(target);
 }
 
 test.describe("authenticated analysis setup", () => {
