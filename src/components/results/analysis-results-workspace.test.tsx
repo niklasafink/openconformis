@@ -39,6 +39,22 @@ const labels = {
   assessmentPane: "Bewertung",
   policyPane: "Policy",
   openEvidence: "Belegstelle öffnen",
+  signal: {
+    title: "Vorabeinschätzung",
+    note: "Sofortiger Textabgleich ohne Modellaufruf.",
+    level: {
+      strong: "hohe Abdeckung",
+      partial: "teilweise Abdeckung",
+      weak: "geringe Abdeckung",
+    },
+    coverage: "Abgedeckte Prüfaspekte",
+    covered: "Im Dokument gefunden",
+    open: "Im Dokument nicht gefunden",
+    hits: "Vorabtreffer",
+    noHits: "Keine Textstelle mit Bezug zu dieser Anforderung gefunden.",
+    pendingAssessment: "Steht aus",
+    assessedCount: "{assessed} von {total} durch KI bewertet",
+  },
   status: {
     fulfilled: "Erfüllt",
     partially_fulfilled: "Teilweise erfüllt",
@@ -224,6 +240,100 @@ describe("analysis result confirmation UI", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Belegstelle öffnen 1" }));
     await waitFor(() => expect(HTMLElement.prototype.scrollTo).toHaveBeenCalled());
+  });
+});
+
+describe("preliminary signal before the AI assessment", () => {
+  const documentBlocks = [
+    {
+      id: "block-1",
+      blockKey: "p1-a1",
+      ordinal: 1,
+      blockType: "paragraph",
+      canonicalText: "Vorher Das Leitungsorgan genehmigt den Rahmen. Nachher",
+      headingPath: ["Governance"],
+      pageNumber: 1,
+      paragraphNumber: 1,
+    },
+  ];
+  const pendingItem = {
+    ...item,
+    aiStatus: "no_assessment_possible" as const,
+    status: "no_assessment_possible" as const,
+    explanation: "",
+    confidencePercent: 0,
+    verificationStatus: "pending" as const,
+    pending: true,
+    signal: {
+      version: "lexical-signal-v1" as const,
+      requirementExternalKey: "dora-5-2",
+      level: "partial" as const,
+      coveragePercent: 50,
+      coveredAspects: ["Dokumentierte Genehmigung"],
+      openAspects: ["Laufende Überwachung der Umsetzung"],
+      hits: [
+        {
+          documentBlockId: "block-1",
+          ordinal: 1,
+          excerpt: "Das Leitungsorgan genehmigt den Rahmen.",
+          headingPath: ["Governance"],
+          pageNumber: 1,
+          paragraphNumber: 1,
+          matchedTerms: ["leitungsorgan"],
+        },
+      ],
+    },
+  };
+
+  it("shows the colour signal and the found passages instead of an empty assessment", () => {
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="preview"
+        canConfirm
+        canOverride
+        frameworkSlug="dora"
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[pendingItem]}
+        labels={labels}
+        documentBlocks={documentBlocks}
+      />,
+    );
+
+    expect(screen.getByText("Vorabeinschätzung: teilweise Abdeckung")).toBeInTheDocument();
+    expect(screen.getByText("0 von 1 durch KI bewertet")).toBeInTheDocument();
+    expect(screen.getByText("Dokumentierte Genehmigung")).toBeInTheDocument();
+    expect(screen.getByText("Laufende Überwachung der Umsetzung")).toBeInTheDocument();
+    // Ohne Bewertung gibt es weder Bestätigung noch Override und keinen Export.
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Status ändern" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Excel/u })).not.toBeInTheDocument();
+  });
+
+  it("highlights a found passage in the policy without loading the document again", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="preview"
+        canConfirm={false}
+        canOverride={false}
+        frameworkSlug="dora"
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[pendingItem]}
+        labels={labels}
+        documentBlocks={documentBlocks}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Das Leitungsorgan genehmigt den Rahmen.", { selector: "mark" }),
+      ).toBeInTheDocument(),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

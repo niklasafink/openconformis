@@ -2,6 +2,8 @@
 node_modules/
 .next/
 .next-e2e/
+# `E2E_DIST_SUFFIX` haengt dem Verzeichnis je Server ein Suffix an.
+.next-e2e-*/
 out/
 dist/
 coverage/

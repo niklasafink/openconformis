@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./index", () => ({
   auth: { getSession: mocks.getSession },
+  getAuthSession: mocks.getSession,
   isAuthenticationConfigured: true,
 }));
 

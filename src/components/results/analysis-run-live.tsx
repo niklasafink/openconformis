@@ -25,6 +25,8 @@ type AnalysisRunLiveProps = {
   requirementCount: number;
   createdAtLabel: string;
   initialState: LiveState;
+  /** Schmale Leiste über dem Ergebnis statt eigenständiger Wartekarte. */
+  compact?: boolean;
   failure?: { code: string | null; detail: string | null };
   labels: {
     failureTitle: string;
@@ -46,6 +48,7 @@ const terminalStatuses = new Set<AnalysisStatus>(["completed", "failed", "cancel
 
 export function AnalysisRunLive({
   analysisId,
+  compact = false,
   failure,
   frameworkSlug,
   requirementCount,
@@ -80,11 +83,13 @@ export function AnalysisRunLive({
         const next = (await response.json()) as LiveState;
         if (disposed) return;
         setPollingFailed(false);
+        const advanced = next.progressPercent !== state.progressPercent;
         setState(next);
         // Auch beim Fehlschlag neu laden: die Begründung des Anbieters wird
         // erst beim Scheitern geschrieben und steckt in der Serverantwort,
-        // nicht im Statusabruf.
-        if (terminalStatuses.has(next.status)) router.refresh();
+        // nicht im Statusabruf. Bei Fortschritt ebenso: der Worker schreibt die
+        // Bewertungen einzeln, und jede fertige ersetzt eine Vorabeinschätzung.
+        if (terminalStatuses.has(next.status) || advanced) router.refresh();
         if (!terminalStatuses.has(next.status)) schedule();
       } catch {
         if (disposed) return;
@@ -98,7 +103,28 @@ export function AnalysisRunLive({
       disposed = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [analysisId, router, state.status]);
+  }, [analysisId, router, state.progressPercent, state.status]);
+
+  if (compact) {
+    return (
+      <section className="analysis-run-strip" aria-live="polite">
+        <span className="analysis-run-status" data-status={state.status}>
+          {labels.status[state.status]}
+        </span>
+        <span className="analysis-run-strip-stage">
+          {state.status === "failed"
+            ? failure?.detail || failure?.code || labels.failureUnknown
+            : labels.stage[state.stage]}
+        </span>
+        <div className="analysis-run-progress" aria-label={labels.progressLabel}>
+          <span style={{ width: `${state.progressPercent}%` }} />
+        </div>
+        <span className="analysis-run-strip-note">
+          {pollingFailed ? labels.pollingFailed : `${state.progressPercent}%`}
+        </span>
+      </section>
+    );
+  }
 
   return (
     <section className="analysis-run-card" aria-live="polite">

@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { and, eq, gt, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { appendAuditEvent } from "@/server/audit/event";
 import { getSelectableFramework } from "@/server/catalogue/service";
@@ -34,9 +35,13 @@ export type BoundActiveDraft = {
   expiresAt: Date;
 };
 
-export async function getBoundActiveDraft(
-  expectedDraftId?: string,
-): Promise<BoundActiveDraft | null> {
+/**
+ * Eine Draft-Abfrage pro Anfrage und Erwartungswert. Seite, Policy-Auswahl und
+ * Umfangsauswahl lasen bisher jede für sich denselben gebundenen Draft.
+ */
+export const getBoundActiveDraft = cache(readBoundActiveDraft);
+
+async function readBoundActiveDraft(expectedDraftId?: string): Promise<BoundActiveDraft | null> {
   if (!isDatabaseConfigured) return null;
 
   const cookieStore = await cookies();

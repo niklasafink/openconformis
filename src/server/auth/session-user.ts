@@ -1,6 +1,8 @@
 import "server-only";
 
-import { auth, isAuthenticationConfigured } from "./index";
+import { cache } from "react";
+
+import { getAuthSession, isAuthenticationConfigured } from "./index";
 import { ensureApplicationUser } from "./identity-projection";
 import { AuthenticationRequiredError } from "./session-principal";
 
@@ -31,7 +33,14 @@ function isLocalAuthBypassEnabled() {
   return process.env.NODE_ENV !== "production" && process.env.LOCAL_AUTH_BYPASS === "true";
 }
 
-export async function requireAuthenticatedSessionUser(): Promise<AuthenticatedSessionUser> {
+/**
+ * Eine Auflösung pro Anfrage. Hülle, Sidebar-Listen und Seite fragten dieselbe
+ * Sitzung bisher je einzeln ab — jedes Mal ein Netzaufruf an den Auth-Dienst
+ * und eine erneute Identitätsprojektion.
+ */
+export const requireAuthenticatedSessionUser = cache(resolveAuthenticatedSessionUser);
+
+async function resolveAuthenticatedSessionUser(): Promise<AuthenticatedSessionUser> {
   if (isLocalAuthBypassEnabled()) {
     await ensureApplicationUser({
       id: localEvaluationUser.id,
@@ -45,7 +54,7 @@ export async function requireAuthenticatedSessionUser(): Promise<AuthenticatedSe
 
   if (!isAuthenticationConfigured) throw new AuthenticationRequiredError();
 
-  const { data: session, error } = await auth.getSession();
+  const { data: session, error } = await getAuthSession();
   if (error || !session?.user || !session.session) throw new AuthenticationRequiredError();
 
   await ensureApplicationUser(session.user);

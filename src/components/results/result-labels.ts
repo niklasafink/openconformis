@@ -41,6 +41,22 @@ export async function loadAnalysisResultLabels(): Promise<AnalysisResultLabels> 
     assessmentPane: t("results.assessmentPane"),
     policyPane: t("results.policyPane"),
     openEvidence: t("results.openEvidence"),
+    signal: {
+      title: t("results.signal.title"),
+      note: t("results.signal.note"),
+      level: {
+        strong: t("results.signal.level.strong"),
+        partial: t("results.signal.level.partial"),
+        weak: t("results.signal.level.weak"),
+      },
+      coverage: t("results.signal.coverage"),
+      covered: t("results.signal.covered"),
+      open: t("results.signal.open"),
+      hits: t("results.signal.hits"),
+      noHits: t("results.signal.noHits"),
+      pendingAssessment: t("results.signal.pendingAssessment"),
+      assessedCount: t.raw("results.signal.assessedCount") as string,
+    },
     status: {
       fulfilled: t("results.status.fulfilled"),
       partially_fulfilled: t("results.status.partially_fulfilled"),

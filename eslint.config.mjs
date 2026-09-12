@@ -10,7 +10,9 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     "coverage/**",
+    // Zwei E2E-Server bauen nach `.next-e2e` und `.next-e2e-<suffix>`.
     ".next-e2e/**",
+    ".next-e2e-*/**",
     // Testartefakte von Playwright: erzeugter Fremdcode, der sonst hunderte
     // Regelverstoesse meldet und echte Befunde im Rauschen untergehen laesst.
     "playwright-report/**",

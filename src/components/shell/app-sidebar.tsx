@@ -9,6 +9,9 @@ import {
   Settings,
 } from "lucide-react";
 
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+
 import { NavUser, type NavUserLabels } from "@/components/shell/nav-user";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -29,7 +32,7 @@ import {
   SidebarMenuSubItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 import type { AppLocale } from "@/i18n/routing";
 
 export type WorkflowStep = "framework" | "policy" | "scope" | "results";
@@ -62,9 +65,6 @@ export type SidebarProject = Readonly<{
 }>;
 
 type AppSidebarProps = Readonly<{
-  activeArea: ActiveArea;
-  activeStep?: WorkflowStep;
-  activeThreadId?: string;
   labels: SidebarLabels;
   locale: AppLocale;
   projects: readonly SidebarProject[];
@@ -81,10 +81,24 @@ const stepPath: Record<WorkflowStep, string> = {
   results: "/analyses/new/results",
 };
 
+/**
+ * Der aktive Punkt kommt aus dem Pfad, nicht aus einer Angabe der Seite: die
+ * Sidebar hängt im Layout und überlebt den Wechsel zwischen den Schritten,
+ * während der Pfad sich bei jeder Navigation ändert.
+ */
+function activeAreaOf(pathname: string): ActiveArea | undefined {
+  if (pathname.startsWith("/analyses")) return "analysis";
+  if (pathname.startsWith("/chat")) return "chat";
+  if (pathname.startsWith("/administration")) return "administration";
+  return undefined;
+}
+
+function activeStepOf(pathname: string): WorkflowStep | undefined {
+  const entries = Object.entries(stepPath) as Array<[WorkflowStep, string]>;
+  return entries.find(([, path]) => pathname === path)?.[0];
+}
+
 export function AppSidebar({
-  activeArea,
-  activeStep,
-  activeThreadId,
   labels,
   locale,
   projects,
@@ -93,6 +107,20 @@ export function AppSidebar({
   user,
   userLabels,
 }: AppSidebarProps) {
+  const pathname = usePathname();
+  const activeArea = activeAreaOf(pathname);
+  const activeStep = activeStepOf(pathname);
+  const activeThreadId = useSearchParams().get("thread") ?? undefined;
+  // Die Sidebar bleibt im Layout stehen, `defaultOpen` griffe deshalb nur beim
+  // ersten Rendern. Wer aus dem Chat in die Gap-Analyse wechselt, soll ihre
+  // Schritte sehen, ohne die Gruppe von Hand aufzuklappen — und sie weiterhin
+  // selbst zuklappen können.
+  const [analysisOpen, setAnalysisOpen] = useState(activeArea === "analysis");
+  const [renderedArea, setRenderedArea] = useState(activeArea);
+  if (renderedArea !== activeArea) {
+    setRenderedArea(activeArea);
+    if (activeArea === "analysis") setAnalysisOpen(true);
+  }
   const steps: Array<{ id: WorkflowStep; label: string }> = [
     { id: "framework", label: labels.framework },
     { id: "policy", label: labels.policy },
@@ -142,7 +170,11 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <Collapsible defaultOpen={activeArea === "analysis"} className="group/collapsible">
+              <Collapsible
+                open={analysisOpen}
+                onOpenChange={setAnalysisOpen}
+                className="group/collapsible"
+              >
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild

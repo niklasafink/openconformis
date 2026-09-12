@@ -1,5 +1,7 @@
 .next
 .next-e2e
+# Zweiter E2E-Server baut nach `.next-e2e-<suffix>`.
+.next-e2e-*
 coverage
 pnpm-lock.yaml
 src/app/.well-known/workflow/v1

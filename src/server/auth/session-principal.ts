@@ -1,11 +1,12 @@
 import "server-only";
 
 import { asc, eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/server/db/client";
 import { members } from "@/server/db/schema/auth";
 
-import { auth, isAuthenticationConfigured } from "./index";
+import { getAuthSession, isAuthenticationConfigured } from "./index";
 import { ensureApplicationUser } from "./identity-projection";
 import { ensurePersonalWorkspaceForUser } from "./personal-workspace";
 import {
@@ -37,10 +38,13 @@ async function readFirstMembership(userId: string) {
   return membership;
 }
 
-export async function requireSessionPrincipal(): Promise<SessionPrincipal> {
+/** Siehe `requireAuthenticatedSessionUser`: eine Auflösung pro Anfrage genügt. */
+export const requireSessionPrincipal = cache(resolveSessionPrincipal);
+
+async function resolveSessionPrincipal(): Promise<SessionPrincipal> {
   if (!isAuthenticationConfigured) throw new AuthenticationRequiredError();
 
-  const { data: session, error } = await auth.getSession();
+  const { data: session, error } = await getAuthSession();
 
   if (error || !session?.user || !session.session) {
     throw new AuthenticationRequiredError();

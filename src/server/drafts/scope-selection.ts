@@ -201,3 +201,63 @@ export async function persistDraftScope(input: {
 
   return { includedRequirementCount: includedKeys.length };
 }
+
+/**
+ * Wechselt allein die Modellroute eines Drafts. Das Ergebnis zeigt die Auswahl
+ * neben dem Schlüsselfeld, damit sie dort korrigierbar bleibt, ohne den ganzen
+ * Prüfungsumfang erneut zu speichern. Rahmenwerk, Policy und Anforderungen
+ * bleiben unberührt; eingefroren wird erst beim Start der Analyse.
+ */
+export async function persistDraftModelSelection(input: {
+  expectedDraftId: string;
+  modelProfileId: string;
+  modelCatalogueVersion: string;
+  unevaluatedWarningAccepted: boolean;
+}) {
+  if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
+  const draft = await getBoundActiveDraft(input.expectedDraftId);
+  if (!draft?.frameworkSlug) throw new Error("DRAFT_NOT_FOUND");
+
+  const resolvedModel = await resolveAnalysisModelSelection({
+    modelProfileId: input.modelProfileId,
+    catalogueVersion: input.modelCatalogueVersion,
+  });
+  if (!resolvedModel.model.evaluated && !input.unevaluatedWarningAccepted) {
+    throw new Error("UNEVALUATED_MODEL_WARNING_REQUIRED");
+  }
+
+  const now = new Date();
+  const unevaluatedWarningAccepted =
+    !resolvedModel.model.evaluated && input.unevaluatedWarningAccepted;
+  const selection = {
+    routeProvider: resolvedModel.model.routeProvider,
+    modelProfileId: resolvedModel.model.id,
+    providerModelId: resolvedModel.model.providerModelId,
+    modelCatalogueVersion: resolvedModel.catalogue.version,
+    evaluated: resolvedModel.model.evaluated,
+    unevaluatedWarningAccepted,
+  };
+
+  await db.transaction(async (transaction) => {
+    await transaction
+      .insert(draftModelSelections)
+      .values({ anonymousDraftId: draft.id, ...selection })
+      .onConflictDoUpdate({
+        target: draftModelSelections.anonymousDraftId,
+        set: { ...selection, updatedAt: now },
+      });
+    await appendAuditEvent(transaction, {
+      anonymousDraftId: draft.id,
+      action: "draft.model_selected",
+      targetType: "draft_model_selection",
+      targetId: draft.id,
+      metadata: {
+        modelProfileId: resolvedModel.model.id,
+        modelCatalogueChanged: resolvedModel.catalogueChanged,
+        unevaluatedWarningAccepted,
+      },
+    });
+  });
+
+  return selection;
+}

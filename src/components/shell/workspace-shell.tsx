@@ -4,47 +4,33 @@ import type { ReactNode } from "react";
 
 import {
   AppSidebar,
-  type ActiveArea,
   type SidebarProject,
   type SidebarThread,
-  type WorkflowStep,
 } from "@/components/shell/app-sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { AppLocale } from "@/i18n/routing";
 import { listRecentAnalyses } from "@/server/analyses/read-analysis";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { isCatalogueAdministrator } from "@/server/catalogue/administrator";
 import { listRecentChatThreads } from "@/server/chat/service";
 
-type ApplicationShellProps = Readonly<{
-  activeArea: ActiveArea;
-  activeStep?: WorkflowStep;
-  activeThreadId?: string;
-  /** Rechte Seite der Kopfzeile: Suche, Sprache, seitenspezifische Aktionen. */
-  actions?: ReactNode;
+type WorkspaceShellProps = Readonly<{
   children: ReactNode;
-  /** Kleine Zeile neben dem Titel, z. B. der Schritt im Workflow. */
-  eyebrow?: string;
   locale: AppLocale;
-  /** Seitentitel in der Kopfzeile. Fehlt er, rendert die Seite ihre eigene Überschrift. */
-  title?: string;
 }>;
 
 /**
  * Gemeinsame Anwendungshülle: schwebende Sidebar (shadcn/ui) mit dem Workflow-
  * Stepper als Unterpunkte der Gap-Analyse, Chat-Verlauf und Kontomenü; rechts
- * die Seite mit einer 56 px hohen Kopfzeile.
+ * die Seite mit ihrer eigenen Kopfzeile.
+ *
+ * Sie hängt im Layout der Arbeitsbereiche, nicht in den einzelnen Seiten. So
+ * bleibt sie beim Wechsel zwischen den Schritten stehen, statt bei jedem Klick
+ * samt Sitzungsauflösung, Projektliste und Chat-Verlauf neu zu rendern. Den
+ * aktiven Punkt liest die Sidebar deshalb aus dem Pfad, nicht aus einer Angabe
+ * der Seite.
  */
-export async function ApplicationShell({
-  activeArea,
-  activeStep,
-  activeThreadId,
-  actions,
-  children,
-  eyebrow,
-  locale,
-  title,
-}: ApplicationShellProps) {
+export async function WorkspaceShell({ children, locale }: WorkspaceShellProps) {
   const [t, topbar, analysisRunT, cookieStore, user] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("Topbar"),
@@ -85,9 +71,6 @@ export async function ApplicationShell({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar
-        activeArea={activeArea}
-        activeStep={activeStep}
-        activeThreadId={activeThreadId}
         locale={locale}
         threads={threads}
         projects={projects}
@@ -120,23 +103,7 @@ export async function ApplicationShell({
           english: topbar("english"),
         }}
       />
-      <SidebarInset className="min-w-0 bg-background">
-        <header className="flex h-14 shrink-0 items-center gap-3 px-4 md:px-6">
-          <SidebarTrigger aria-label={t("toggleSidebar")} className="md:hidden" />
-          {title ? (
-            <div className="flex min-w-0 items-baseline gap-3">
-              <h1 className="truncate font-serif text-[26px] leading-none font-normal tracking-tight">
-                {title}
-              </h1>
-              {eyebrow ? (
-                <span className="hidden text-xs text-muted-foreground sm:inline">{eyebrow}</span>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="ml-auto flex items-center gap-2">{actions}</div>
-        </header>
-        <div className="workspace-content min-w-0">{children}</div>
-      </SidebarInset>
+      <SidebarInset className="min-w-0 bg-background">{children}</SidebarInset>
     </SidebarProvider>
   );
 }

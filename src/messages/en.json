@@ -151,7 +151,7 @@
     "context": "Company context",
     "contextPlaceholder": "Optional context on governance, responsibilities, or existing evidence",
     "included": "applicable",
-    "start": "Start analysis",
+    "start": "Confirm scope",
     "model": "Model",
     "evaluated": "Evaluated",
     "unevaluated": "Not evaluated",
@@ -195,24 +195,26 @@
     "modelHint": "Choose model"
   },
   "ResultsPreview": {
-    "preparing": "Preparing analysis",
-    "parsing": "Checking document",
-    "mapping": "Mapping requirements",
-    "checking": "Validating evidence",
-    "startFailed": "The analysis could not be started. Please try again.",
-    "lockedTitle": "Unlock result",
-    "lockedBody": "Register for free. The real analysis then runs on your own API key; the preview does not call any model.",
-    "byokTitle": "Connect your model access",
-    "byokBody": "The analysis runs on your own API key. It is stored encrypted for this run only and deleted within 24 hours at the latest.",
-    "selectedModel": "Selected model",
-    "connect": "Connect and start",
-    "connecting": "Validating …",
-    "keyLink": "Create API key",
+    "step": "Step 4 of 4",
+    "panelTitle": "Model access",
+    "model": "Model",
+    "evaluated": "evaluated",
+    "unevaluated": "not evaluated",
+    "unevaluatedWarning": "This model is not evaluated. Results may be unreliable.",
+    "apiKey": "API key",
+    "keyLink": "Create an API key",
+    "connect": "Connect",
+    "connecting": "Checking …",
+    "connected": "Connected",
+    "notConnected": "No key connected",
+    "unreachable": "Provider unreachable",
     "keyFailed": "The key or model access could not be confirmed.",
-    "unlockResult": "Register to view result",
-    "close": "Close dialog",
-    "goToSignIn": "Go to sign-in",
-    "step": "Step 4 of 4"
+    "modelFailed": "The model could not be applied.",
+    "start": "Start analysis",
+    "starting": "Starting analysis …",
+    "startFailed": "The analysis could not be started. Please try again.",
+    "replaceKey": "Enter a new key",
+    "hint": "The key is stored encrypted for this run only and deleted after 24 hours at the latest."
   },
   "AnalysisRun": {
     "title": "Analysis of your policy",
@@ -264,6 +266,22 @@
         "not_fulfilled": "Not fulfilled",
         "not_applicable": "Not applicable",
         "no_assessment_possible": "No assessment possible"
+      },
+      "signal": {
+        "title": "Preliminary signal",
+        "note": "Instant text match without a model call. It shows where the policy touches the requirement at all and is explicitly not an assessment — the AI assessment replaces it.",
+        "level": {
+          "strong": "high coverage",
+          "partial": "partial coverage",
+          "weak": "low coverage"
+        },
+        "coverage": "Covered assessment aspects",
+        "covered": "Found in the document",
+        "open": "Not found in the document",
+        "hits": "Preliminary matches",
+        "noHits": "No passage related to this requirement was found.",
+        "pendingAssessment": "Pending",
+        "assessedCount": "{assessed} of {total} assessed by AI"
       }
     },
     "status": {

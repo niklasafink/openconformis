@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createNeonAuth } from "@neondatabase/auth/next/server";
 
 // Eine leer gesetzte Variable ist dasselbe wie eine fehlende. `??` fällt darauf
@@ -32,3 +34,10 @@ export const auth = createNeonAuth({
   },
   logLevel: process.env.NODE_ENV === "test" ? "silent" : "warn",
 });
+
+/**
+ * Eine Sitzungsabfrage pro Anfrage. `auth.getSession()` ist ein Netzaufruf an den
+ * Auth-Dienst; die Seite fragte ihn bisher über Hülle, Sidebar-Listen, Principal
+ * und Seite selbst mehrfach ab und wartete jedes Mal erneut auf dieselbe Antwort.
+ */
+export const getAuthSession = cache(() => auth.getSession());

@@ -3,7 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { AdminWorkspace } from "@/components/admin/admin-workspace";
-import { ApplicationShell } from "@/components/shell/application-shell";
+import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
 import { listAnalysisInstructions } from "@/server/ai/analysis-instruction-service";
@@ -27,16 +27,15 @@ export default async function AdministrationPage({ params }: AdministrationPageP
   if (!catalogue || !instructions || !operations) notFound();
 
   return (
-    <ApplicationShell
-      activeArea="administration"
-      locale={locale}
-      actions={<LanguageMenu locale={locale} pathname="/administration" />}
-    >
-      <AdminWorkspace
-        initialCatalogue={JSON.parse(JSON.stringify(catalogue))}
-        initialInstructions={JSON.parse(JSON.stringify(instructions))}
-        initialOperations={JSON.parse(JSON.stringify(operations))}
-      />
-    </ApplicationShell>
+    <>
+      <PageHeader actions={<LanguageMenu locale={locale} pathname="/administration" />} />
+      <div className="workspace-content min-w-0">
+        <AdminWorkspace
+          initialCatalogue={JSON.parse(JSON.stringify(catalogue))}
+          initialInstructions={JSON.parse(JSON.stringify(instructions))}
+          initialOperations={JSON.parse(JSON.stringify(operations))}
+        />
+      </div>
+    </>
   );
 }

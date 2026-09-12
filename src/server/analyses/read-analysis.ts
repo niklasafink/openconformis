@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
+import { createRequirementSignal } from "@/domain/analysis/signal";
+
 import { requireSessionPrincipal } from "@/server/auth/session-principal";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
@@ -101,32 +103,30 @@ export async function getOwnedAnalysisResultWorkspace(input: {
       organizationId: analyses.organizationId,
       frameworkSlug: analyses.frameworkSlug,
       organizationContext: analyses.organizationContext,
+      policyVersionId: analyses.policyVersionId,
       policyName: policies.displayName,
     })
     .from(analyses)
     .innerJoin(policyVersions, eq(policyVersions.id, analyses.policyVersionId))
     .innerJoin(policies, eq(policies.id, policyVersions.policyId))
-    .where(
-      and(
-        eq(analyses.id, input.analysisId),
-        eq(analyses.ownerUserId, input.ownerUserId),
-        eq(analyses.status, "completed"),
-      ),
-    )
+    .where(and(eq(analyses.id, input.analysisId), eq(analyses.ownerUserId, input.ownerUserId)))
     .limit(1);
   if (!analysis) return undefined;
 
+  // Links verbunden, nicht innen: der Worker schreibt die Ergebnisse einzeln,
+  // während der Lauf noch läuft. Anforderungen ohne Ergebnis fehlen deshalb
+  // nicht, sie tragen so lange die lexikalische Vorab-Einschätzung.
   const rows = await db
     .select({ scope: analysisScopeItems, result: analysisRequirementResults })
     .from(analysisScopeItems)
-    .innerJoin(
+    .leftJoin(
       analysisRequirementResults,
       eq(analysisRequirementResults.scopeItemId, analysisScopeItems.id),
     )
     .where(eq(analysisScopeItems.analysisId, analysis.id))
     .orderBy(asc(analysisScopeItems.displayOrder));
 
-  const resultIds = rows.map(({ result }) => result.id);
+  const resultIds = rows.flatMap(({ result }) => (result ? [result.id] : []));
   const [evidenceRows, overrideRows] = await Promise.all([
     resultIds.length === 0
       ? Promise.resolve([])
@@ -156,11 +156,79 @@ export async function getOwnedAnalysisResultWorkspace(input: {
     }
   }
 
+  const blocks = await db
+    .select({
+      id: documentBlocks.id,
+      blockKey: documentBlocks.blockKey,
+      ordinal: documentBlocks.ordinal,
+      blockType: documentBlocks.blockType,
+      canonicalText: documentBlocks.canonicalText,
+      headingPath: documentBlocks.headingPath,
+      pageNumber: documentBlocks.pageNumber,
+      paragraphNumber: documentBlocks.paragraphNumber,
+      tokenCount: documentBlocks.tokenCount,
+      textHash: documentBlocks.textHash,
+    })
+    .from(documentBlocks)
+    .where(eq(documentBlocks.policyVersionId, analysis.policyVersionId))
+    .orderBy(asc(documentBlocks.ordinal))
+    .limit(10_000);
+
   return {
     ...analysis,
+    // Tokenzahl und Texthash trägt nur die Vorab-Einschätzung; der Browser
+    // bekommt sie nicht.
+    documentBlocks: blocks.map((block) => ({
+      id: block.id,
+      blockKey: block.blockKey,
+      ordinal: block.ordinal,
+      blockType: block.blockType,
+      canonicalText: block.canonicalText,
+      headingPath: block.headingPath,
+      pageNumber: block.pageNumber,
+      paragraphNumber: block.paragraphNumber,
+    })),
     items: rows.map(({ scope, result }) => {
+      if (!result) {
+        return {
+          id: `pending-${scope.id}`,
+          regulatoryId: scope.regulatoryId,
+          title: scope.title,
+          legalText: scope.legalText,
+          subrequirements: scope.subrequirements,
+          aiStatus: "no_assessment_possible" as const,
+          status: "no_assessment_possible" as const,
+          override: null,
+          explanation: "",
+          missingInformation: [] as string[],
+          confidencePercent: 0,
+          verificationStatus: "pending" as const,
+          confirmedAt: null,
+          evidence: [],
+          pending: true,
+          signal: createRequirementSignal(
+            {
+              externalKey: scope.requirementExternalKey,
+              regulatoryId: scope.regulatoryId,
+              title: scope.title,
+              legalText: scope.legalText,
+              assessmentAspects: scope.assessmentAspects,
+              sizeGuidance: scope.sizeGuidance,
+              subrequirements: scope.subrequirements.map((subrequirement) => ({
+                regulatoryId: subrequirement.regulatoryId,
+                title: subrequirement.title,
+                legalText: subrequirement.legalText,
+                assessmentAspects: subrequirement.assessmentAspects,
+              })),
+            },
+            blocks,
+          ),
+        };
+      }
       const override = latestOverrideByResult.get(result.id);
       return {
+        pending: false,
+        signal: null,
         id: result.id,
         regulatoryId: scope.regulatoryId,
         title: scope.title,
@@ -204,13 +272,7 @@ export async function getOwnedAnalysisDocumentBlocks(input: {
     .from(analyses)
     .innerJoin(policyVersions, eq(policyVersions.id, analyses.policyVersionId))
     .innerJoin(policies, eq(policies.id, policyVersions.policyId))
-    .where(
-      and(
-        eq(analyses.id, input.analysisId),
-        eq(analyses.ownerUserId, input.ownerUserId),
-        eq(analyses.status, "completed"),
-      ),
-    )
+    .where(and(eq(analyses.id, input.analysisId), eq(analyses.ownerUserId, input.ownerUserId)))
     .limit(1);
   if (!analysis) return undefined;
 

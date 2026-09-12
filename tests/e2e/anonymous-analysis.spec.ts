@@ -59,10 +59,11 @@ test.describe("authenticated analysis setup", () => {
     await expect(page.getByRole("heading", { name: "Prüfungsumfang und Kontext" })).toBeVisible();
   });
 
-  test("shows the interactive locked result and the BYOK connect card", async ({ page }) => {
+  test("shows the locked result at once and connects the key from the header", async ({ page }) => {
     // Wer die Ergebnis-Vorschau erreicht, ist bereits angemeldet (die App lässt
-    // niemanden anders bis hierhin) — es gibt keine Registrierung mehr an
-    // dieser Stelle, sondern direkt den eigenen Modellzugang.
+    // niemanden anders bis hierhin). Zwischen Prüfungsumfang und Ergebnis liegt
+    // nichts mehr: kein Ladeschritt, kein Dialog — der eigene Modellzugang sitzt
+    // in der Kopfzeile.
     const pageErrors: Error[] = [];
     page.on("pageerror", (error) => pageErrors.push(error));
     await signUpAndLandOn(page, "/de/analyses/new/framework?framework=dora");
@@ -71,25 +72,25 @@ test.describe("authenticated analysis setup", () => {
     const unevaluatedWarning = page.locator(".scope-model-warning input");
     await expect(unevaluatedWarning).toBeVisible();
     await unevaluatedWarning.check();
-    await page.getByRole("button", { name: "Analyse starten" }).click();
+    await page.getByRole("button", { name: "Umfang bestätigen" }).click();
 
     await expect(page).toHaveURL(/\/de\/analyses\/new\/results\?/u);
-    await expect(page.getByRole("heading", { name: "Ergebnis freischalten" })).toHaveCount(0);
+    // Das Ergebnis steht sofort, ohne dass eine Überlagerung es verdeckt.
+    await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    // Wer bereits angemeldet ist, sieht sofort den eigenen Modellzugang statt
-    // einer Registrierung — der Dialog öffnet sich automatisch.
-    await expect(
-      page.getByRole("heading", { name: "Eigenen Modellzugang verbinden" }),
-    ).toBeVisible();
+    // Ohne verbundenen Schlüssel meldet das Zugangsfeld rot und die Analyse
+    // lässt sich nicht starten.
+    // Der Knopf trägt den Modellnamen; stabil ansprechbar ist er über den Titel.
+    const accessPanel = page.getByTitle("Modellzugang");
+    await expect(accessPanel).toBeVisible();
+    await accessPanel.click();
+    await expect(page.getByText("Kein Schlüssel hinterlegt")).toBeVisible();
     await expect(page.getByLabel(/API-Key$/u)).toBeVisible();
-    await page.getByRole("button", { name: "Dialog schließen" }).click();
-    await expect(page.getByRole("heading", { name: "Eigenen Modellzugang verbinden" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("button", { name: "Analyse starten" })).toBeDisabled();
+    await expect(page.getByRole("combobox")).toBeVisible();
+    await page.keyboard.press("Escape");
 
-    await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible({
-      timeout: 10_000,
-    });
     await page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u }).click();
     await expect(
       page.getByRole("heading", { name: "Schulung des Leitungsorgans zu IKT-Risiken" }),

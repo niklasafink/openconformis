@@ -1,6 +1,7 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema/auth";
@@ -20,11 +21,35 @@ export class IdentityProjectionConflictError extends Error {
   }
 }
 
+const projectIdentity = cache(
+  async (id: string, name: string, email: string, emailVerified: boolean, image: string | null) => {
+    const identity: NeonIdentity = { id, name, email, emailVerified, image };
+    return writeApplicationUser(identity);
+  },
+);
+
+/**
+ * Pro Anfrage genügt eine Projektion. Der Aufruf hing bisher an jeder Sitzungs-
+ * und Principal-Auflösung und schrieb dieselbe Zeile beim Rendern einer Seite
+ * mehrfach — zwei Datenbankabfragen je Wiederholung ohne neues Ergebnis.
+ * Die Zwischenspeicherung schlüsselt auf Skalare, weil `cache()` Objekte über
+ * Referenzgleichheit vergleicht und `session.user` bei jedem Aufruf neu entsteht.
+ */
+export async function ensureApplicationUser(identity: NeonIdentity) {
+  return projectIdentity(
+    identity.id,
+    identity.name,
+    identity.email,
+    identity.emailVerified,
+    identity.image ?? null,
+  );
+}
+
 /**
  * Mirrors the managed Neon Auth identity into the application schema. Fachliche
  * tables keep their existing foreign keys without owning credentials or sessions.
  */
-export async function ensureApplicationUser(identity: NeonIdentity) {
+async function writeApplicationUser(identity: NeonIdentity) {
   const [emailOwner] = await db
     .select({ id: users.id })
     .from(users)

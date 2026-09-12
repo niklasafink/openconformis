@@ -101,6 +101,9 @@ export async function getCurrentPolicyPreview(expectedDraftId?: string) {
       headingPath: documentBlocks.headingPath,
       pageNumber: documentBlocks.pageNumber,
       paragraphNumber: documentBlocks.paragraphNumber,
+      // Für die lexikalische Vorab-Einschätzung; sie geht nicht an den Browser.
+      tokenCount: documentBlocks.tokenCount,
+      textHash: documentBlocks.textHash,
     })
     .from(documentBlocks)
     .where(eq(documentBlocks.policyVersionId, selection.policyVersionId))

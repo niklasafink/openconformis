@@ -248,6 +248,9 @@ export async function listActiveTemporaryCredentials(purpose: AiCredentialPurpos
       credentialId: aiCredentials.id,
       provider: aiCredentials.provider,
       purpose: aiCredentials.purpose,
+      // Das Ergebnis zeigt die Verbindung je Draft an; ohne die Bindung ließe
+      // sich ein Schlüssel eines anderen Drafts nicht davon unterscheiden.
+      bindingId: aiCredentials.bindingId,
       lastFour: aiCredentials.secretLastFour,
       safeLabel: aiCredentials.safeLabel,
       accessibleModelIds: aiCredentials.accessibleModelIds,

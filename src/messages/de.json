@@ -151,7 +151,7 @@
     "context": "Unternehmenskontext",
     "contextPlaceholder": "Optionaler Kontext zu Governance, Verantwortlichkeiten oder vorhandenen Nachweisen",
     "included": "einschlägig",
-    "start": "Analyse starten",
+    "start": "Umfang bestätigen",
     "model": "Modell",
     "evaluated": "Evaluiert",
     "unevaluated": "Nicht geprüft",
@@ -195,24 +195,26 @@
     "modelHint": "Modell wählen"
   },
   "ResultsPreview": {
-    "preparing": "Analyse wird vorbereitet",
-    "parsing": "Dokument prüfen",
-    "mapping": "Anforderungen zuordnen",
-    "checking": "Belegstellen validieren",
-    "startFailed": "Die Analyse konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
-    "lockedTitle": "Ergebnis freischalten",
-    "lockedBody": "Registrieren Sie sich kostenlos. Die echte Analyse läuft danach über Ihren eigenen API-Schlüssel; der Vorschaulauf ruft kein Modell auf.",
-    "byokTitle": "Eigenen Modellzugang verbinden",
-    "byokBody": "Die Analyse läuft über Ihren eigenen API-Schlüssel. Er wird nur für diesen Lauf verschlüsselt gespeichert und spätestens nach 24 Stunden gelöscht.",
-    "selectedModel": "Ausgewähltes Modell",
-    "connect": "Verbinden und starten",
-    "connecting": "Wird geprüft …",
+    "step": "Schritt 4 von 4",
+    "panelTitle": "Modellzugang",
+    "model": "Modell",
+    "evaluated": "geprüft",
+    "unevaluated": "ungeprüft",
+    "unevaluatedWarning": "Dieses Modell ist nicht evaluiert. Ergebnisse können unzuverlässig sein.",
+    "apiKey": "API-Key",
     "keyLink": "API-Key erstellen",
+    "connect": "Verbinden",
+    "connecting": "Wird geprüft …",
+    "connected": "Verbunden",
+    "notConnected": "Kein Schlüssel hinterlegt",
+    "unreachable": "Anbieter nicht erreichbar",
     "keyFailed": "Der Schlüssel oder Modellzugriff konnte nicht bestätigt werden.",
-    "unlockResult": "Für Ergebnis registrieren",
-    "close": "Dialog schließen",
-    "goToSignIn": "Zur Anmeldung",
-    "step": "Schritt 4 von 4"
+    "modelFailed": "Das Modell konnte nicht übernommen werden.",
+    "start": "Analyse starten",
+    "starting": "Analyse startet …",
+    "startFailed": "Die Analyse konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
+    "replaceKey": "Neuen Schlüssel eingeben",
+    "hint": "Der Schlüssel wird nur für diesen Lauf verschlüsselt gespeichert und spätestens nach 24 Stunden gelöscht."
   },
   "AnalysisRun": {
     "title": "Analyse Ihrer Policy",
@@ -264,6 +266,22 @@
         "not_fulfilled": "Nicht erfüllt",
         "not_applicable": "Nicht einschlägig",
         "no_assessment_possible": "Keine Einschätzung möglich"
+      },
+      "signal": {
+        "title": "Vorabeinschätzung",
+        "note": "Sofortiger Textabgleich ohne Modellaufruf. Er zeigt, wo die Policy die Anforderung überhaupt berührt, und ist ausdrücklich keine Bewertung — die KI-Bewertung ersetzt ihn.",
+        "level": {
+          "strong": "hohe Abdeckung",
+          "partial": "teilweise Abdeckung",
+          "weak": "geringe Abdeckung"
+        },
+        "coverage": "Abgedeckte Prüfaspekte",
+        "covered": "Im Dokument gefunden",
+        "open": "Im Dokument nicht gefunden",
+        "hits": "Vorabtreffer",
+        "noHits": "Keine Textstelle mit Bezug zu dieser Anforderung gefunden.",
+        "pendingAssessment": "Steht aus",
+        "assessedCount": "{assessed} von {total} durch KI bewertet"
       }
     },
     "status": {

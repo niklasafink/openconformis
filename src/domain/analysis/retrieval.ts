@@ -94,7 +94,12 @@ export type RetrievalOptions = {
   minimumScore?: number;
 };
 
-function tokens(value: string) {
+/**
+ * Inhaltstragende Tokens eines Textes. Exportiert, damit die Vorab-Einschätzung
+ * dieselbe Zerlegung benutzt wie die Belegsuche — sonst misst sie eine andere
+ * Sprache als die, die später die Belege findet.
+ */
+export function lexicalTokens(value: string) {
   return (
     value
       .normalize("NFKC")
@@ -118,7 +123,8 @@ function termFrequencies(values: string[]) {
 function weightedQueryTerms(requirement: RetrievalRequirement) {
   const weights = new Map<string, number>();
   const add = (value: string, weight: number) => {
-    for (const token of tokens(value)) weights.set(token, (weights.get(token) ?? 0) + weight);
+    for (const token of lexicalTokens(value))
+      weights.set(token, (weights.get(token) ?? 0) + weight);
   };
 
   add(requirement.title, 4);
@@ -135,7 +141,7 @@ function weightedQueryTerms(requirement: RetrievalRequirement) {
 }
 
 function candidateTokenCount(block: RetrievalBlock) {
-  return block.tokenCount ?? tokens(block.canonicalText).length;
+  return block.tokenCount ?? lexicalTokens(block.canonicalText).length;
 }
 
 export function createRetrievalPacket(
@@ -149,8 +155,8 @@ export function createRetrievalPacket(
   const minimumScore = options.minimumScore ?? 0.75;
   const queryTerms = weightedQueryTerms(requirement);
   const documents = blocks.map((block) => {
-    const bodyTokens = tokens(block.canonicalText);
-    const headingTokens = tokens(block.headingPath.join(" "));
+    const bodyTokens = lexicalTokens(block.canonicalText);
+    const headingTokens = lexicalTokens(block.headingPath.join(" "));
     return {
       block,
       bodyTokens,

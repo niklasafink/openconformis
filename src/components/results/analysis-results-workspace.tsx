@@ -1,7 +1,9 @@
 "use client";
 
-import { ChevronDown, Download, FileText, LockKeyhole, Pencil, X } from "lucide-react";
+import { ChevronDown, Download, FileText, Pencil, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import type { RequirementSignal, SignalLevel } from "@/domain/analysis/signal";
 
 export type ResultStatus =
   | "fulfilled"
@@ -23,6 +25,13 @@ export type ResultItem = {
   }>;
   aiStatus: ResultStatus;
   status: ResultStatus;
+  /**
+   * Sofortige lexikalische Vorab-Einschätzung. Sie trägt die Ampel, solange die
+   * Anforderung noch auf ihre KI-Bewertung wartet.
+   */
+  signal?: RequirementSignal | null;
+  /** Noch keine KI-Bewertung vorhanden — Status und Begründung sind leer. */
+  pending?: boolean;
   override: { id: string; status: ResultStatus; reason: string; createdAt: string } | null;
   explanation: string;
   missingInformation: string[];
@@ -88,6 +97,20 @@ export type AnalysisResultLabels = {
   assessmentPane: string;
   policyPane: string;
   openEvidence: string;
+  signal: AnalysisSignalLabels;
+};
+
+export type AnalysisSignalLabels = {
+  title: string;
+  note: string;
+  level: Record<SignalLevel, string>;
+  coverage: string;
+  covered: string;
+  open: string;
+  hits: string;
+  noHits: string;
+  pendingAssessment: string;
+  assessedCount: string;
 };
 
 type AnalysisResultsWorkspaceProps = {
@@ -100,12 +123,16 @@ type AnalysisResultsWorkspaceProps = {
   organizationContext: string;
   items: ResultItem[];
   labels: AnalysisResultLabels;
-  lockedPreview?: {
-    documentBlocks: DocumentBlock[];
-    unlockLabel: string;
-    onUnlock: () => void;
-  };
+  /**
+   * Dokumentblöcke, die der Server schon kennt. Ohne sie lädt der Arbeitsplatz
+   * sie über die Analyse nach — das geht erst nach dem abgeschlossenen Lauf.
+   */
+  documentBlocks?: DocumentBlock[];
+  /** Leiste über dem Ergebnis, solange der Lauf noch arbeitet. */
+  banner?: React.ReactNode;
 };
+
+const signalLevels: SignalLevel[] = ["strong", "partial", "weak"];
 
 export function splitEvidenceHighlight(text: string, quote: string) {
   const normalizedQuote = quote.trim();
@@ -117,6 +144,45 @@ export function splitEvidenceHighlight(text: string, quote: string) {
     match: text.slice(start, start + normalizedQuote.length),
     after: text.slice(start + normalizedQuote.length),
   };
+}
+
+export type Citation = {
+  id: string;
+  documentBlockId: string;
+  citationOrder: number;
+  exactQuote: string;
+  pageNumber: number | null;
+  paragraphNumber: number | null;
+};
+
+/**
+ * Die Stellen, die zur ausgewählten Anforderung im Dokument hervorgehoben
+ * werden. Nach der Bewertung sind das die Belege des Modells, davor die
+ * Vorabtreffer der lexikalischen Einschätzung — beides exakte Teilstrings
+ * unveränderter Dokumentblöcke.
+ */
+export function citationsOf(item: ResultItem | undefined): Citation[] {
+  if (!item) return [];
+  if (!item.pending) {
+    return item.evidence.map(
+      ({ id, documentBlockId, citationOrder, exactQuote, pageNumber, paragraphNumber }) => ({
+        id,
+        documentBlockId,
+        citationOrder,
+        exactQuote,
+        pageNumber,
+        paragraphNumber,
+      }),
+    );
+  }
+  return (item.signal?.hits ?? []).map((hit, index) => ({
+    id: `${item.id}-hit-${hit.ordinal}`,
+    documentBlockId: hit.documentBlockId,
+    citationOrder: index + 1,
+    exactQuote: hit.excerpt,
+    pageNumber: hit.pageNumber,
+    paragraphNumber: hit.paragraphNumber,
+  }));
 }
 
 const statuses: ResultStatus[] = [
@@ -137,7 +203,8 @@ export function AnalysisResultsWorkspace({
   organizationContext,
   items,
   labels,
-  lockedPreview,
+  documentBlocks: providedDocumentBlocks,
+  banner,
 }: AnalysisResultsWorkspaceProps) {
   const initialId = items.some(({ id }) => id === initialSelectedId)
     ? initialSelectedId
@@ -150,11 +217,11 @@ export function AnalysisResultsWorkspace({
   const [savingConfirmationId, setSavingConfirmationId] = useState<string>();
   const [confirmationError, setConfirmationError] = useState(false);
   const [documentBlocks, setDocumentBlocks] = useState<DocumentBlock[] | undefined>(
-    lockedPreview?.documentBlocks,
+    providedDocumentBlocks,
   );
   const [documentError, setDocumentError] = useState(false);
-  const [activeEvidenceId, setActiveEvidenceId] = useState<string | undefined>(() =>
-    lockedPreview ? undefined : items.find(({ id }) => id === initialId)?.evidence[0]?.id,
+  const [activeEvidenceId, setActiveEvidenceId] = useState<string | undefined>(
+    () => citationsOf(items.find(({ id }) => id === initialId))[0]?.id,
   );
   const [hoveredEvidenceId, setHoveredEvidenceId] = useState<string>();
   const [mobilePane, setMobilePane] = useState<"assessment" | "policy">("assessment");
@@ -167,26 +234,43 @@ export function AnalysisResultsWorkspace({
   const documentBlockRefs = useRef(new Map<string, HTMLElement>());
 
   const selected = reviewItems.find(({ id }) => id === selectedId) ?? reviewItems[0];
-  const activeEvidence = selected?.evidence.find(
-    ({ id }) => id === (hoveredEvidenceId ?? activeEvidenceId),
-  );
+  const citations = citationsOf(selected);
+  const activeEvidence = citations.find(({ id }) => id === (hoveredEvidenceId ?? activeEvidenceId));
+  const pendingCount = reviewItems.filter(({ pending }) => pending).length;
   const counts = useMemo(
     () =>
-      reviewItems.reduce<Record<ResultStatus, number>>(
-        (totals, item) => ({ ...totals, [item.status]: totals[item.status] + 1 }),
-        {
-          fulfilled: 0,
-          partially_fulfilled: 0,
-          not_fulfilled: 0,
-          not_applicable: 0,
-          no_assessment_possible: 0,
-        },
-      ),
+      reviewItems
+        .filter(({ pending }) => !pending)
+        .reduce<Record<ResultStatus, number>>(
+          (totals, item) => ({ ...totals, [item.status]: totals[item.status] + 1 }),
+          {
+            fulfilled: 0,
+            partially_fulfilled: 0,
+            not_fulfilled: 0,
+            not_applicable: 0,
+            no_assessment_possible: 0,
+          },
+        ),
+    [reviewItems],
+  );
+  // Die Ampel der Vorab-Einschätzung zählt nur die Anforderungen, die noch auf
+  // ihre Bewertung warten; bewertete Anforderungen tragen ihren echten Status.
+  const signalCounts = useMemo(
+    () =>
+      reviewItems
+        .filter(({ pending }) => pending)
+        .reduce<Record<SignalLevel, number>>(
+          (totals, item) => {
+            const level = item.signal?.level ?? "weak";
+            return { ...totals, [level]: totals[level] + 1 };
+          },
+          { strong: 0, partial: 0, weak: 0 },
+        ),
     [reviewItems],
   );
 
   useEffect(() => {
-    if (lockedPreview) return;
+    if (providedDocumentBlocks) return;
     let current = true;
     void fetch(`/api/analyses/${analysisId}/document`, { credentials: "same-origin" })
       .then(async (response) => {
@@ -202,7 +286,7 @@ export function AnalysisResultsWorkspace({
     return () => {
       current = false;
     };
-  }, [analysisId, lockedPreview]);
+  }, [analysisId, providedDocumentBlocks]);
 
   if (!selected) return null;
   const selectedForReview = selected;
@@ -211,13 +295,14 @@ export function AnalysisResultsWorkspace({
   const confirmationCountLabel = labels.confirmedCount
     .replace("{confirmed}", String(confirmedCount))
     .replace("{total}", String(reviewItems.length));
+  const assessedCountLabel = labels.signal.assessedCount
+    .replace("{assessed}", String(reviewItems.length - pendingCount))
+    .replace("{total}", String(reviewItems.length));
   const selectedIsConfirmed = confirmedById[selected.id] ?? false;
 
   function selectRequirement(id: string) {
     setSelectedId(id);
-    setActiveEvidenceId(
-      lockedPreview ? undefined : reviewItems.find((item) => item.id === id)?.evidence[0]?.id,
-    );
+    setActiveEvidenceId(citationsOf(reviewItems.find((item) => item.id === id))[0]?.id);
     setHoveredEvidenceId(undefined);
     setConfirmationError(false);
     const url = new URL(window.location.href);
@@ -307,6 +392,7 @@ export function AnalysisResultsWorkspace({
 
   return (
     <div className="result-workspace">
+      {banner}
       <header className="result-heading">
         <div>
           <span>{frameworkSlug.toUpperCase()}</span>
@@ -318,32 +404,29 @@ export function AnalysisResultsWorkspace({
         <span>
           <strong>{reviewItems.length}</strong> {labels.checked}
         </span>
-        <div className="result-summary-statuses" data-preview-locked={!!lockedPreview || undefined}>
-          <div className={lockedPreview ? "result-preview-blur" : undefined}>
-            {statuses.map((status) => (
-              <span key={status} data-result-status={status}>
-                <i aria-hidden="true" />
-                <strong>{counts[status]}</strong> {labels.status[status]}
-              </span>
-            ))}
+        <div className="result-summary-statuses">
+          <div>
+            {pendingCount > 0
+              ? signalLevels.map((level) => (
+                  <span key={level} data-signal-level={level}>
+                    <i aria-hidden="true" />
+                    <strong>{signalCounts[level]}</strong> {labels.signal.level[level]}
+                  </span>
+                ))
+              : null}
+            {statuses
+              .filter((status) => pendingCount === 0 || counts[status] > 0)
+              .map((status) => (
+                <span key={status} data-result-status={status}>
+                  <i aria-hidden="true" />
+                  <strong>{counts[status]}</strong> {labels.status[status]}
+                </span>
+              ))}
           </div>
-          {lockedPreview ? (
-            <button
-              type="button"
-              className="result-preview-unlock result-preview-unlock-inline"
-              onClick={lockedPreview.onUnlock}
-            >
-              <LockKeyhole size={14} aria-hidden="true" />
-              {lockedPreview.unlockLabel}
-            </button>
-          ) : null}
         </div>
         <div className="result-summary-actions">
-          {lockedPreview ? (
-            <button type="button" className="result-export-button" onClick={lockedPreview.onUnlock}>
-              <LockKeyhole size={15} aria-hidden="true" />
-              {labels.exportExcel}
-            </button>
+          {pendingCount > 0 ? (
+            <span>{assessedCountLabel}</span>
           ) : (
             <>
               <span>{confirmationCountLabel}</span>
@@ -392,10 +475,12 @@ export function AnalysisResultsWorkspace({
                   <small>{item.title}</small>
                 </span>
                 <i
-                  data-result-status={item.status}
-                  data-preview-locked={!!lockedPreview || undefined}
+                  data-result-status={item.pending ? undefined : item.status}
+                  data-signal-level={item.pending ? (item.signal?.level ?? "weak") : undefined}
                   aria-label={
-                    lockedPreview ? lockedPreview.unlockLabel : labels.status[item.status]
+                    item.pending
+                      ? `${labels.signal.title}: ${labels.signal.level[item.signal?.level ?? "weak"]}`
+                      : labels.status[item.status]
                   }
                 />
               </button>
@@ -419,7 +504,7 @@ export function AnalysisResultsWorkspace({
                   {labels.confirmationFailed}
                 </span>
               ) : null}
-              {canConfirm ? (
+              {canConfirm && !selected.pending ? (
                 <label className="result-confirmation-control">
                   <input
                     type="checkbox"
@@ -438,18 +523,14 @@ export function AnalysisResultsWorkspace({
                   </span>
                 </label>
               ) : null}
-              {lockedPreview ? (
-                <button
-                  type="button"
-                  className="result-preview-status-lock"
-                  onClick={lockedPreview.onUnlock}
+              {selected.pending ? (
+                <span
+                  className="result-signal-pill"
+                  data-signal-level={selected.signal?.level ?? "weak"}
                 >
-                  <span className="result-status-pill" data-result-status={selected.status}>
-                    {labels.status[selected.status]}
-                  </span>
-                  <LockKeyhole size={14} aria-hidden="true" />
-                  <span>{lockedPreview.unlockLabel}</span>
-                </button>
+                  <i aria-hidden="true" />
+                  {labels.signal.title}: {labels.signal.level[selected.signal?.level ?? "weak"]}
+                </span>
               ) : canOverride ? (
                 <button
                   type="button"
@@ -496,15 +577,49 @@ export function AnalysisResultsWorkspace({
             ) : null}
             <details className="result-section result-ai-section" open>
               <summary>
-                <span>{labels.assessment}</span>
+                <span>{selected.pending ? labels.signal.title : labels.assessment}</span>
                 <ChevronDown size={16} aria-hidden="true" />
               </summary>
-              <div className="result-preview-lockable" data-locked={!!lockedPreview || undefined}>
-                <div className={lockedPreview ? "result-preview-blur" : undefined}>
+              {selected.pending ? (
+                <div className="result-signal-panel">
+                  <p className="result-signal-note">{labels.signal.note}</p>
+                  <dl className="result-assessment-meta">
+                    <div>
+                      <dt>{labels.signal.coverage}</dt>
+                      <dd>{selected.signal?.coveragePercent ?? 0}%</dd>
+                    </div>
+                    <div>
+                      <dt>{labels.aiStatus}</dt>
+                      <dd>{labels.signal.pendingAssessment}</dd>
+                    </div>
+                  </dl>
+                  {(selected.signal?.coveredAspects.length ?? 0) > 0 ? (
+                    <div className="result-signal-aspects" data-covered="true">
+                      <strong>{labels.signal.covered}</strong>
+                      <ul>
+                        {selected.signal?.coveredAspects.map((aspect) => (
+                          <li key={aspect}>{aspect}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {(selected.signal?.openAspects.length ?? 0) > 0 ? (
+                    <div className="result-signal-aspects">
+                      <strong>{labels.signal.open}</strong>
+                      <ul>
+                        {selected.signal?.openAspects.map((aspect) => (
+                          <li key={aspect}>{aspect}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div>
                   <p>{selected.explanation}</p>
-                  {selected.evidence.length > 0 ? (
+                  {citations.length > 0 ? (
                     <div className="result-citation-links" aria-label={labels.evidence}>
-                      {selected.evidence.map((evidence) => (
+                      {citations.map((evidence) => (
                         <button
                           key={evidence.id}
                           type="button"
@@ -558,34 +673,23 @@ export function AnalysisResultsWorkspace({
                     </div>
                   ) : null}
                 </div>
-                {lockedPreview ? (
-                  <button
-                    type="button"
-                    className="result-preview-unlock"
-                    onClick={lockedPreview.onUnlock}
-                  >
-                    <LockKeyhole size={16} aria-hidden="true" />
-                    {lockedPreview.unlockLabel}
-                  </button>
-                ) : null}
-              </div>
+              )}
             </details>
             <details className="result-section result-evidence-section" open>
               <summary>
                 <span>
-                  {labels.evidence} {selected.evidence.length}
+                  {selected.pending ? labels.signal.hits : labels.evidence} {citations.length}
                 </span>
                 <ChevronDown size={16} aria-hidden="true" />
               </summary>
-              <div
-                className="result-evidence-list result-preview-lockable"
-                data-locked={!!lockedPreview || undefined}
-              >
-                <div className={lockedPreview ? "result-preview-blur" : undefined}>
-                  {selected.evidence.length === 0 ? (
-                    <p className="result-empty-evidence">{labels.noEvidence}</p>
+              <div className="result-evidence-list">
+                <div>
+                  {citations.length === 0 ? (
+                    <p className="result-empty-evidence">
+                      {selected.pending ? labels.signal.noHits : labels.noEvidence}
+                    </p>
                   ) : (
-                    selected.evidence.map((evidence) => (
+                    citations.map((evidence) => (
                       <button
                         key={evidence.id}
                         type="button"
@@ -614,16 +718,6 @@ export function AnalysisResultsWorkspace({
                     ))
                   )}
                 </div>
-                {lockedPreview ? (
-                  <button
-                    type="button"
-                    className="result-preview-unlock"
-                    onClick={lockedPreview.onUnlock}
-                  >
-                    <LockKeyhole size={16} aria-hidden="true" />
-                    {lockedPreview.unlockLabel}
-                  </button>
-                ) : null}
               </div>
             </details>
           </div>

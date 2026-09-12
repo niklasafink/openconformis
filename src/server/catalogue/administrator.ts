@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, eq, isNull } from "drizzle-orm";
+import { cache } from "react";
 
 import {
   AuthorizationDeniedError,
@@ -39,8 +40,8 @@ export async function requireCatalogueAdministrator() {
  * für berechtigte Nutzer erscheinen, sonst führt er für alle anderen in einen
  * 404 statt gar nicht erst sichtbar zu sein.
  */
-export async function isCatalogueAdministrator(): Promise<boolean> {
+export const isCatalogueAdministrator = cache(async (): Promise<boolean> => {
   return requireCatalogueAdministrator()
     .then(() => true)
     .catch(() => false);
-}
+});
