@@ -4,6 +4,13 @@ export type SamplePolicyBlock = Readonly<{
   text: string;
 }>;
 
+/**
+ * Pfad der mitgelieferten Beispieldatei, relativ zum Projektstamm. Die Fassung
+ * der Beispiel-Policy liegt nicht im Objektspeicher, sondern im Repository —
+ * Auswahl und Originalvorschau müssen denselben Pfad benutzen.
+ */
+export const samplePolicyAssetPath = "assets/samples/beispiel-ikt-sicherheitsrichtlinie.docx";
+
 export const samplePolicy = {
   id: "musterbank-ikt-v3-2",
   filename: "Beispiel-IKT-Sicherheitsrichtlinie.docx",

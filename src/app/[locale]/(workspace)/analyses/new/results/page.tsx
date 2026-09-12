@@ -11,7 +11,6 @@ import { ModelAccessPanel, type ActiveCredential } from "@/components/results/mo
 import { loadAnalysisResultLabels } from "@/components/results/result-labels";
 import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
-import { createRequirementSignal } from "@/domain/analysis/signal";
 import { doraDemoRelease } from "@/domain/frameworks/dora-demo-release";
 import { routing } from "@/i18n/routing";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
@@ -20,6 +19,7 @@ import { findOwnedAnalysisIdForDraft } from "@/server/analyses/read-analysis";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { getDraftScopeSelection } from "@/server/drafts/scope-selection";
+import { originalDocumentKind } from "@/server/policies/original-document";
 import { getCurrentPolicyPreview } from "@/server/policies/sample-service";
 
 import { selectAnalysisModel } from "./actions";
@@ -84,11 +84,16 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
       }
     : null;
 
+  // Die Originalansicht zeigt die hochgeladene Datei selbst; fehlt sie, bleibt
+  // der ausgelesene Text.
+  const originalKind = policyPreview.selection.originalDeletedAt
+    ? null
+    : originalDocumentKind(policyPreview.selection.mimeType ?? null);
+
   const includedKeys = new Set(scope.includedRequirementKeys);
-  const institutionSize = scope.institutionSize;
-  // Die Vorab-Einschätzung läuft rein lexikalisch auf dem Server: kein
-  // Modellaufruf, kein Schlüssel, kein Wartebalken. Sie ersetzt keine Bewertung,
-  // sondern zeigt vor dem Lauf, wo die Policy die Anforderung überhaupt berührt.
+  // Vor dem Lauf steht jede Anforderung auf „noch nicht bewertet". Es gibt hier
+  // bewusst keine geschätzte Ampel: erst der echte Lauf erzeugt Status,
+  // Begründung und Belegstellen.
   const items: ResultItem[] = doraDemoRelease.requirements
     .filter((requirement) => includedKeys.has(requirement.externalKey))
     .map((requirement) => ({
@@ -112,23 +117,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
       confirmedAt: null,
       evidence: [],
       pending: true,
-      signal: createRequirementSignal(
-        {
-          externalKey: requirement.externalKey,
-          regulatoryId: requirement.regulatoryId,
-          title: requirement.title,
-          legalText: requirement.legalText,
-          assessmentAspects: requirement.assessmentAspects,
-          sizeGuidance: requirement.sizeGuidance[institutionSize],
-          subrequirements: requirement.subrequirements.map((subrequirement) => ({
-            regulatoryId: subrequirement.regulatoryId,
-            title: subrequirement.title,
-            legalText: subrequirement.legalText,
-            assessmentAspects: subrequirement.assessmentAspects,
-          })),
-        },
-        policyPreview.blocks,
-      ),
     }));
   const documentBlocks: DocumentBlock[] = policyPreview.blocks.map(
     ({
@@ -203,6 +191,15 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           items={items}
           labels={resultLabels}
           documentBlocks={documentBlocks}
+          original={
+            originalKind && policyPreview.selection.policyVersionId
+              ? {
+                  policyVersionId: policyPreview.selection.policyVersionId,
+                  kind: originalKind,
+                  draftId: boundDraft.id,
+                }
+              : null
+          }
         />
       </div>
     </>

@@ -14,7 +14,7 @@ import { appendAuditEvent } from "@/server/audit/event";
 import { db, isDatabaseConfigured } from "@/server/db/client";
 import { policies, policyUploadIntents, policyVersions } from "@/server/db/schema/documents";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
-import { createPrivateObjectStore } from "@/server/storage/object-store";
+import { createPrivateObjectStore, resolveStorageDriver } from "@/server/storage/object-store";
 import { launchDocumentIngestionWorkflow } from "@/server/workflows/launch";
 
 const hour = 60 * 60 * 1000;
@@ -67,7 +67,7 @@ export async function createPolicyUploadIntent(untrustedInput: unknown) {
       source: "upload",
       originalFilename: filename,
       declaredMimeType: input.mimeType,
-      storageDriver: process.env.STORAGE_DRIVER ?? "vercel-blob",
+      storageDriver: resolveStorageDriver(),
       objectKey,
       parseStatus: "awaiting_upload",
       originalDeleteAfter,
@@ -253,6 +253,57 @@ export async function completePolicyUploadIntent(intentId: string, expectedDraft
   const parsed = policyUploadRequestSchema.shape.draftId.safeParse(intentId);
   if (!parsed.success) throw new Error("INVALID_INTENT");
   return completePolicyUpload(intentId, expectedDraftId);
+}
+
+export type PolicyProcessingState = {
+  policyVersionId: string;
+  parseStatus: string;
+  /** Verarbeitung abgeschlossen: Umfang und Ergebnis können den Text lesen. */
+  ready: boolean;
+  /** Endgültig gescheitert — ein weiteres Warten ändert nichts mehr. */
+  failed: boolean;
+  errorCode: string | null;
+  pageCount: number | null;
+};
+
+const failedParseStatuses = new Set(["failed", "quarantined", "needs_ocr_review", "deleted"]);
+
+/**
+ * Der Stand der Aufbereitung einer hochgeladenen Datei. Ohne ihn stünde der
+ * Nutzer nach dem Upload vor einer Seite ohne Weiter — der Umfangsschritt
+ * findet die Policy erst, wenn der Parser sie fertig zerlegt hat.
+ */
+export async function getPolicyProcessingState(
+  policyVersionId: string,
+  expectedDraftId: string,
+): Promise<PolicyProcessingState> {
+  if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
+
+  const draft = await getBoundActiveDraft(expectedDraftId);
+  if (!draft) throw new Error("DRAFT_NOT_FOUND");
+
+  const [version] = await db
+    .select({
+      id: policyVersions.id,
+      parseStatus: policyVersions.parseStatus,
+      parseErrorCode: policyVersions.parseErrorCode,
+      pageCount: policyVersions.pageCount,
+    })
+    .from(policyVersions)
+    .where(
+      and(eq(policyVersions.id, policyVersionId), eq(policyVersions.anonymousDraftId, draft.id)),
+    )
+    .limit(1);
+  if (!version) throw new Error("UPLOAD_NOT_FOUND");
+
+  return {
+    policyVersionId: version.id,
+    parseStatus: version.parseStatus,
+    ready: version.parseStatus === "ready" && version.pageCount !== null,
+    failed: failedParseStatuses.has(version.parseStatus),
+    errorCode: version.parseErrorCode,
+    pageCount: version.pageCount,
+  };
 }
 
 export function parsePolicyUploadRequest(input: unknown): PolicyUploadRequest {

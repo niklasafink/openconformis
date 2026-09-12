@@ -11,11 +11,13 @@ const cleanupBatchSize = 25;
 
 export async function purgeExpiredPolicyData() {
   const now = new Date();
-  const store = createPrivateObjectStore();
+  // Der Speicher wird je Fassung gewählt: nach einem Treiberwechsel bleiben
+  // sonst genau die Objekte liegen, die aufgeräumt werden sollten.
   const originals = await db
     .select({
       id: policyVersions.id,
       objectKey: policyVersions.objectKey,
+      storageDriver: policyVersions.storageDriver,
     })
     .from(policyVersions)
     .where(
@@ -25,7 +27,7 @@ export async function purgeExpiredPolicyData() {
 
   let originalObjectsDeleted = 0;
   for (const version of originals) {
-    await store.deleteObject(version.objectKey);
+    await createPrivateObjectStore(version.storageDriver).deleteObject(version.objectKey);
     const [deleted] = await db
       .update(policyVersions)
       .set({ originalDeletedAt: now })
@@ -39,6 +41,7 @@ export async function purgeExpiredPolicyData() {
       id: policyVersions.id,
       policyId: policyVersions.policyId,
       processedObjectKey: policyVersions.processedObjectKey,
+      storageDriver: policyVersions.storageDriver,
     })
     .from(policyVersions)
     .where(
@@ -55,7 +58,11 @@ export async function purgeExpiredPolicyData() {
 
   let parsedPoliciesDeleted = 0;
   for (const version of parsed) {
-    if (version.processedObjectKey) await store.deleteObject(version.processedObjectKey);
+    if (version.processedObjectKey) {
+      await createPrivateObjectStore(version.storageDriver).deleteObject(
+        version.processedObjectKey,
+      );
+    }
     await db.transaction(async (transaction) => {
       await transaction
         .delete(documentBlocks)

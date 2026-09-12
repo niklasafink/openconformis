@@ -1,5 +1,8 @@
 import "server-only";
 
+import { createRequire } from "node:module";
+import { join } from "node:path";
+
 import mammoth from "mammoth";
 
 import {
@@ -80,6 +83,15 @@ async function parsePdf(bytes: Uint8Array): Promise<ParsedDocument> {
   if (!hasSupportedFileSignature(bytes, pdfMimeType)) throw new Error("PDF_SIGNATURE_INVALID");
 
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // pdf.js kommt mit dem relativen Vorgabewert `./pdf.worker.mjs`, den es neben
+  // seiner eigenen Datei sucht. Gebündelt zeigt der in ein Chunk-Verzeichnis
+  // ohne Workerdatei, und jedes PDF scheiterte mit „Setting up fake worker
+  // failed". Weil der Vorgabewert belegt ist, muss er überschrieben werden.
+  // Aufgelöst wird vom Projektstamm aus: `import.meta.url` ist im Bundle ein
+  // virtueller Pfad, von dem aus sich `node_modules` nicht finden lässt.
+  pdfjs.GlobalWorkerOptions.workerSrc = createRequire(join(process.cwd(), "package.json")).resolve(
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+  );
   const task = pdfjs.getDocument({
     data: Uint8Array.from(bytes),
     useSystemFonts: true,

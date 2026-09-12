@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AnalysisResultsWorkspace, splitEvidenceHighlight } from "./analysis-results-workspace";
+import { AnalysisResultsWorkspace } from "./analysis-results-workspace";
+import { splitEvidenceHighlight } from "./policy-document-viewer";
 
 const labels = {
   checked: "geprüft",
@@ -39,21 +40,14 @@ const labels = {
   assessmentPane: "Bewertung",
   policyPane: "Policy",
   openEvidence: "Belegstelle öffnen",
-  signal: {
-    title: "Vorabeinschätzung",
-    note: "Sofortiger Textabgleich ohne Modellaufruf.",
-    level: {
-      strong: "hohe Abdeckung",
-      partial: "teilweise Abdeckung",
-      weak: "geringe Abdeckung",
-    },
-    coverage: "Abgedeckte Prüfaspekte",
-    covered: "Im Dokument gefunden",
-    open: "Im Dokument nicht gefunden",
-    hits: "Vorabtreffer",
-    noHits: "Keine Textstelle mit Bezug zu dieser Anforderung gefunden.",
-    pendingAssessment: "Steht aus",
-    assessedCount: "{assessed} von {total} durch KI bewertet",
+  originalView: "Original",
+  textView: "Text",
+  originalUnavailable: "Original nicht mehr verfügbar",
+  pending: {
+    title: "Noch nicht bewertet",
+    note: "Diese Anforderung wartet auf die Bewertung durch das Modell.",
+    noEvidence: "Belegstellen entstehen mit der Bewertung.",
+    assessedCount: "{assessed} von {total} bewertet",
   },
   status: {
     fulfilled: "Erfüllt",
@@ -243,7 +237,7 @@ describe("analysis result confirmation UI", () => {
   });
 });
 
-describe("preliminary signal before the AI assessment", () => {
+describe("requirements without an assessment", () => {
   const documentBlocks = [
     {
       id: "block-1",
@@ -264,28 +258,9 @@ describe("preliminary signal before the AI assessment", () => {
     confidencePercent: 0,
     verificationStatus: "pending" as const,
     pending: true,
-    signal: {
-      version: "lexical-signal-v1" as const,
-      requirementExternalKey: "dora-5-2",
-      level: "partial" as const,
-      coveragePercent: 50,
-      coveredAspects: ["Dokumentierte Genehmigung"],
-      openAspects: ["Laufende Überwachung der Umsetzung"],
-      hits: [
-        {
-          documentBlockId: "block-1",
-          ordinal: 1,
-          excerpt: "Das Leitungsorgan genehmigt den Rahmen.",
-          headingPath: ["Governance"],
-          pageNumber: 1,
-          paragraphNumber: 1,
-          matchedTerms: ["leitungsorgan"],
-        },
-      ],
-    },
   };
 
-  it("shows the colour signal and the found passages instead of an empty assessment", () => {
+  it("states that the requirement is not assessed yet and estimates nothing", () => {
     render(
       <AnalysisResultsWorkspace
         analysisId="preview"
@@ -300,17 +275,21 @@ describe("preliminary signal before the AI assessment", () => {
       />,
     );
 
-    expect(screen.getByText("Vorabeinschätzung: teilweise Abdeckung")).toBeInTheDocument();
-    expect(screen.getByText("0 von 1 durch KI bewertet")).toBeInTheDocument();
-    expect(screen.getByText("Dokumentierte Genehmigung")).toBeInTheDocument();
-    expect(screen.getByText("Laufende Überwachung der Umsetzung")).toBeInTheDocument();
+    expect(screen.getAllByText("Noch nicht bewertet").length).toBeGreaterThan(0);
+    expect(screen.getByText("0 von 1 bewertet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Diese Anforderung wartet auf die Bewertung durch das Modell."),
+    ).toBeInTheDocument();
+    // Kein geschätzter Status und keine erfundenen Belegstellen vor dem Lauf.
+    expect(screen.queryByText("Keine Einschätzung möglich")).not.toBeInTheDocument();
+    expect(screen.getByText("Belegstellen entstehen mit der Bewertung.")).toBeInTheDocument();
     // Ohne Bewertung gibt es weder Bestätigung noch Override und keinen Export.
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Status ändern" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Excel/u })).not.toBeInTheDocument();
   });
 
-  it("highlights a found passage in the policy without loading the document again", async () => {
+  it("shows the policy text it was given without fetching the document again", () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -328,11 +307,10 @@ describe("preliminary signal before the AI assessment", () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByText("Das Leitungsorgan genehmigt den Rahmen.", { selector: "mark" }),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      screen.getByText("Vorher Das Leitungsorgan genehmigt den Rahmen. Nachher"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("mark")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -349,5 +327,52 @@ describe("evidence highlighting", () => {
   it("returns no highlight for an empty or missing quote", () => {
     expect(splitEvidenceHighlight("Policy", "")).toBeNull();
     expect(splitEvidenceHighlight("Policy", "anderer Text")).toBeNull();
+  });
+});
+
+describe("live results during a run", () => {
+  it("replaces a pending requirement as soon as the run delivers its assessment", () => {
+    const pending = {
+      ...item,
+      id: "pending-1",
+      aiStatus: "no_assessment_possible" as const,
+      status: "no_assessment_possible" as const,
+      explanation: "",
+      pending: true,
+    };
+    const view = render(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        canConfirm={false}
+        canOverride={false}
+        frameworkSlug="dora"
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[pending]}
+        labels={labels}
+        documentBlocks={[]}
+      />,
+    );
+
+    expect(screen.getByText("0 von 1 bewertet")).toBeInTheDocument();
+
+    // Der Server liefert dieselbe Anforderung bewertet nach — ohne Neuladen.
+    view.rerender(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        canConfirm={false}
+        canOverride={false}
+        frameworkSlug="dora"
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[{ ...item, id: "result-1" }]}
+        labels={labels}
+        documentBlocks={[]}
+      />,
+    );
+
+    expect(screen.queryByText("0 von 1 bewertet")).not.toBeInTheDocument();
+    expect(screen.getByText("Die laufende Überwachung ist nicht belegt.")).toBeInTheDocument();
+    expect(screen.getAllByText("Teilweise erfüllt").length).toBeGreaterThan(0);
   });
 });

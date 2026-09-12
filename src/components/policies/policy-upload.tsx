@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
@@ -8,6 +9,8 @@ import { docxMimeType, maximumPolicyBytes, pdfMimeType } from "@/domain/policies
 
 type PolicyUploadProps = Readonly<{
   draftId?: string;
+  /** Ziel nach abgeschlossener Aufbereitung — der Umfangsschritt. */
+  continueHref: string;
   labels: {
     dropzone: string;
     select: string;
@@ -15,6 +18,8 @@ type PolicyUploadProps = Readonly<{
     upload: string;
     uploading: string;
     uploaded: string;
+    processing: string;
+    processingFailed: string;
     invalidType: string;
     tooLarge: string;
     unavailable: string;
@@ -37,11 +42,35 @@ function normalizedMimeType(file: File) {
   return file.type;
 }
 
-export function PolicyUpload({ draftId, labels }: PolicyUploadProps) {
+type UploadStatus = "idle" | "uploading" | "processing" | "uploaded";
+
+/**
+ * Wartet, bis der Parser die hochgeladene Datei zerlegt hat. Vorher findet der
+ * Umfangsschritt die Policy nicht und würde den Nutzer an den Anfang
+ * zurückwerfen.
+ */
+async function waitForProcessing(policyVersionId: string, draftId: string) {
+  const deadline = Date.now() + 5 * 60 * 1000;
+  for (;;) {
+    const response = await fetch(
+      `/api/policies/${policyVersionId}/status?draft=${encodeURIComponent(draftId)}`,
+      { credentials: "same-origin", cache: "no-store" },
+    );
+    if (!response.ok) throw new Error("processing");
+    const state = (await response.json()) as { ready: boolean; failed: boolean };
+    if (state.ready) return;
+    if (state.failed) throw new Error("processing");
+    if (Date.now() > deadline) throw new Error("processing");
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+  }
+}
+
+export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProps) {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "uploading" | "uploaded">("idle");
+  const [status, setStatus] = useState<UploadStatus>("idle");
   const [dragging, setDragging] = useState(false);
 
   function chooseFile(candidate?: File) {
@@ -100,10 +129,17 @@ export function PolicyUpload({ draftId, labels }: PolicyUploadProps) {
       });
       if (!completeResponse.ok) throw new Error("complete");
 
+      setStatus("processing");
+      await waitForProcessing(intent.policyVersionId, draftId);
       setStatus("uploaded");
-    } catch {
+      router.push(continueHref);
+    } catch (cause) {
       setStatus("idle");
-      setError(labels.failed);
+      setError(
+        cause instanceof Error && cause.message === "processing"
+          ? labels.processingFailed
+          : labels.failed,
+      );
     }
   }
 
@@ -126,7 +162,7 @@ export function PolicyUpload({ draftId, labels }: PolicyUploadProps) {
             className="button button-tertiary"
             type="button"
             aria-label={labels.remove}
-            disabled={status === "uploading"}
+            disabled={status !== "idle"}
             onClick={() => {
               setFile(null);
               setError(null);
@@ -179,9 +215,11 @@ export function PolicyUpload({ draftId, labels }: PolicyUploadProps) {
         >
           {status === "uploading"
             ? labels.uploading
-            : status === "uploaded"
-              ? labels.uploaded
-              : labels.upload}
+            : status === "processing"
+              ? labels.processing
+              : status === "uploaded"
+                ? labels.uploaded
+                : labels.upload}
         </button>
       ) : null}
     </div>

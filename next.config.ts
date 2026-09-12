@@ -2,23 +2,12 @@ import createNextIntlPlugin from "next-intl/plugin";
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 
+import { buildContentSecurityPolicy } from "./src/domain/operations/content-security-policy";
+
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const isDevelopment = process.env.NODE_ENV === "development";
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
-  "font-src 'self' data:",
-  "connect-src 'self' https://*.blob.vercel-storage.com",
-  "frame-src https://challenges.cloudflare.com",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
+const contentSecurityPolicy = buildContentSecurityPolicy(isDevelopment);
 
 const nextConfig: NextConfig = {
   // Zwei parallele E2E-Server (siehe `playwright.config.ts`) dürfen sich nicht
@@ -29,6 +18,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./assets/samples/**/*",
+      // Der Parser lädt diesen Worker zur Laufzeit über seinen aufgelösten
+      // Pfad; ohne ihn im Paket scheitert jedes PDF in der Serverumgebung.
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/@tesseract.js-data/deu/4.0.0/**/*",
       "./node_modules/@tesseract.js-data/eng/4.0.0/**/*",
     ],

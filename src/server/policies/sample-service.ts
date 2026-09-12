@@ -6,7 +6,11 @@ import { resolve } from "node:path";
 
 import { and, asc, eq } from "drizzle-orm";
 
-import { getSamplePolicyCanonicalText, samplePolicy } from "@/domain/policies/sample-policy";
+import {
+  getSamplePolicyCanonicalText,
+  samplePolicy,
+  samplePolicyAssetPath,
+} from "@/domain/policies/sample-policy";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db, isDatabaseConfigured } from "@/server/db/client";
 import {
@@ -17,10 +21,7 @@ import {
 } from "@/server/db/schema/documents";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 
-const sampleAssetPath = resolve(
-  process.cwd(),
-  "assets/samples/beispiel-ikt-sicherheitsrichtlinie.docx",
-);
+const sampleAssetPath = resolve(process.cwd(), samplePolicyAssetPath);
 
 const day = 24 * 60 * 60 * 1000;
 
@@ -56,6 +57,9 @@ export type SelectedPolicy = {
   pageCount: number;
   source: "sample" | "upload";
   persisted: boolean;
+  /** Für die Originalansicht: Dateityp und ob die Datei noch vorliegt. */
+  mimeType?: string | null;
+  originalDeletedAt?: Date | null;
 };
 
 export async function getCurrentPolicySelection(expectedDraftId?: string) {
@@ -71,6 +75,8 @@ export async function getCurrentPolicySelection(expectedDraftId?: string) {
       filename: policyVersions.originalFilename,
       pageCount: policyVersions.pageCount,
       source: policyVersions.source,
+      mimeType: policyVersions.detectedMimeType,
+      originalDeletedAt: policyVersions.originalDeletedAt,
     })
     .from(draftPolicySelections)
     .innerJoin(policyVersions, eq(policyVersions.id, draftPolicySelections.policyVersionId))

@@ -123,6 +123,8 @@
     "upload": "Upload securely",
     "uploading": "Uploading …",
     "uploaded": "Upload received",
+    "processing": "Processing the document …",
+    "processingFailed": "The document could not be processed. Please try another file.",
     "invalidType": "Select a PDF or DOCX file.",
     "tooLarge": "The file must not exceed 25 MB.",
     "uploadUnavailable": "Select a framework first.",
@@ -260,6 +262,9 @@
       "assessmentPane": "Assessment",
       "policyPane": "Policy",
       "openEvidence": "Open evidence",
+      "originalView": "Original",
+      "textView": "Text",
+      "originalUnavailable": "The original document is no longer available; the extracted text is shown instead.",
       "status": {
         "fulfilled": "Fulfilled",
         "partially_fulfilled": "Partially fulfilled",
@@ -267,21 +272,11 @@
         "not_applicable": "Not applicable",
         "no_assessment_possible": "No assessment possible"
       },
-      "signal": {
-        "title": "Preliminary signal",
-        "note": "Instant text match without a model call. It shows where the policy touches the requirement at all and is explicitly not an assessment — the AI assessment replaces it.",
-        "level": {
-          "strong": "high coverage",
-          "partial": "partial coverage",
-          "weak": "low coverage"
-        },
-        "coverage": "Covered assessment aspects",
-        "covered": "Found in the document",
-        "open": "Not found in the document",
-        "hits": "Preliminary matches",
-        "noHits": "No passage related to this requirement was found.",
-        "pendingAssessment": "Pending",
-        "assessedCount": "{assessed} of {total} assessed by AI"
+      "pending": {
+        "title": "Not assessed yet",
+        "note": "This requirement is waiting for the model assessment. Status, reasoning and evidence appear only once the run has produced them.",
+        "noEvidence": "Evidence appears with the assessment.",
+        "assessedCount": "{assessed} of {total} assessed"
       }
     },
     "status": {

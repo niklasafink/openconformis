@@ -14,6 +14,7 @@ import {
 } from "@/server/analyses/read-analysis";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { requireSessionPrincipal } from "@/server/auth/session-principal";
+import { originalDocumentKind } from "@/server/policies/original-document";
 import { canConfirmAssessment, canOverrideAssessment } from "@/server/analyses/review-analysis";
 import { isDatabaseConfigured } from "@/server/db/client";
 
@@ -48,6 +49,11 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     getOwnedAnalysisResultWorkspace({ analysisId, ownerUserId: user.id }),
   ]);
   const sameOrganization = principal?.organizationId === results?.organizationId;
+  // Ohne Original — gelöscht nach Aufbewahrungsfrist — bleibt nur der
+  // ausgelesene Text; der Umschalter entfällt dann.
+  const originalKind = results?.policyOriginalDeletedAt
+    ? null
+    : originalDocumentKind(results?.policyMimeType ?? null);
   const running = analysis.status !== "completed";
 
   const createdAtLabel = new Intl.DateTimeFormat(locale, {
@@ -102,6 +108,9 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
             items={results.items}
             labels={resultLabels}
             documentBlocks={results.documentBlocks}
+            original={
+              originalKind ? { policyVersionId: results.policyVersionId, kind: originalKind } : null
+            }
             banner={
               running ? (
                 <AnalysisRunLive

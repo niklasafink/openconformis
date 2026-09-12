@@ -2,8 +2,6 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
-import { createRequirementSignal } from "@/domain/analysis/signal";
-
 import { requireSessionPrincipal } from "@/server/auth/session-principal";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
@@ -105,6 +103,8 @@ export async function getOwnedAnalysisResultWorkspace(input: {
       organizationContext: analyses.organizationContext,
       policyVersionId: analyses.policyVersionId,
       policyName: policies.displayName,
+      policyMimeType: policyVersions.detectedMimeType,
+      policyOriginalDeletedAt: policyVersions.originalDeletedAt,
     })
     .from(analyses)
     .innerJoin(policyVersions, eq(policyVersions.id, analyses.policyVersionId))
@@ -115,7 +115,7 @@ export async function getOwnedAnalysisResultWorkspace(input: {
 
   // Links verbunden, nicht innen: der Worker schreibt die Ergebnisse einzeln,
   // während der Lauf noch läuft. Anforderungen ohne Ergebnis fehlen deshalb
-  // nicht, sie tragen so lange die lexikalische Vorab-Einschätzung.
+  // nicht, sie stehen so lange sichtbar auf „noch nicht bewertet".
   const rows = await db
     .select({ scope: analysisScopeItems, result: analysisRequirementResults })
     .from(analysisScopeItems)
@@ -176,8 +176,8 @@ export async function getOwnedAnalysisResultWorkspace(input: {
 
   return {
     ...analysis,
-    // Tokenzahl und Texthash trägt nur die Vorab-Einschätzung; der Browser
-    // bekommt sie nicht.
+    // Tokenzahl und Texthash bleiben auf dem Server; der Browser bekommt sie
+    // nicht.
     documentBlocks: blocks.map((block) => ({
       id: block.id,
       blockKey: block.blockKey,
@@ -206,29 +206,11 @@ export async function getOwnedAnalysisResultWorkspace(input: {
           confirmedAt: null,
           evidence: [],
           pending: true,
-          signal: createRequirementSignal(
-            {
-              externalKey: scope.requirementExternalKey,
-              regulatoryId: scope.regulatoryId,
-              title: scope.title,
-              legalText: scope.legalText,
-              assessmentAspects: scope.assessmentAspects,
-              sizeGuidance: scope.sizeGuidance,
-              subrequirements: scope.subrequirements.map((subrequirement) => ({
-                regulatoryId: subrequirement.regulatoryId,
-                title: subrequirement.title,
-                legalText: subrequirement.legalText,
-                assessmentAspects: subrequirement.assessmentAspects,
-              })),
-            },
-            blocks,
-          ),
         };
       }
       const override = latestOverrideByResult.get(result.id);
       return {
         pending: false,
-        signal: null,
         id: result.id,
         regulatoryId: scope.regulatoryId,
         title: scope.title,

@@ -59,6 +59,7 @@ export async function ingestPolicyVersion(job: DocumentIngestionJob, workflowRun
       anonymousDraftId: policyVersions.anonymousDraftId,
       declaredMimeType: policyVersions.declaredMimeType,
       objectKey: policyVersions.objectKey,
+      storageDriver: policyVersions.storageDriver,
     });
 
   if (!version) {
@@ -79,7 +80,7 @@ export async function ingestPolicyVersion(job: DocumentIngestionJob, workflowRun
   const anonymousDraftId = version.anonymousDraftId;
 
   try {
-    const objectStore = createPrivateObjectStore();
+    const objectStore = createPrivateObjectStore(version.storageDriver);
     const bytes = await objectStore.getObjectBytes(version.objectKey, maximumPolicyBytes);
     const sha256 = createHash("sha256").update(bytes).digest("hex");
 

@@ -82,6 +82,14 @@ Neue Tests sollen beobachtbares Verhalten und echte Fehlerfälle absichern.
 Vor Löschungen Runtime-Imports, Konfiguration, Skripte und Dokumentationsverweise prüfen.
 Migrationen, Lizenzen, Herkunftsnachweise und Betriebsunterlagen nicht pauschal entfernen.
 
+## Zusammenarbeit
+
+Rückfragen an den Nutzer immer als konkrete Stichpunkte stellen — keine Fließtextabsätze,
+keine offenen Sammelfragen. Jede Frage nennt die Entscheidung und ihre Folge.
+Soll der Nutzer selbst etwas tun, gehört dazu immer eine nummerierte
+Schritt-für-Schritt-Anleitung mit den genauen Befehlen, Pfaden und Klickwegen —
+nie nur der Hinweis, dass etwas fehlt oder zu konfigurieren ist.
+
 ## Lizenz und weiterführende Quellen
 
 Source-available unter PolyForm Noncommercial 1.0.0; keine OSI-Open-Source-Lizenz.

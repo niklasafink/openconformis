@@ -53,6 +53,7 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
               </div>
               <PolicyUpload
                 draftId={draft}
+                continueHref={`/${locale}/analyses/new/scope${draft ? `?draft=${draft}` : ""}`}
                 labels={{
                   dropzone: t("dropzone"),
                   select: t("selectFile"),
@@ -60,6 +61,8 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
                   upload: t("upload"),
                   uploading: t("uploading"),
                   uploaded: t("uploaded"),
+                  processing: t("processing"),
+                  processingFailed: t("processingFailed"),
                   invalidType: t("invalidType"),
                   tooLarge: t("tooLarge"),
                   unavailable: t("uploadUnavailable"),

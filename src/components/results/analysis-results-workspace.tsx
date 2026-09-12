@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronDown, Download, FileText, Pencil, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Download, Pencil, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { RequirementSignal, SignalLevel } from "@/domain/analysis/signal";
+import { PolicyDocumentViewer, type PolicyOriginal } from "./policy-document-viewer";
 
 export type ResultStatus =
   | "fulfilled"
@@ -26,11 +26,10 @@ export type ResultItem = {
   aiStatus: ResultStatus;
   status: ResultStatus;
   /**
-   * Sofortige lexikalische Vorab-Einschätzung. Sie trägt die Ampel, solange die
-   * Anforderung noch auf ihre KI-Bewertung wartet.
+   * Noch keine KI-Bewertung vorhanden. Status, Begründung und Belege bleiben
+   * leer, bis der Lauf diese Anforderung tatsächlich bewertet hat — vorher gibt
+   * es hier nichts anzuzeigen und nichts zu schätzen.
    */
-  signal?: RequirementSignal | null;
-  /** Noch keine KI-Bewertung vorhanden — Status und Begründung sind leer. */
   pending?: boolean;
   override: { id: string; status: ResultStatus; reason: string; createdAt: string } | null;
   explanation: string;
@@ -97,19 +96,16 @@ export type AnalysisResultLabels = {
   assessmentPane: string;
   policyPane: string;
   openEvidence: string;
-  signal: AnalysisSignalLabels;
+  originalView: string;
+  textView: string;
+  originalUnavailable: string;
+  pending: AnalysisPendingLabels;
 };
 
-export type AnalysisSignalLabels = {
+export type AnalysisPendingLabels = {
   title: string;
   note: string;
-  level: Record<SignalLevel, string>;
-  coverage: string;
-  covered: string;
-  open: string;
-  hits: string;
-  noHits: string;
-  pendingAssessment: string;
+  noEvidence: string;
   assessedCount: string;
 };
 
@@ -128,23 +124,11 @@ type AnalysisResultsWorkspaceProps = {
    * sie über die Analyse nach — das geht erst nach dem abgeschlossenen Lauf.
    */
   documentBlocks?: DocumentBlock[];
+  /** Die hochgeladene Datei selbst, für die Originalansicht neben dem Text. */
+  original?: PolicyOriginal | null;
   /** Leiste über dem Ergebnis, solange der Lauf noch arbeitet. */
   banner?: React.ReactNode;
 };
-
-const signalLevels: SignalLevel[] = ["strong", "partial", "weak"];
-
-export function splitEvidenceHighlight(text: string, quote: string) {
-  const normalizedQuote = quote.trim();
-  if (!normalizedQuote) return null;
-  const start = text.indexOf(normalizedQuote);
-  if (start < 0) return null;
-  return {
-    before: text.slice(0, start),
-    match: text.slice(start, start + normalizedQuote.length),
-    after: text.slice(start + normalizedQuote.length),
-  };
-}
 
 export type Citation = {
   id: string;
@@ -156,33 +140,22 @@ export type Citation = {
 };
 
 /**
- * Die Stellen, die zur ausgewählten Anforderung im Dokument hervorgehoben
- * werden. Nach der Bewertung sind das die Belege des Modells, davor die
- * Vorabtreffer der lexikalischen Einschätzung — beides exakte Teilstrings
- * unveränderter Dokumentblöcke.
+ * Die Belegstellen der ausgewählten Anforderung — ausschließlich die des
+ * Modells und nur für tatsächlich bewertete Anforderungen. Eine offene
+ * Anforderung hat keine Belege, also wird auch nichts hervorgehoben.
  */
 export function citationsOf(item: ResultItem | undefined): Citation[] {
-  if (!item) return [];
-  if (!item.pending) {
-    return item.evidence.map(
-      ({ id, documentBlockId, citationOrder, exactQuote, pageNumber, paragraphNumber }) => ({
-        id,
-        documentBlockId,
-        citationOrder,
-        exactQuote,
-        pageNumber,
-        paragraphNumber,
-      }),
-    );
-  }
-  return (item.signal?.hits ?? []).map((hit, index) => ({
-    id: `${item.id}-hit-${hit.ordinal}`,
-    documentBlockId: hit.documentBlockId,
-    citationOrder: index + 1,
-    exactQuote: hit.excerpt,
-    pageNumber: hit.pageNumber,
-    paragraphNumber: hit.paragraphNumber,
-  }));
+  if (!item || item.pending) return [];
+  return item.evidence.map(
+    ({ id, documentBlockId, citationOrder, exactQuote, pageNumber, paragraphNumber }) => ({
+      id,
+      documentBlockId,
+      citationOrder,
+      exactQuote,
+      pageNumber,
+      paragraphNumber,
+    }),
+  );
 }
 
 const statuses: ResultStatus[] = [
@@ -204,6 +177,7 @@ export function AnalysisResultsWorkspace({
   items,
   labels,
   documentBlocks: providedDocumentBlocks,
+  original = null,
   banner,
 }: AnalysisResultsWorkspaceProps) {
   const initialId = items.some(({ id }) => id === initialSelectedId)
@@ -214,6 +188,15 @@ export function AnalysisResultsWorkspace({
   const [confirmedById, setConfirmedById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(items.map((item) => [item.id, item.confirmedAt !== null])),
   );
+  // Während der Lauf arbeitet, lädt die Seite ihre Ergebnisse nach. Ohne diesen
+  // Abgleich bliebe der Arbeitsplatz auf dem Stand des ersten Renderns stehen
+  // und zeigte fertige Bewertungen weiter als „noch nicht bewertet".
+  const [renderedItems, setRenderedItems] = useState(items);
+  if (items !== renderedItems) {
+    setRenderedItems(items);
+    setReviewItems(items);
+    setConfirmedById(Object.fromEntries(items.map((item) => [item.id, item.confirmedAt !== null])));
+  }
   const [savingConfirmationId, setSavingConfirmationId] = useState<string>();
   const [confirmationError, setConfirmationError] = useState(false);
   const [documentBlocks, setDocumentBlocks] = useState<DocumentBlock[] | undefined>(
@@ -232,6 +215,13 @@ export function AnalysisResultsWorkspace({
   const [savingOverride, setSavingOverride] = useState(false);
   const documentScrollRef = useRef<HTMLDivElement>(null);
   const documentBlockRefs = useRef(new Map<string, HTMLElement>());
+  const registerScrollContainer = useCallback((node: HTMLDivElement | null) => {
+    documentScrollRef.current = node;
+  }, []);
+  const registerBlock = useCallback((blockId: string, node: HTMLElement | null) => {
+    if (node) documentBlockRefs.current.set(blockId, node);
+    else documentBlockRefs.current.delete(blockId);
+  }, []);
 
   const selected = reviewItems.find(({ id }) => id === selectedId) ?? reviewItems[0];
   const citations = citationsOf(selected);
@@ -253,22 +243,6 @@ export function AnalysisResultsWorkspace({
         ),
     [reviewItems],
   );
-  // Die Ampel der Vorab-Einschätzung zählt nur die Anforderungen, die noch auf
-  // ihre Bewertung warten; bewertete Anforderungen tragen ihren echten Status.
-  const signalCounts = useMemo(
-    () =>
-      reviewItems
-        .filter(({ pending }) => pending)
-        .reduce<Record<SignalLevel, number>>(
-          (totals, item) => {
-            const level = item.signal?.level ?? "weak";
-            return { ...totals, [level]: totals[level] + 1 };
-          },
-          { strong: 0, partial: 0, weak: 0 },
-        ),
-    [reviewItems],
-  );
-
   useEffect(() => {
     if (providedDocumentBlocks) return;
     let current = true;
@@ -295,7 +269,7 @@ export function AnalysisResultsWorkspace({
   const confirmationCountLabel = labels.confirmedCount
     .replace("{confirmed}", String(confirmedCount))
     .replace("{total}", String(reviewItems.length));
-  const assessedCountLabel = labels.signal.assessedCount
+  const assessedCountLabel = labels.pending.assessedCount
     .replace("{assessed}", String(reviewItems.length - pendingCount))
     .replace("{total}", String(reviewItems.length));
   const selectedIsConfirmed = confirmedById[selected.id] ?? false;
@@ -406,14 +380,12 @@ export function AnalysisResultsWorkspace({
         </span>
         <div className="result-summary-statuses">
           <div>
-            {pendingCount > 0
-              ? signalLevels.map((level) => (
-                  <span key={level} data-signal-level={level}>
-                    <i aria-hidden="true" />
-                    <strong>{signalCounts[level]}</strong> {labels.signal.level[level]}
-                  </span>
-                ))
-              : null}
+            {pendingCount > 0 ? (
+              <span data-result-pending="true">
+                <i aria-hidden="true" />
+                <strong>{pendingCount}</strong> {labels.pending.title}
+              </span>
+            ) : null}
             {statuses
               .filter((status) => pendingCount === 0 || counts[status] > 0)
               .map((status) => (
@@ -476,12 +448,8 @@ export function AnalysisResultsWorkspace({
                 </span>
                 <i
                   data-result-status={item.pending ? undefined : item.status}
-                  data-signal-level={item.pending ? (item.signal?.level ?? "weak") : undefined}
-                  aria-label={
-                    item.pending
-                      ? `${labels.signal.title}: ${labels.signal.level[item.signal?.level ?? "weak"]}`
-                      : labels.status[item.status]
-                  }
+                  data-result-pending={item.pending || undefined}
+                  aria-label={item.pending ? labels.pending.title : labels.status[item.status]}
                 />
               </button>
             ))}
@@ -524,12 +492,8 @@ export function AnalysisResultsWorkspace({
                 </label>
               ) : null}
               {selected.pending ? (
-                <span
-                  className="result-signal-pill"
-                  data-signal-level={selected.signal?.level ?? "weak"}
-                >
-                  <i aria-hidden="true" />
-                  {labels.signal.title}: {labels.signal.level[selected.signal?.level ?? "weak"]}
+                <span className="result-status-pill" data-result-pending="true">
+                  {labels.pending.title}
                 </span>
               ) : canOverride ? (
                 <button
@@ -577,43 +541,11 @@ export function AnalysisResultsWorkspace({
             ) : null}
             <details className="result-section result-ai-section" open>
               <summary>
-                <span>{selected.pending ? labels.signal.title : labels.assessment}</span>
+                <span>{selected.pending ? labels.pending.title : labels.assessment}</span>
                 <ChevronDown size={16} aria-hidden="true" />
               </summary>
               {selected.pending ? (
-                <div className="result-signal-panel">
-                  <p className="result-signal-note">{labels.signal.note}</p>
-                  <dl className="result-assessment-meta">
-                    <div>
-                      <dt>{labels.signal.coverage}</dt>
-                      <dd>{selected.signal?.coveragePercent ?? 0}%</dd>
-                    </div>
-                    <div>
-                      <dt>{labels.aiStatus}</dt>
-                      <dd>{labels.signal.pendingAssessment}</dd>
-                    </div>
-                  </dl>
-                  {(selected.signal?.coveredAspects.length ?? 0) > 0 ? (
-                    <div className="result-signal-aspects" data-covered="true">
-                      <strong>{labels.signal.covered}</strong>
-                      <ul>
-                        {selected.signal?.coveredAspects.map((aspect) => (
-                          <li key={aspect}>{aspect}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {(selected.signal?.openAspects.length ?? 0) > 0 ? (
-                    <div className="result-signal-aspects">
-                      <strong>{labels.signal.open}</strong>
-                      <ul>
-                        {selected.signal?.openAspects.map((aspect) => (
-                          <li key={aspect}>{aspect}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
+                <p className="result-pending-note">{labels.pending.note}</p>
               ) : (
                 <div>
                   <p>{selected.explanation}</p>
@@ -678,7 +610,7 @@ export function AnalysisResultsWorkspace({
             <details className="result-section result-evidence-section" open>
               <summary>
                 <span>
-                  {selected.pending ? labels.signal.hits : labels.evidence} {citations.length}
+                  {labels.evidence} {citations.length}
                 </span>
                 <ChevronDown size={16} aria-hidden="true" />
               </summary>
@@ -686,7 +618,7 @@ export function AnalysisResultsWorkspace({
                 <div>
                   {citations.length === 0 ? (
                     <p className="result-empty-evidence">
-                      {selected.pending ? labels.signal.noHits : labels.noEvidence}
+                      {selected.pending ? labels.pending.noEvidence : labels.noEvidence}
                     </p>
                   ) : (
                     citations.map((evidence) => (
@@ -728,58 +660,32 @@ export function AnalysisResultsWorkspace({
           data-mobile-hidden={mobilePane !== "policy" || undefined}
           aria-label={labels.policyText}
         >
-          <div className="result-policy-header">
-            <FileText size={18} aria-hidden="true" />
-            <strong>{policyName}</strong>
-          </div>
-          <div className="result-column-scroll result-document-scroll" ref={documentScrollRef}>
-            {documentError ? (
-              <p className="result-document-state" role="alert">
-                {labels.documentFailed}
-              </p>
-            ) : !documentBlocks ? (
-              <p className="result-document-state">{labels.documentLoading}</p>
-            ) : (
-              documentBlocks.map((block) => {
-                const isActive = block.id === activeEvidence?.documentBlockId;
-                const highlight = isActive
-                  ? splitEvidenceHighlight(block.canonicalText, activeEvidence.exactQuote)
-                  : null;
-                return (
-                  <article
-                    key={block.id}
-                    ref={(node) => {
-                      if (node) documentBlockRefs.current.set(block.id, node);
-                      else documentBlockRefs.current.delete(block.id);
-                    }}
-                    tabIndex={-1}
-                    className="result-document-block"
-                    data-active={isActive || undefined}
-                  >
-                    {block.headingPath.length > 0 ? (
-                      <small>{block.headingPath.join(" / ")}</small>
-                    ) : null}
-                    <p>
-                      {highlight ? (
-                        <>
-                          {highlight.before}
-                          <mark>{highlight.match}</mark>
-                          {highlight.after}
-                        </>
-                      ) : (
-                        block.canonicalText
-                      )}
-                    </p>
-                    <footer>
-                      {block.pageNumber ? `${labels.page} ${block.pageNumber}` : ""}
-                      {block.pageNumber && block.paragraphNumber ? " · " : ""}
-                      {block.paragraphNumber ? `${labels.paragraph} ${block.paragraphNumber}` : ""}
-                    </footer>
-                  </article>
-                );
-              })
-            )}
-          </div>
+          <PolicyDocumentViewer
+            original={original}
+            blocks={documentBlocks}
+            blocksFailed={documentError}
+            activeEvidence={
+              activeEvidence
+                ? {
+                    documentBlockId: activeEvidence.documentBlockId,
+                    exactQuote: activeEvidence.exactQuote,
+                    pageNumber: activeEvidence.pageNumber,
+                  }
+                : undefined
+            }
+            labels={{
+              policyName,
+              original: labels.originalView,
+              text: labels.textView,
+              loading: labels.documentLoading,
+              failed: labels.documentFailed,
+              originalUnavailable: labels.originalUnavailable,
+              page: labels.page,
+              paragraph: labels.paragraph,
+            }}
+            registerScrollContainer={registerScrollContainer}
+            registerBlock={registerBlock}
+          />
         </section>
       </div>
 

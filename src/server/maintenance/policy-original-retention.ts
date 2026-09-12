@@ -21,7 +21,10 @@ export async function getPolicyOriginalRetentionState(policyVersionId: string) {
 
 export async function deletePolicyOriginalIfDue(policyVersionId: string) {
   const [version] = await db
-    .select({ objectKey: policyVersions.objectKey })
+    .select({
+      objectKey: policyVersions.objectKey,
+      storageDriver: policyVersions.storageDriver,
+    })
     .from(policyVersions)
     .where(
       and(
@@ -33,7 +36,9 @@ export async function deletePolicyOriginalIfDue(policyVersionId: string) {
     .limit(1);
   if (!version) return { deleted: false as const };
 
-  await createPrivateObjectStore().deleteObject(version.objectKey);
+  // Der Treiber der Fassung, nicht der aktuell konfigurierte: sonst bliebe ein
+  // Original nach einem Speicherwechsel unbemerkt liegen.
+  await createPrivateObjectStore(version.storageDriver).deleteObject(version.objectKey);
   const [deleted] = await db
     .update(policyVersions)
     .set({ originalDeletedAt: new Date() })

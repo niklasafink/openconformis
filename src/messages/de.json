@@ -123,6 +123,8 @@
     "upload": "Sicher hochladen",
     "uploading": "Wird hochgeladen …",
     "uploaded": "Upload angenommen",
+    "processing": "Dokument wird verarbeitet …",
+    "processingFailed": "Das Dokument konnte nicht verarbeitet werden. Bitte eine andere Datei versuchen.",
     "invalidType": "Bitte eine PDF- oder DOCX-Datei auswählen.",
     "tooLarge": "Die Datei darf maximal 25 MB groß sein.",
     "uploadUnavailable": "Bitte zuerst ein Rahmenwerk auswählen.",
@@ -260,6 +262,9 @@
       "assessmentPane": "Bewertung",
       "policyPane": "Policy",
       "openEvidence": "Belegstelle öffnen",
+      "originalView": "Original",
+      "textView": "Text",
+      "originalUnavailable": "Das Originaldokument ist nicht mehr verfügbar; gezeigt wird der ausgelesene Text.",
       "status": {
         "fulfilled": "Erfüllt",
         "partially_fulfilled": "Teilweise erfüllt",
@@ -267,21 +272,11 @@
         "not_applicable": "Nicht einschlägig",
         "no_assessment_possible": "Keine Einschätzung möglich"
       },
-      "signal": {
-        "title": "Vorabeinschätzung",
-        "note": "Sofortiger Textabgleich ohne Modellaufruf. Er zeigt, wo die Policy die Anforderung überhaupt berührt, und ist ausdrücklich keine Bewertung — die KI-Bewertung ersetzt ihn.",
-        "level": {
-          "strong": "hohe Abdeckung",
-          "partial": "teilweise Abdeckung",
-          "weak": "geringe Abdeckung"
-        },
-        "coverage": "Abgedeckte Prüfaspekte",
-        "covered": "Im Dokument gefunden",
-        "open": "Im Dokument nicht gefunden",
-        "hits": "Vorabtreffer",
-        "noHits": "Keine Textstelle mit Bezug zu dieser Anforderung gefunden.",
-        "pendingAssessment": "Steht aus",
-        "assessedCount": "{assessed} von {total} durch KI bewertet"
+      "pending": {
+        "title": "Noch nicht bewertet",
+        "note": "Diese Anforderung wartet auf die Bewertung durch das Modell. Status, Begründung und Belegstellen erscheinen erst, wenn der Lauf sie erzeugt hat.",
+        "noEvidence": "Belegstellen entstehen mit der Bewertung.",
+        "assessedCount": "{assessed} von {total} bewertet"
       }
     },
     "status": {
