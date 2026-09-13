@@ -12,7 +12,12 @@ import {
 } from "@/domain/policies/upload";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db, isDatabaseConfigured } from "@/server/db/client";
-import { policies, policyUploadIntents, policyVersions } from "@/server/db/schema/documents";
+import {
+  draftPolicySelections,
+  policies,
+  policyUploadIntents,
+  policyVersions,
+} from "@/server/db/schema/documents";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { createPrivateObjectStore, resolveStorageDriver } from "@/server/storage/object-store";
 import { launchDocumentIngestionWorkflow } from "@/server/workflows/launch";
@@ -235,6 +240,19 @@ async function completePolicyUpload(intentId: string, expectedDraftId?: string) 
       .update(policyVersions)
       .set({ parseStatus: "uploaded", objectEtag: object.etag, uploadedAt: now })
       .where(eq(policyVersions.id, record.policyVersionId));
+    // Die Auswahl gilt ab Upload-Abschluss, nicht erst nach dem Parsen: Der
+    // Nutzer arbeitet im Umfang weiter, während die Datei im Hintergrund
+    // aufbereitet wird. Lesende Stellen, die Text brauchen, prüfen `ready`.
+    await transaction
+      .insert(draftPolicySelections)
+      .values({
+        anonymousDraftId: record.anonymousDraftId,
+        policyVersionId: record.policyVersionId,
+      })
+      .onConflictDoUpdate({
+        target: draftPolicySelections.anonymousDraftId,
+        set: { policyVersionId: record.policyVersionId, updatedAt: now },
+      });
     await appendAuditEvent(transaction, {
       anonymousDraftId: record.anonymousDraftId,
       action: "upload.received",
@@ -296,6 +314,15 @@ export async function getPolicyProcessingState(
     .limit(1);
   if (!version) throw new Error("UPLOAD_NOT_FOUND");
 
+  return processingState(version);
+}
+
+function processingState(version: {
+  id: string;
+  parseStatus: string;
+  parseErrorCode: string | null;
+  pageCount: number | null;
+}): PolicyProcessingState {
   return {
     policyVersionId: version.id,
     parseStatus: version.parseStatus,
@@ -304,6 +331,34 @@ export async function getPolicyProcessingState(
     errorCode: version.parseErrorCode,
     pageCount: version.pageCount,
   };
+}
+
+/**
+ * Stand der aktuell gewählten Policy des Drafts, auch solange sie noch
+ * verarbeitet wird. Der Umfangsschritt zeigt damit den Fortschritt an, statt
+ * den Nutzer bis zum Ende des Parsens auf dem Upload festzuhalten.
+ */
+export async function getSelectedPolicyProcessingState(
+  expectedDraftId?: string,
+): Promise<PolicyProcessingState | null> {
+  if (!isDatabaseConfigured) return null;
+
+  const draft = await getBoundActiveDraft(expectedDraftId);
+  if (!draft) return null;
+
+  const [version] = await db
+    .select({
+      id: policyVersions.id,
+      parseStatus: policyVersions.parseStatus,
+      parseErrorCode: policyVersions.parseErrorCode,
+      pageCount: policyVersions.pageCount,
+    })
+    .from(draftPolicySelections)
+    .innerJoin(policyVersions, eq(policyVersions.id, draftPolicySelections.policyVersionId))
+    .where(eq(draftPolicySelections.anonymousDraftId, draft.id))
+    .limit(1);
+
+  return version ? processingState(version) : null;
 }
 
 export function parsePolicyUploadRequest(input: unknown): PolicyUploadRequest {

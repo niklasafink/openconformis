@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
+import { PolicyProcessingStatus } from "@/components/policies/policy-processing-status";
 import { ScopeForm } from "@/components/scope/scope-form";
 import { Input } from "@/components/ui/input";
 import { routing } from "@/i18n/routing";
@@ -12,6 +13,7 @@ import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { getDraftScopeSelection } from "@/server/drafts/scope-selection";
 import { getCurrentPolicySelection } from "@/server/policies/sample-service";
+import { getSelectedPolicyProcessingState } from "@/server/policies/upload-service";
 
 import { saveScopeAndContinue } from "./actions";
 
@@ -27,17 +29,22 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [t, boundDraft, selection, savedScope] = await Promise.all([
+  const [t, boundDraft, selection, processing, savedScope] = await Promise.all([
     getTranslations("Scope"),
     getBoundActiveDraft(draft),
     getCurrentPolicySelection(draft),
+    getSelectedPolicyProcessingState(draft),
     getDraftScopeSelection(draft),
   ]);
   // Ohne aktiven Draft (kein Rahmenwerk oder keine Policy gewählt) lässt sich der
   // Umfang nicht rekonstruieren. Der Sidebar-Schritt ist immer sichtbar, auch
   // bevor der Ablauf begonnen wurde — ein 404 wäre eine Sackgasse statt eines
-  // Wegs zurück zum Anfang des Ablaufs.
-  if (!boundDraft?.frameworkSlug || !selection) redirect(`/${locale}/analyses/new/framework`);
+  // Wegs zurück zum Anfang des Ablaufs. Ein Upload, der noch verarbeitet wird,
+  // zählt bereits als Auswahl: Der Umfang lässt sich parallel festlegen.
+  if (!boundDraft?.frameworkSlug || (!selection && !processing)) {
+    redirect(`/${locale}/analyses/new/framework`);
+  }
+  const pendingPolicy = selection ? null : processing;
   const release = await getPublishedFrameworkRelease(boundDraft.frameworkSlug);
   if (!release) notFound();
   const initialIncludedKeys =
@@ -86,6 +93,22 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
             initialContext={savedScope?.organizationContext ?? ""}
             initialIncludedKeys={initialIncludedKeys}
             query={q}
+            policyPending={Boolean(pendingPolicy)}
+            actionsNote={
+              pendingPolicy ? (
+                <PolicyProcessingStatus
+                  draftId={boundDraft.id}
+                  policyVersionId={pendingPolicy.policyVersionId}
+                  failed={pendingPolicy.failed}
+                  policyHref={`/analyses/new/policy?draft=${boundDraft.id}`}
+                  labels={{
+                    processing: t("policyProcessing"),
+                    failed: t("policyFailed"),
+                    chooseAgain: t("choosePolicyAgain"),
+                  }}
+                />
+              ) : null
+            }
             labels={{
               size: t("size"),
               sizeHelp: t("sizeHelp"),

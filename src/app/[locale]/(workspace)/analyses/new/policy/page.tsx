@@ -69,8 +69,6 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
                   upload: t("upload"),
                   uploading: t("uploading"),
                   uploaded: t("uploaded"),
-                  processing: t("processing"),
-                  processingFailed: t("processingFailed"),
                   invalidType: t("invalidType"),
                   tooLarge: t("tooLarge"),
                   unavailable: t("uploadUnavailable"),

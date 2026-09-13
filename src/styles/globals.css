@@ -1100,6 +1100,19 @@
   gap: 12px;
 }
 
+.policy-processing-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.policy-processing-status a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .scope-detail-backdrop {
   position: fixed;
   z-index: 30;

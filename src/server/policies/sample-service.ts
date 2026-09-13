@@ -81,7 +81,13 @@ export async function getCurrentPolicySelection(expectedDraftId?: string) {
     .from(draftPolicySelections)
     .innerJoin(policyVersions, eq(policyVersions.id, draftPolicySelections.policyVersionId))
     .innerJoin(policies, eq(policies.id, policyVersions.policyId))
-    .where(eq(draftPolicySelections.anonymousDraftId, draft.id))
+    // Ein Upload ist schon ab Abschluss ausgewählt; Text gibt es erst ab `ready`.
+    .where(
+      and(
+        eq(draftPolicySelections.anonymousDraftId, draft.id),
+        eq(policyVersions.parseStatus, "ready"),
+      ),
+    )
     .limit(1);
 
   if (!selection || selection.pageCount === null) return null;

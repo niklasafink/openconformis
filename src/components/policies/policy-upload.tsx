@@ -18,8 +18,6 @@ type PolicyUploadProps = Readonly<{
     upload: string;
     uploading: string;
     uploaded: string;
-    processing: string;
-    processingFailed: string;
     invalidType: string;
     tooLarge: string;
     unavailable: string;
@@ -42,28 +40,7 @@ function normalizedMimeType(file: File) {
   return file.type;
 }
 
-type UploadStatus = "idle" | "uploading" | "processing" | "uploaded";
-
-/**
- * Wartet, bis der Parser die hochgeladene Datei zerlegt hat. Vorher findet der
- * Umfangsschritt die Policy nicht und würde den Nutzer an den Anfang
- * zurückwerfen.
- */
-async function waitForProcessing(policyVersionId: string, draftId: string) {
-  const deadline = Date.now() + 5 * 60 * 1000;
-  for (;;) {
-    const response = await fetch(
-      `/api/policies/${policyVersionId}/status?draft=${encodeURIComponent(draftId)}`,
-      { credentials: "same-origin", cache: "no-store" },
-    );
-    if (!response.ok) throw new Error("processing");
-    const state = (await response.json()) as { ready: boolean; failed: boolean };
-    if (state.ready) return;
-    if (state.failed) throw new Error("processing");
-    if (Date.now() > deadline) throw new Error("processing");
-    await new Promise((resolve) => setTimeout(resolve, 1_500));
-  }
-}
+type UploadStatus = "idle" | "uploading" | "uploaded";
 
 export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProps) {
   const router = useRouter();
@@ -129,17 +106,12 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
       });
       if (!completeResponse.ok) throw new Error("complete");
 
-      setStatus("processing");
-      await waitForProcessing(intent.policyVersionId, draftId);
+      // Die Aufbereitung läuft serverseitig weiter; der Umfang zeigt ihren Stand.
       setStatus("uploaded");
       router.push(continueHref);
-    } catch (cause) {
+    } catch {
       setStatus("idle");
-      setError(
-        cause instanceof Error && cause.message === "processing"
-          ? labels.processingFailed
-          : labels.failed,
-      );
+      setError(labels.failed);
     }
   }
 
@@ -215,11 +187,9 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
         >
           {status === "uploading"
             ? labels.uploading
-            : status === "processing"
-              ? labels.processing
-              : status === "uploaded"
-                ? labels.uploaded
-                : labels.upload}
+            : status === "uploaded"
+              ? labels.uploaded
+              : labels.upload}
         </button>
       ) : null}
     </div>

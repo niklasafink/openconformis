@@ -122,8 +122,6 @@
     "upload": "Upload securely",
     "uploading": "Uploading …",
     "uploaded": "Upload received",
-    "processing": "Processing the document …",
-    "processingFailed": "The document could not be processed. Please try another file.",
     "invalidType": "Select a PDF or DOCX file.",
     "tooLarge": "The file must not exceed 25 MB.",
     "uploadUnavailable": "Select a framework first.",
@@ -152,7 +150,10 @@
     "context": "Company context",
     "contextPlaceholder": "Optional context on governance, responsibilities, or existing evidence",
     "included": "applicable",
-    "continue": "Continue"
+    "continue": "Continue",
+    "policyProcessing": "Processing the document in the background …",
+    "policyFailed": "The document could not be processed.",
+    "choosePolicyAgain": "Choose another file"
   },
   "Chat": {
     "title": "How can I help?",

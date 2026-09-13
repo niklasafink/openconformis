@@ -122,8 +122,6 @@
     "upload": "Sicher hochladen",
     "uploading": "Wird hochgeladen …",
     "uploaded": "Upload angenommen",
-    "processing": "Dokument wird verarbeitet …",
-    "processingFailed": "Das Dokument konnte nicht verarbeitet werden. Bitte eine andere Datei versuchen.",
     "invalidType": "Bitte eine PDF- oder DOCX-Datei auswählen.",
     "tooLarge": "Die Datei darf maximal 25 MB groß sein.",
     "uploadUnavailable": "Bitte zuerst ein Rahmenwerk auswählen.",
@@ -152,7 +150,10 @@
     "context": "Unternehmenskontext",
     "contextPlaceholder": "Optionaler Kontext zu Governance, Verantwortlichkeiten oder vorhandenen Nachweisen",
     "included": "einschlägig",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "policyProcessing": "Dokument wird im Hintergrund verarbeitet …",
+    "policyFailed": "Das Dokument konnte nicht verarbeitet werden.",
+    "choosePolicyAgain": "Andere Datei wählen"
   },
   "Chat": {
     "title": "Wie kann ich helfen?",

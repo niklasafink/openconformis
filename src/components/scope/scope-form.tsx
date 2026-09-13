@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, ChevronDown, Info, Pencil } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import type { PublishedRequirement } from "@/server/catalogue/service";
 import type { InstitutionSize } from "@/server/drafts/scope-selection";
@@ -15,6 +15,10 @@ type ScopeFormProps = {
   initialContext: string;
   initialIncludedKeys: string[];
   query: string;
+  /** Die Policy wird noch aufbereitet; Weiter bleibt bis dahin gesperrt. */
+  policyPending?: boolean;
+  /** Hinweis neben der Weiter-Schaltfläche, etwa zum Stand der Aufbereitung. */
+  actionsNote?: ReactNode;
   labels: {
     size: string;
     sizeHelp: string;
@@ -42,6 +46,8 @@ export function ScopeForm({
   initialContext,
   initialIncludedKeys,
   query,
+  policyPending = false,
+  actionsNote,
   labels,
 }: ScopeFormProps) {
   const [institutionSize, setInstitutionSize] = useState<InstitutionSize>(initialSize);
@@ -163,7 +169,12 @@ export function ScopeForm({
       </section>
 
       <div className="scope-actions">
-        <button className="button button-primary" type="submit" disabled={included.size === 0}>
+        {actionsNote}
+        <button
+          className="button button-primary"
+          type="submit"
+          disabled={included.size === 0 || policyPending}
+        >
           {labels.continue}
           <ArrowRight size={16} aria-hidden="true" />
         </button>
