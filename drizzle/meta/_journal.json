@@ -330,6 +330,13 @@
       "when": 1789333829210,
       "tag": "0046_saved_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1789337359191,
+      "tag": "0047_policy_selection_before_ready",
+      "breakpoints": true
     }
   ]
 }
