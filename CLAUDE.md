@@ -38,12 +38,15 @@ Der Chat ist ein eigener sekundärer Arbeitsbereich ohne Policy-Kontext.
 
 - Jeder echte Analyse- und Chat-Aufruf verwendet einen eigenen API-Key des Nutzers.
   Es gibt keinen Betreiber-Key und keinen Gratislauf.
-- Schlüssel nur kurzlebig verschlüsselt speichern, an Nutzer, Sitzung, Zweck und Draft
-  binden und nach Abschluss oder TTL löschen. Keine Secrets in URLs, Browser-Speicher,
-  Logs, Audit-Metadaten oder Workflow-Payloads.
+- Ein eingegebener Schlüssel bleibt verschlüsselt je Nutzer und Anbieter gespeichert, bis
+  der Nutzer ihn ersetzt oder entfernt. Jeder Lauf und Chat leitet daraus einen kurzlebigen,
+  an Nutzer, Sitzung, Zweck und Draft gebundenen Schlüssel ab, der nach Abschluss oder TTL
+  gelöscht wird. Keine Secrets in URLs, Browser-Speicher, Logs, Audit-Metadaten oder
+  Workflow-Payloads.
 - BYOK bleibt providerneutral. Technisch nicht funktionsfähige Routen sind gesperrt.
-  Es gibt keine EU-Hosting- oder Zero-Data-Retention-Vorgabe. Nicht evaluierte
-  Modelle benötigen einen deutlichen Warnhinweis.
+  Es gibt keine EU-Hosting- oder Zero-Data-Retention-Vorgabe. Bei nicht evaluierten
+  Modellen gilt der bewusste Klick auf Start als Kenntnisnahme; ein eigener Warnsatz
+  ist nicht nötig.
 - Rahmenwerk, Policy, Scope, Modellroute und Anweisungsversionen werden beim Start eingefroren.
   Wiederholungen dürfen keine zweite Analyse desselben Drafts erzeugen.
 - Bewertungen benötigen Begründungen und genaue Belege, auch beim Status „erfüllt“.

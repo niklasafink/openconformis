@@ -27,7 +27,8 @@ const inputSchema = z
     purpose: aiCredentialPurposeSchema,
     bindingId: z.uuid().optional(),
     requiredModelId: z.string().trim().min(1).max(300),
-    apiKey: z.string().trim().min(8).max(20_000),
+    /** Ohne Schlüssel nutzt der Server den gespeicherten Schlüssel des Nutzers. */
+    apiKey: z.string().trim().min(8).max(20_000).optional(),
   })
   .superRefine((input, context) => {
     if (input.purpose === "analysis" && !input.bindingId) {
@@ -67,6 +68,7 @@ function errorResponse(error: unknown) {
       ["BYOK_PROVIDER_DISABLED", 409],
       ["BYOK_PRIVACY_ROUTE_UNAVAILABLE", 409],
       ["BYOK_BINDING_NOT_FOUND", 404],
+      ["BYOK_SAVED_CREDENTIAL_NOT_FOUND", 404],
       ["BYOK_INPUT_INVALID", 400],
       ["BYOK_TTL_INVALID", 503],
     ]).get(error.code);

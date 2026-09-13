@@ -297,3 +297,34 @@ export const aiCredentials = pgTable(
     ),
   ],
 );
+
+/**
+ * Der dauerhaft gespeicherte Schlüssel eines Nutzers je Anbieter. Er wird nie
+ * direkt für einen Lauf benutzt: Analyse und Chat leiten daraus jeweils einen
+ * kurzlebigen, gebundenen Eintrag in `ai_credentials` ab. Löschen des Kontos
+ * entfernt ihn mit.
+ */
+export const aiSavedCredentials = pgTable(
+  "ai_saved_credentials",
+  {
+    id: uuid("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: aiRouteProvider("provider").notNull(),
+    encryptedSecret: text("encrypted_secret").notNull(),
+    nonce: text("nonce").notNull(),
+    authenticationTag: text("authentication_tag").notNull(),
+    encryptionKeyVersion: integer("encryption_key_version").notNull(),
+    secretLastFour: text("secret_last_four").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("ai_saved_credentials_owner_provider_uidx").on(table.ownerUserId, table.provider),
+    check(
+      "ai_saved_credentials_identity_check",
+      sql`${table.encryptionKeyVersion} > 0 AND length(${table.secretLastFour}) = 4`,
+    ),
+  ],
+);

@@ -18,6 +18,14 @@ export type CredentialBinding = {
   expiresAt: string;
 };
 
+/** Bindung eines dauerhaft gespeicherten Schlüssels: nur Nutzer und Anbieter, keine Sitzung. */
+export type SavedCredentialBinding = {
+  kind: "saved";
+  credentialId: string;
+  ownerUserId: string;
+  provider: AiRouteProvider;
+};
+
 export type EncryptedCredential = {
   ciphertext: string;
   nonce: string;
@@ -36,7 +44,18 @@ function decodeEncryptionKey(encodedKey: string) {
   return key;
 }
 
-function associatedData(binding: CredentialBinding) {
+function associatedData(binding: CredentialBinding | SavedCredentialBinding) {
+  if ("kind" in binding) {
+    return Buffer.from(
+      JSON.stringify({
+        kind: binding.kind,
+        credentialId: binding.credentialId,
+        ownerUserId: binding.ownerUserId,
+        provider: binding.provider,
+      }),
+      "utf8",
+    );
+  }
   return Buffer.from(
     JSON.stringify({
       credentialId: binding.credentialId,
@@ -64,7 +83,7 @@ export function activeCredentialEncryptionConfiguration() {
 
 export function encryptCredentialSecret(input: {
   secret: string;
-  binding: CredentialBinding;
+  binding: CredentialBinding | SavedCredentialBinding;
   encodedKey: string;
   keyVersion: number;
 }): EncryptedCredential {
@@ -89,7 +108,7 @@ export function encryptCredentialSecret(input: {
 
 export function decryptCredentialSecret(input: {
   encrypted: EncryptedCredential;
-  binding: CredentialBinding;
+  binding: CredentialBinding | SavedCredentialBinding;
   encodedKey: string;
 }) {
   const nonce = Buffer.from(input.encrypted.nonce, "base64");

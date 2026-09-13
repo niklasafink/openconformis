@@ -56,8 +56,9 @@ have passed their launch gates.
 4. Registration is required to reveal the result. Supported methods are magic link,
    e-mail/password, Google and Microsoft.
 5. After successful account verification, the result screen asks for the user's
-   own provider key. The server validates it against the provider, encrypts it and
-   binds it to the draft.
+   own provider key. The server validates it against the provider, keeps it encrypted
+   per user and provider for later runs (see D-028), and derives a temporary credential
+   bound to the draft. A saved key is reused without re-entry.
 6. `POST /api/analyses/start` atomically claims the signed anonymous draft,
    freezes it together with the credential and enqueues the durable run. From this
    point the UI renders only persisted worker stages and real failure/progress
@@ -143,6 +144,7 @@ the provider adapter for the shortest possible duration.
 | Analysis/account deletion                       | Revoke synchronously; complete active policy-data deletion within 24 hours. |
 | Analysis BYOK ciphertext                        | Delete at terminal state; 24-hour hard backstop.                            |
 | Chat BYOK ciphertext                            | Delete at session end; maximum 24 hours from validation.                    |
+| Saved BYOK key (per user and provider)          | Retain until the user replaces or removes it, or deletes the account.       |
 | Redacted usage/cost metadata                    | 30 days unless a longer legal/accounting duty is documented.                |
 
 Results retain only the evidence excerpts needed for review. They are still
@@ -173,6 +175,8 @@ Credentials for direct providers use the same temporary custody contract.
 - `sponsored_run_grants`: unique account grant, reserved revision, retry window and
   successful-completion consumption.
 - `ai_credentials`: temporary encrypted secret with purpose and hard TTL.
+- `ai_saved_credentials`: the user's encrypted key per provider, source for temporary
+  credentials; never passed to a workflow.
 - `ai_usage_events`: safe model, route, token, cache, cost and outcome metadata.
 - `sponsorship_budget_days`: atomic daily count/cost circuit breaker.
 - `analysis_runs`: credential mode and opaque credential/grant reference, never key.

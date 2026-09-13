@@ -78,6 +78,7 @@ export function ChatWorkspace({
   initialThreadId,
   initialCredentials,
   labels,
+  savedCredentials: initialSavedCredentials = [],
   userName,
 }: {
   locale: "de" | "en";
@@ -86,6 +87,8 @@ export function ChatWorkspace({
   initialThreadId?: string;
   initialCredentials: Credential[];
   labels: Labels;
+  /** Dauerhaft gespeicherte Schlüssel des Nutzers: Anbieter und letzte vier Zeichen. */
+  savedCredentials?: ReadonlyArray<{ provider: string; lastFour: string }>;
   userName?: string;
 }) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -100,6 +103,7 @@ export function ChatWorkspace({
   const [keyError, setKeyError] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [credentials, setCredentials] = useState(initialCredentials);
+  const [savedCredentials, setSavedCredentials] = useState(initialSavedCredentials);
   const pendingQuestion = useRef<string | null>(null);
   const selectedModel = catalogue.models.find((model) => model.id === modelProfileId);
   const selectedFramework = frameworks.find((framework) => framework.id === frameworkSlug);
@@ -112,6 +116,9 @@ export function ChatWorkspace({
           new Date(credential.expiresAt) > new Date(),
       ),
     [credentials, selectedModel],
+  );
+  const savedCredential = savedCredentials.find(
+    (credential) => credential.provider === selectedModel?.routeProvider,
   );
 
   useEffect(() => {
@@ -227,14 +234,16 @@ export function ChatWorkspace({
     setInput("");
     if (!activeCredential) {
       pendingQuestion.current = question;
-      setKeyOpen(true);
+      // Ein gespeicherter Schlüssel verbindet sich still; nur ohne ihn wird gefragt.
+      if (savedCredential) await connectCredential(true);
+      else setKeyOpen(true);
       return;
     }
     await streamQuestion(question, activeCredential.credentialId);
   }
 
-  async function connectCredential() {
-    if (!selectedModel || connecting || apiKey.trim().length < 8) return;
+  async function connectCredential(useSaved = false) {
+    if (!selectedModel || connecting || (!useSaved && apiKey.trim().length < 8)) return;
     setKeyError("");
     setConnecting(true);
     try {
@@ -245,13 +254,23 @@ export function ChatWorkspace({
           provider: selectedModel.routeProvider,
           purpose: "chat",
           requiredModelId: selectedModel.providerModelId,
-          apiKey: apiKey.trim(),
+          ...(useSaved ? {} : { apiKey: apiKey.trim() }),
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as Partial<Credential>;
-      if (!response.ok || !payload.credentialId) return setKeyError(labels.failed);
+      if (!response.ok || !payload.credentialId) {
+        if (useSaved) setKeyOpen(true);
+        return setKeyError(labels.failed);
+      }
       const credential = payload as Credential;
       setCredentials((current) => [...current, credential]);
+      if (!useSaved) {
+        const provider = selectedModel.routeProvider;
+        setSavedCredentials((current) => [
+          ...current.filter((saved) => saved.provider !== provider),
+          { provider, lastFour: credential.lastFour },
+        ]);
+      }
       setApiKey("");
       setKeyOpen(false);
       const question = pendingQuestion.current;
@@ -366,8 +385,11 @@ export function ChatWorkspace({
                 disabled={!selectedModel}
               >
                 <span>
-                  {activeCredential
-                    ? labels.keyConnected.replace("{lastFour}", activeCredential.lastFour)
+                  {activeCredential || savedCredential
+                    ? labels.keyConnected.replace(
+                        "{lastFour}",
+                        (activeCredential ?? savedCredential)?.lastFour ?? "",
+                      )
                     : labels.noKey}
                 </span>
                 <ChevronDown className="size-3.5" />

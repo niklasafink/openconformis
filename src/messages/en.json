@@ -184,6 +184,8 @@
     "model": "Model",
     "selected": "Selected",
     "apiKey": "API key",
+    "savedKey": "••••{lastFour} saved",
+    "removeSavedKey": "Remove saved key",
     "keyFailed": "The key or model access could not be confirmed.",
     "keyErrors": {
       "UNTRUSTED_ORIGIN": "Request from an untrusted address: NEXT_PUBLIC_APP_URL does not match the domain in use.",
@@ -196,6 +198,7 @@
       "BYOK_PROVIDER_DISABLED": "The provider is not enabled in BYOK_PROVIDER_ALLOWLIST on the server.",
       "BYOK_PRIVACY_ROUTE_UNAVAILABLE": "There is no analysis route for this provider. Please choose another model.",
       "BYOK_BINDING_NOT_FOUND": "The analysis draft does not belong to this session or no longer exists. Please reload the page.",
+      "BYOK_SAVED_CREDENTIAL_NOT_FOUND": "No key is saved for this provider. Please enter the API key.",
       "BYOK_TTL_INVALID": "Server misconfiguration: BYOK_CREDENTIAL_TTL_HOURS must be between 1 and 24.",
       "BYOK_ENCRYPTION_NOT_CONFIGURED": "Server misconfiguration: BYOK_ENCRYPTION_KEY or BYOK_ENCRYPTION_KEY_VERSION is missing or invalid.",
       "BYOK_ENCRYPTION_KEY_INVALID": "Server misconfiguration: BYOK_ENCRYPTION_KEY is not a valid 32-byte base64 key.",

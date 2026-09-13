@@ -24,6 +24,7 @@ import {
 } from "@/server/security/credential-crypto";
 
 import { validateProviderCredential } from "./credential-validation";
+import { readSavedCredentialSecret, saveUserCredential } from "./saved-credential-service";
 import {
   allowedByokProviders,
   getAnalysisProviderConfiguration,
@@ -70,7 +71,8 @@ type CredentialConnectInput = {
   purpose: string;
   bindingId: string;
   requiredModelId: string;
-  secret: string;
+  /** Ohne Angabe gilt der gespeicherte Schlüssel des Nutzers für diesen Anbieter. */
+  secret?: string;
 };
 
 type SessionUser = Awaited<ReturnType<typeof requireAuthenticatedSessionUser>>;
@@ -104,9 +106,15 @@ async function connectTemporaryCredential(
   const user = await requireAuthenticatedSessionUser();
   const provider = aiRouteProviderSchema.parse(input.provider);
   const purpose = aiCredentialPurposeSchema.parse(input.purpose);
+  // Ein eingegebener Schlüssel hat Vorrang und wird nach der Prüfung gespeichert;
+  // sonst kommt der gespeicherte Schlüssel zum Einsatz.
+  const typedSecret = input.secret?.trim() ? input.secret : undefined;
+  const secret =
+    typedSecret ?? (await readSavedCredentialSecret({ ownerUserId: user.id, provider }));
+  if (!secret) throw new TemporaryCredentialError("BYOK_SAVED_CREDENTIAL_NOT_FOUND");
   if (
-    input.secret.length < 8 ||
-    input.secret.length > 20_000 ||
+    secret.length < 8 ||
+    secret.length > 20_000 ||
     !input.requiredModelId.trim() ||
     input.requiredModelId.length > 300
   ) {
@@ -123,7 +131,7 @@ async function connectTemporaryCredential(
 
   const validation = await validateProviderCredential({
     provider,
-    secret: input.secret,
+    secret,
     requiredModelId: input.requiredModelId,
     route: purpose === "analysis" ? getAnalysisProviderConfiguration(provider) : undefined,
   });
@@ -141,7 +149,7 @@ async function connectTemporaryCredential(
   });
   const encryption = activeCredentialEncryptionConfiguration();
   const encrypted = encryptCredentialSecret({
-    secret: input.secret,
+    secret,
     binding,
     encodedKey: encryption.encodedKey,
     keyVersion: encryption.keyVersion,
@@ -195,7 +203,7 @@ async function connectTemporaryCredential(
       nonce: encrypted.nonce,
       authenticationTag: encrypted.authenticationTag,
       encryptionKeyVersion: encrypted.keyVersion,
-      secretLastFour: input.secret.slice(-4),
+      secretLastFour: secret.slice(-4),
       safeLabel,
       accessibleModelIds: validation.accessibleModelIds,
       modelAccessHash: createContentHash(validation.accessibleModelIds),
@@ -213,13 +221,20 @@ async function connectTemporaryCredential(
         expiresAt: expiresAt.toISOString(),
       },
     });
+    if (typedSecret) {
+      await saveUserCredential(transaction, {
+        ownerUserId: user.id,
+        provider,
+        secret: typedSecret,
+      });
+    }
   });
 
   return {
     credentialId,
     provider,
     purpose,
-    lastFour: input.secret.slice(-4),
+    lastFour: secret.slice(-4),
     safeLabel,
     accessibleModelIds: validation.accessibleModelIds,
     expiresAt: expiresAt.toISOString(),

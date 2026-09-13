@@ -456,3 +456,24 @@ false`); the model is chosen next to the API key in the result. The locked resul
 every requirement with checkboxes preset from the saved scope; before
 `POST /api/analyses/start` the checked keys are written back to the draft scope, so both
 screens show the same selection and the start freezes exactly it.
+
+## D-028 Save the user's key per provider
+
+Product direction (2026-09-13): once a user has entered a provider key, they should not
+have to enter it again. The owner also decided that the start click is enough
+acknowledgement for an unevaluated model; no separate warning sentence is required.
+
+Implementation: `ai_saved_credentials` stores one AES-256-GCM encrypted key per user and
+provider (associated data: row id, user and provider). Connecting a typed key saves it
+after successful provider validation. `POST /api/ai-credentials` and
+`POST /api/analyses/[analysisId]/rerun` accept a missing `apiKey`; the server then
+decrypts the saved key and creates the usual temporary credential in `ai_credentials`,
+so runs, workflow payloads and deletion after a run are unchanged. The model and key
+field shows the last four characters and offers "Gespeicherten Key entfernen"
+(`DELETE /api/ai-credentials/saved?provider=…`). Rotating `BYOK_ENCRYPTION_KEY_VERSION`
+makes saved keys unreadable; they are then treated as absent.
+
+Consequences: amends D-025's "short-lived only" storage rule and the unevaluated-model
+warning. Account deletion cascades to saved keys.
+
+Decision: accepted.

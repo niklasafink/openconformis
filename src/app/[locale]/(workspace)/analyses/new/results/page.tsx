@@ -15,6 +15,7 @@ import { LanguageMenu } from "@/components/shell/language-menu";
 import { doraDemoRelease } from "@/domain/frameworks/dora-demo-release";
 import { routing } from "@/i18n/routing";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
+import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
 import { findOwnedAnalysisIdForDraft } from "@/server/analyses/read-analysis";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
@@ -72,9 +73,10 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     );
   }
 
-  const [catalogue, credentials] = await Promise.all([
+  const [catalogue, credentials, savedCredentials] = await Promise.all([
     getAnalysisModelCatalogue(),
     listActiveTemporaryCredentials("analysis").catch(() => []),
+    listSavedCredentials().catch(() => []),
   ]);
   // Nur ein Schlüssel, der an genau diesen Draft gebunden ist, zählt als Zugang.
   const bound = credentials.find((credential) => credential.bindingId === boundDraft.id);
@@ -163,6 +165,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
               draftId={boundDraft.id}
               initialCredential={initialCredential}
               initialModelProfileId={scope.modelSelection.modelProfileId}
+              initialSavedCredentials={savedCredentials}
               locale={locale}
               selectModelAction={selectAnalysisModel}
               selectRequirementsAction={selectAnalysisRequirements}
@@ -171,6 +174,8 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
                 model: t("model"),
                 selected: t("selected"),
                 apiKey: t("apiKey"),
+                savedKey: t("savedKey", { lastFour: "{lastFour}" }),
+                removeSavedKey: t("removeSavedKey"),
                 keyFailed: t("keyFailed"),
                 keyErrors: t.raw("keyErrors") as Record<string, string>,
                 modelFailed: t("modelFailed"),

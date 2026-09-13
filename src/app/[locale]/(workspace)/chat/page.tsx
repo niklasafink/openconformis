@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
 import { getChatModelCatalogue } from "@/server/ai/model-catalogue";
+import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { listFrameworkCatalogue } from "@/server/catalogue/service";
@@ -29,11 +30,12 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
 
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  const [t, catalogue, frameworks, credentials, user] = await Promise.all([
+  const [t, catalogue, frameworks, credentials, savedCredentials, user] = await Promise.all([
     getTranslations("Chat"),
     getChatModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
     listFrameworkCatalogue(locale).catch(() => []),
     listActiveTemporaryCredentials("chat").catch(() => []),
+    listSavedCredentials().catch(() => []),
     requireAuthenticatedSessionUser().catch(() => null),
   ]);
 
@@ -52,6 +54,7 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
             ...credential,
             expiresAt: credential.expiresAt.toISOString(),
           }))}
+          savedCredentials={savedCredentials}
           labels={{
             title: t("title"),
             greeting: t("greeting", { name: "{name}" }),

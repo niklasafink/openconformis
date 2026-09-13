@@ -67,3 +67,40 @@ describe("temporary credential encryption", () => {
     ).toThrow("BYOK_ENCRYPTION_KEY_INVALID");
   });
 });
+
+describe("saved credential encryption", () => {
+  const savedBinding = {
+    kind: "saved" as const,
+    credentialId: "5f0e3a1c-7b2d-4c8e-9f6a-1d2b3c4d5e6f",
+    ownerUserId: "user-1",
+    provider: "openrouter" as const,
+  };
+
+  it("round-trips a saved key for its owner and provider only", () => {
+    const encrypted = encryptCredentialSecret({
+      secret: "saved-canary-value",
+      binding: savedBinding,
+      encodedKey,
+      keyVersion: 1,
+    });
+
+    expect(decryptCredentialSecret({ encrypted, binding: savedBinding, encodedKey })).toBe(
+      "saved-canary-value",
+    );
+    expect(() =>
+      decryptCredentialSecret({
+        encrypted,
+        binding: { ...savedBinding, ownerUserId: "user-2" },
+        encodedKey,
+      }),
+    ).toThrow("BYOK_CIPHERTEXT_INVALID");
+    // Ein gespeicherter Schlüssel lässt sich nicht als kurzlebiger Lauf-Schlüssel lesen.
+    expect(() =>
+      decryptCredentialSecret({
+        encrypted,
+        binding: { ...binding, credentialId: savedBinding.credentialId },
+        encodedKey,
+      }),
+    ).toThrow("BYOK_CIPHERTEXT_INVALID");
+  });
+});

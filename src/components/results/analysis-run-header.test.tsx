@@ -62,6 +62,8 @@ const accessLabels = {
   model: "Modell",
   selected: "Ausgewählt",
   apiKey: "API-Key",
+  savedKey: "••••{lastFour} gespeichert",
+  removeSavedKey: "Gespeicherten Key entfernen",
   keyFailed: "Der Schlüssel konnte nicht bestätigt werden.",
   keyErrors: { CREDENTIAL_REJECTED: "Der Anbieter lehnt den Schlüssel ab." },
   modelFailed: "Das Modell konnte nicht übernommen werden.",
@@ -210,6 +212,38 @@ describe("analysis run header", () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({
       requirementKeys: ["dora-art-5", "dora-art-6", "dora-art-9"],
     });
+  });
+
+  it("starts with the saved key without asking for it again", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ analysisId: "8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f", status: "queued" }, 202),
+    );
+    render(
+      <AnalysisRunHeaderProvider
+        analysisId={analysisId}
+        initialState={{ status: "completed", stage: "completed", progressPercent: 100 }}
+        failure={{ code: null, detail: null }}
+        labels={labels}
+      >
+        <AnalysisRerunControls
+          catalogue={catalogue}
+          initialModelProfileId="openrouter:anthropic/claude-sonnet-5"
+          labels={accessLabels}
+          lastFour={null}
+          locale="de"
+          savedCredentials={[{ provider: "openrouter", lastFour: "9f2a" }]}
+        />
+      </AnalysisRunHeaderProvider>,
+    );
+
+    fireEvent.click(screen.getByTitle("Modellzugang"));
+    expect(await screen.findByPlaceholderText("••••9f2a gespeichert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gespeicherten Key entfernen" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Analyse starten" }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(JSON.parse(String(init?.body))).not.toHaveProperty("apiKey");
   });
 
   it("names the provider's reason when the key is rejected", async () => {

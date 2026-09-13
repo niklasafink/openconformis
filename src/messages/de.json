@@ -184,6 +184,8 @@
     "model": "Modell",
     "selected": "Ausgewählt",
     "apiKey": "API-Key",
+    "savedKey": "••••{lastFour} gespeichert",
+    "removeSavedKey": "Gespeicherten Key entfernen",
     "keyFailed": "Der Schlüssel oder Modellzugriff konnte nicht bestätigt werden.",
     "keyErrors": {
       "UNTRUSTED_ORIGIN": "Anfrage von einer nicht freigegebenen Adresse: NEXT_PUBLIC_APP_URL passt nicht zur aufgerufenen Domain.",
@@ -196,6 +198,7 @@
       "BYOK_PROVIDER_DISABLED": "Der Anbieter ist in BYOK_PROVIDER_ALLOWLIST auf dem Server nicht freigegeben.",
       "BYOK_PRIVACY_ROUTE_UNAVAILABLE": "Für diesen Anbieter gibt es keine Analyse-Route. Bitte ein anderes Modell wählen.",
       "BYOK_BINDING_NOT_FOUND": "Der Analyse-Entwurf gehört nicht zu dieser Sitzung oder existiert nicht mehr. Bitte die Seite neu laden.",
+      "BYOK_SAVED_CREDENTIAL_NOT_FOUND": "Für diesen Anbieter ist kein Schlüssel gespeichert. Bitte den API-Key eingeben.",
       "BYOK_TTL_INVALID": "Serverkonfiguration fehlerhaft: BYOK_CREDENTIAL_TTL_HOURS muss zwischen 1 und 24 liegen.",
       "BYOK_ENCRYPTION_NOT_CONFIGURED": "Serverkonfiguration fehlerhaft: BYOK_ENCRYPTION_KEY oder BYOK_ENCRYPTION_KEY_VERSION fehlt oder ist ungültig.",
       "BYOK_ENCRYPTION_KEY_INVALID": "Serverkonfiguration fehlerhaft: BYOK_ENCRYPTION_KEY ist kein gültiger 32-Byte-Base64-Schlüssel.",

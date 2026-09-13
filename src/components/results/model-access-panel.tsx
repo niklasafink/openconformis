@@ -17,6 +17,9 @@ export type ModelAccessLabels = Readonly<{
   model: string;
   selected: string;
   apiKey: string;
+  /** „••••{lastFour} gespeichert" */
+  savedKey: string;
+  removeSavedKey: string;
   keyFailed: string;
   /** Ursache je Fehlercode der Schlüsselverbindung. */
   keyErrors: Readonly<Record<string, string>>;
@@ -38,6 +41,7 @@ type ModelAccessPanelProps = Readonly<{
   draftId: string;
   initialCredential: ActiveCredential | null;
   initialModelProfileId: string;
+  initialSavedCredentials?: readonly SavedCredential[];
   labels: ModelAccessLabels;
   locale: AppLocale;
   selectModelAction: (input: {
@@ -51,6 +55,16 @@ type ModelAccessPanelProps = Readonly<{
     requirementKeys: string[];
   }) => Promise<{ ok: true } | { ok: false; code: string }>;
 }>;
+
+/** Dauerhaft gespeicherter Schlüssel des Nutzers, so wie ihn der Browser sehen darf. */
+export type SavedCredential = Readonly<{ provider: string; lastFour: string }>;
+
+export function deleteSavedCredentialRequest(provider: string) {
+  return fetch(`/api/ai-credentials/saved?provider=${encodeURIComponent(provider)}`, {
+    method: "DELETE",
+    credentials: "same-origin",
+  });
+}
 
 export function postJson(url: string, body: unknown) {
   return fetch(url, {
@@ -93,6 +107,7 @@ export function ModelAccessPanel({
   draftId,
   initialCredential,
   initialModelProfileId,
+  initialSavedCredentials = [],
   labels,
   locale,
   selectModelAction,
@@ -109,6 +124,7 @@ export function ModelAccessPanel({
       : (catalogue.models[0]?.id ?? ""),
   );
   const [credential, setCredential] = useState(initialCredential);
+  const [savedCredentials, setSavedCredentials] = useState(initialSavedCredentials);
   const [apiKey, setApiKey] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +134,18 @@ export function ModelAccessPanel({
   const connected = Boolean(
     model && credential?.accessibleModelIds.includes(model.providerModelId),
   );
+  // Ein gespeicherter Schlüssel des Anbieters erspart die erneute Eingabe.
+  const saved = model
+    ? savedCredentials.find(({ provider }) => provider === model.routeProvider)
+    : undefined;
+
+  async function removeSavedKey() {
+    if (!model) return;
+    const provider = model.routeProvider;
+    const response = await deleteSavedCredentialRequest(provider).catch(() => null);
+    if (!response?.ok) return setError(labels.keyFailed);
+    setSavedCredentials((current) => current.filter((entry) => entry.provider !== provider));
+  }
 
   async function saveModel(nextModelProfileId: string, unevaluatedWarningAccepted: boolean) {
     try {
@@ -155,31 +183,43 @@ export function ModelAccessPanel({
         return;
       }
       let credentialId = connected ? credential?.credentialId : undefined;
-      if (apiKey.trim()) {
+      // Ohne eingegebenen Schlüssel verbindet der Server den gespeicherten.
+      if (apiKey.trim() || !connected) {
         const response = await postJson("/api/ai-credentials", {
           provider: model.routeProvider,
           purpose: "analysis",
           bindingId: draftId,
           requiredModelId: model.providerModelId,
-          apiKey: apiKey.trim(),
+          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         });
         // Eine Antwort ohne JSON (etwa eine Plattform-Fehlerseite) ist ein eigener
         // Fehlerfall und darf nicht als falscher Schlüssel erscheinen.
         const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
           credentialId?: string;
+          lastFour?: string;
           code?: string;
           detail?: string;
         };
         if (!response.ok || !payload.credentialId) {
+          if (payload.code === "BYOK_SAVED_CREDENTIAL_NOT_FOUND") {
+            setSavedCredentials((current) =>
+              current.filter((entry) => entry.provider !== model.routeProvider),
+            );
+          }
           setError(describeKeyFailure(labels, payload, response.status));
           return;
         }
         credentialId = payload.credentialId;
         setCredential({
           credentialId,
-          lastFour: apiKey.trim().slice(-4),
+          lastFour: payload.lastFour ?? apiKey.trim().slice(-4),
           accessibleModelIds: [model.providerModelId],
         });
+        const lastFour = payload.lastFour ?? apiKey.trim().slice(-4);
+        setSavedCredentials((current) => [
+          ...current.filter((entry) => entry.provider !== model.routeProvider),
+          { provider: model.routeProvider, lastFour },
+        ]);
         setApiKey("");
       }
       if (!credentialId) return;
@@ -217,7 +257,7 @@ export function ModelAccessPanel({
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
-          <ReachabilityLight connected={connected} />
+          <ReachabilityLight connected={connected || Boolean(saved)} />
           {labels.apiKey}
         </Button>
       </PopoverTrigger>
@@ -227,8 +267,16 @@ export function ModelAccessPanel({
           catalogue={catalogue}
           disabled={selectedKeys?.length === 0}
           error={error}
-          keyOptional={connected}
-          keyPlaceholder={connected ? `••••${credential?.lastFour ?? ""}` : undefined}
+          keyOptional={connected || Boolean(saved)}
+          keyPlaceholder={
+            connected
+              ? `••••${credential?.lastFour ?? ""}`
+              : saved
+                ? labels.savedKey.replace("{lastFour}", saved.lastFour)
+                : undefined
+          }
+          onRemoveSavedKey={saved ? () => void removeSavedKey() : undefined}
+          removeSavedKeyLabel={labels.removeSavedKey}
           labels={labels}
           modelProfileId={modelProfileId}
           onApiKeyChange={setApiKey}

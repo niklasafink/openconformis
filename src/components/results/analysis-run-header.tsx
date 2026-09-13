@@ -21,10 +21,12 @@ import {
   type AnalysisStatus,
 } from "./analysis-run-live";
 import {
+  deleteSavedCredentialRequest,
   describeKeyFailure,
   postJson,
   ReachabilityLight,
   type ModelAccessLabels,
+  type SavedCredential,
 } from "./model-access-panel";
 import { ModelKeyForm } from "./model-key-form";
 import { useRequirementSelection } from "./requirement-selection";
@@ -301,6 +303,7 @@ export function AnalysisRerunControls({
   labels,
   lastFour,
   locale,
+  savedCredentials: initialSavedCredentials = [],
 }: Readonly<{
   catalogue: AnalysisModelCatalogue;
   initialModelProfileId: string;
@@ -308,6 +311,8 @@ export function AnalysisRerunControls({
   /** Letzte vier Zeichen des Schlüssels dieses Laufs; `null`, wenn keiner mehr hinterlegt ist. */
   lastFour: string | null;
   locale: string;
+  /** Dauerhaft gespeicherte Schlüssel des Nutzers; damit startet der Lauf ohne Eingabe. */
+  savedCredentials?: readonly SavedCredential[];
 }>) {
   const router = useRouter();
   const header = useAnalysisRunHeader();
@@ -318,6 +323,7 @@ export function AnalysisRerunControls({
       : (catalogue.models[0]?.id ?? ""),
   );
   const [apiKey, setApiKey] = useState("");
+  const [savedCredentials, setSavedCredentials] = useState(initialSavedCredentials);
   const [scope, setScope] = useState<"all" | "selection">("all");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -327,6 +333,18 @@ export function AnalysisRerunControls({
     : [];
   const onlySelection = scope === "selection" && selection !== null;
   const count = String(selectedKeys.length);
+  const model = catalogue.models.find(({ id }) => id === modelProfileId);
+  const saved = model
+    ? savedCredentials.find(({ provider }) => provider === model.routeProvider)
+    : undefined;
+
+  async function removeSavedKey() {
+    if (!model) return;
+    const provider = model.routeProvider;
+    const response = await deleteSavedCredentialRequest(provider).catch(() => null);
+    if (!response?.ok) return setError(labels.keyFailed);
+    setSavedCredentials((current) => current.filter((entry) => entry.provider !== provider));
+  }
 
   function openFor(nextScope: "all" | "selection") {
     setScope(nextScope);
@@ -344,7 +362,8 @@ export function AnalysisRerunControls({
         // Der bewusste Klick auf den Startknopf gilt als Kenntnisnahme, falls das
         // Modell nicht evaluiert ist.
         unevaluatedWarningAccepted: true,
-        apiKey: apiKey.trim(),
+        // Ohne eingegebenen Schlüssel nimmt der Server den gespeicherten.
+        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         ...(onlySelection ? { requirementKeys: selectedKeys } : {}),
       });
       const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
@@ -406,7 +425,7 @@ export function AnalysisRerunControls({
             aria-expanded={header.rerunOpen}
             onClick={() => header.setRerunOpen(!header.rerunOpen)}
           >
-            <ReachabilityLight connected={lastFour !== null} />
+            <ReachabilityLight connected={lastFour !== null || Boolean(saved)} />
             {labels.apiKey}
           </Button>
         </div>
@@ -417,7 +436,16 @@ export function AnalysisRerunControls({
           catalogue={catalogue}
           disabled={onlySelection && selectedKeys.length === 0}
           error={error}
-          keyPlaceholder={lastFour !== null ? `••••${lastFour}` : undefined}
+          keyOptional={Boolean(saved)}
+          keyPlaceholder={
+            saved
+              ? labels.savedKey.replace("{lastFour}", saved.lastFour)
+              : lastFour !== null
+                ? `••••${lastFour}`
+                : undefined
+          }
+          onRemoveSavedKey={saved ? () => void removeSavedKey() : undefined}
+          removeSavedKeyLabel={labels.removeSavedKey}
           labels={labels}
           modelProfileId={modelProfileId}
           onApiKeyChange={setApiKey}

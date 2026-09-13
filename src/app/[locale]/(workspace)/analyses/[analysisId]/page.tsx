@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
+import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
 import {
   getOwnedAnalysisResultWorkspace,
@@ -51,15 +52,17 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
   const analysis = await getOwnedAnalysisStatus({ analysisId, ownerUserId: user.id });
   if (!analysis) notFound();
 
-  const [navigation, t, access, resultLabels, results, credentials, catalogue] = await Promise.all([
-    getTranslations("Navigation"),
-    getTranslations("AnalysisRun"),
-    getTranslations("ResultsPreview"),
-    loadAnalysisResultLabels(),
-    getOwnedAnalysisResultWorkspace({ analysisId, ownerUserId: user.id }),
-    listActiveTemporaryCredentials("analysis").catch(() => []),
-    getAnalysisModelCatalogue(),
-  ]);
+  const [navigation, t, access, resultLabels, results, credentials, catalogue, savedCredentials] =
+    await Promise.all([
+      getTranslations("Navigation"),
+      getTranslations("AnalysisRun"),
+      getTranslations("ResultsPreview"),
+      loadAnalysisResultLabels(),
+      getOwnedAnalysisResultWorkspace({ analysisId, ownerUserId: user.id }),
+      listActiveTemporaryCredentials("analysis").catch(() => []),
+      getAnalysisModelCatalogue(),
+      listSavedCredentials().catch(() => []),
+    ]);
   // Grün, solange der an diesen Lauf gebundene Schlüssel noch hinterlegt ist.
   const boundCredential = credentials.find(
     (credential) => credential.bindingId === analysis.sourceDraftId,
@@ -158,11 +161,14 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
                 initialModelProfileId={analysis.modelProfileId}
                 lastFour={boundCredential ? (boundCredential.lastFour ?? "") : null}
                 locale={locale}
+                savedCredentials={savedCredentials}
                 labels={{
                   panelTitle: access("panelTitle"),
                   model: access("model"),
                   selected: access("selected"),
                   apiKey: access("apiKey"),
+                  savedKey: access("savedKey", { lastFour: "{lastFour}" }),
+                  removeSavedKey: access("removeSavedKey"),
                   keyFailed: access("keyFailed"),
                   keyErrors: access.raw("keyErrors") as Record<string, string>,
                   modelFailed: access("modelFailed"),

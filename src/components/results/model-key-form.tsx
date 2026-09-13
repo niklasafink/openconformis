@@ -35,6 +35,9 @@ type ModelKeyFormProps = Readonly<{
   onApiKeyChange: (apiKey: string) => void;
   onModelChange: (modelProfileId: string) => void;
   onSubmit: () => void;
+  /** Entfernt den gespeicherten Schlüssel; ohne Angabe gibt es keinen. */
+  onRemoveSavedKey?: () => void;
+  removeSavedKeyLabel?: string;
   pending: boolean;
   submitLabel: string;
   submittingLabel: string;
@@ -56,6 +59,8 @@ export function ModelKeyForm({
   onApiKeyChange,
   onModelChange,
   onSubmit,
+  onRemoveSavedKey,
+  removeSavedKeyLabel,
   pending,
   submitLabel,
   submittingLabel,
@@ -120,6 +125,16 @@ export function ModelKeyForm({
           value={apiKey}
           onChange={(event) => onApiKeyChange(event.target.value)}
         />
+        {onRemoveSavedKey && removeSavedKeyLabel ? (
+          <button
+            type="button"
+            className="justify-self-start text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+            disabled={pending}
+            onClick={onRemoveSavedKey}
+          >
+            {removeSavedKeyLabel}
+          </button>
+        ) : null}
       </div>
 
       {error ? (
