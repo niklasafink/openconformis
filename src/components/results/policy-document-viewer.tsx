@@ -1,7 +1,9 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
+import { listMarkerPattern } from "@/domain/policies/document-structure";
 
 import type { DocumentBlock } from "./analysis-results-workspace";
 
@@ -39,98 +41,130 @@ type PolicyDocumentViewerProps = {
   registerBlock: (blockId: string, node: HTMLElement | null) => void;
 };
 
+/* ----------------------------- Zitatsuche ------------------------------- */
+
 /**
- * Vergleichsform für Zitatsuche: Groß-/Kleinschreibung, typografische
- * Anführungszeichen und Leerraum unterscheiden sich zwischen ausgelesenem
- * Rohtext und gerendertem Dokument, der Wortlaut nicht. Jede Ersetzung bleibt
- * zeichenweise, damit sich eine Fundstelle zurückrechnen lässt.
+ * Vergleichsform für Zitatsuche: Groß-/Kleinschreibung und typografische
+ * Anführungszeichen unterscheiden sich zwischen ausgelesenem Rohtext und
+ * gerendertem Dokument, der Wortlaut nicht.
  */
 function normalizeCharacter(character: string) {
-  if (/[  ]/u.test(character)) return " ";
   if (/[‘’‚′]/u.test(character)) return "'";
   if (/[“”„″]/u.test(character)) return '"';
   if (/[‐-―−]/u.test(character)) return "-";
   return character.toLowerCase();
 }
 
-function normalizeForMatching(value: string) {
-  return Array.from(value).map(normalizeCharacter).join("").replace(/\s+/gu, " ");
-}
+/** Ein Treffer innerhalb eines Textstücks, als UTF-16-Positionen. */
+export type TextRange = { segment: number; start: number; end: number };
 
 /**
- * Normalisiert und merkt sich für jede Stelle der Vergleichsform, aus welchem
- * Zeichen des Rohtexts sie stammt. Ohne diese Zuordnung träfe die Markierung
- * überall dort daneben, wo das gerenderte Dokument mehr Leerraum enthält als
- * der ausgelesene Auszug.
- */
-function normalizeWithOffsets(raw: string) {
-  let normalized = "";
-  const offsets: number[] = [];
-  let previousWasSpace = false;
-
-  for (let index = 0; index < raw.length; index += 1) {
-    const character = raw[index] ?? "";
-    if (/\s/u.test(character)) {
-      if (previousWasSpace) continue;
-      previousWasSpace = true;
-      normalized += " ";
-      offsets.push(index);
-      continue;
-    }
-    previousWasSpace = false;
-    normalized += normalizeCharacter(character);
-    offsets.push(index);
-  }
-  offsets.push(raw.length);
-
-  return { normalized, offsets };
-}
-
-/**
- * Ordnet ein Belegzitat den Textabschnitten einer PDF-Seite zu und liefert die
- * Nummern der Abschnitte, die es berühren.
+ * Sucht ein Zitat in aufeinanderfolgenden Textstücken — Textknoten eines
+ * Word-Dokuments oder Textabschnitte einer PDF-Seite — und liefert je
+ * berührtem Stück die genaue Zeichenspanne.
  *
  * Leerraum wird dabei vollständig ignoriert. pdf.js zerlegt eine Seite in
- * Textstücke, die nicht an Wortgrenzen enden — im ausgelesenen Text steht dann
+ * Stücke, die nicht an Wortgrenzen enden — im ausgelesenen Text steht dann
  * „gene hmigt", in der Textebene „genehmigt". Ein Vergleich, der Leerzeichen
- * nur zusammenfasst statt zu entfernen, findet solche Zitate nie.
+ * nur zusammenfasst statt zu entfernen, fände solche Zitate nie.
+ *
+ * `from` beginnt die Suche erst ab einer Stelle, damit ein Zitat innerhalb
+ * seines Belegblocks gefunden wird und nicht in einer früheren Wiederholung.
  */
-export function findQuoteSpans(spanTexts: readonly string[], quote: string): number[] {
-  const needle = normalizeForMatching(quote).replace(/\s+/gu, "");
+export function findQuoteRanges(
+  segments: readonly string[],
+  quote: string,
+  from?: Pick<TextRange, "segment" | "start">,
+): TextRange[] {
+  let needle = "";
+  for (const character of quote) {
+    for (const normalized of normalizeCharacter(character)) {
+      if (!/\s/u.test(normalized)) needle += normalized;
+    }
+  }
   if (!needle) return [];
 
   let haystack = "";
-  const spanOfCharacter: number[] = [];
-  spanTexts.forEach((text, spanIndex) => {
-    for (const character of normalizeForMatching(text)) {
-      if (/\s/u.test(character)) continue;
-      haystack += character;
-      spanOfCharacter.push(spanIndex);
+  const positions: TextRange[] = [];
+  segments.forEach((text, segment) => {
+    let offset = 0;
+    for (const character of text) {
+      const start = offset;
+      offset += character.length;
+      for (const normalized of normalizeCharacter(character)) {
+        if (/\s/u.test(normalized)) continue;
+        haystack += normalized;
+        positions.push({ segment, start, end: offset });
+      }
     }
   });
 
-  const start = haystack.indexOf(needle);
-  if (start < 0) return [];
+  const fromIndex = from
+    ? positions.findIndex(
+        (position) =>
+          position.segment > from.segment ||
+          (position.segment === from.segment && position.start >= from.start),
+      )
+    : 0;
+  if (fromIndex < 0) return [];
+  const index = haystack.indexOf(needle, fromIndex);
+  if (index < 0) return [];
 
-  const touched = new Set<number>();
-  for (let index = start; index < start + needle.length; index += 1) {
-    const spanIndex = spanOfCharacter[index];
-    if (spanIndex !== undefined) touched.add(spanIndex);
+  const ranges = new Map<number, TextRange>();
+  for (const position of positions.slice(index, index + needle.length)) {
+    const range = ranges.get(position.segment);
+    if (range) range.end = Math.max(range.end, position.end);
+    else ranges.set(position.segment, { ...position });
   }
-  return [...touched].sort((first, second) => first - second);
+  const touched = [...ranges.values()].sort((first, second) => first.segment - second.segment);
+  // Zwischen zwei berührten Stücken liegt nur Leerraum — sonst gehörte das
+  // nächste Zeichen noch zum vorigen Stück. Er wird mitmarkiert, damit die
+  // Hervorhebung keine Lücken zwischen den Wörtern lässt.
+  touched.forEach((range, position) => {
+    if (position > 0) range.start = 0;
+    if (position < touched.length - 1) range.end = segments[range.segment]?.length ?? range.end;
+  });
+  return touched;
+}
+
+/** Nummern der Textstücke, die ein Zitat berührt. */
+export function findQuoteSpans(spanTexts: readonly string[], quote: string): number[] {
+  return findQuoteRanges(spanTexts, quote).map(({ segment }) => segment);
+}
+
+/**
+ * Sucht zuerst den Belegblock und darin das Zitat. Fehlt der Block, zählt das
+ * erste Vorkommen des Zitats; der Rahmen umfasst dann nur das Zitat selbst.
+ */
+function locateEvidence(segments: readonly string[], quote: string, blockText?: string) {
+  const block = blockText ? findQuoteRanges(segments, blockText) : [];
+  const blockStart = block[0];
+  const withinBlock = blockStart ? findQuoteRanges(segments, quote, blockStart) : [];
+  const quoteRanges = withinBlock.length > 0 ? withinBlock : findQuoteRanges(segments, quote);
+  return { block: block.length > 0 ? block : quoteRanges, quote: quoteRanges };
 }
 
 export function splitEvidenceHighlight(text: string, quote: string) {
-  const normalizedQuote = quote.trim();
-  if (!normalizedQuote) return null;
-  const start = text.indexOf(normalizedQuote);
-  if (start < 0) return null;
+  const [range] = findQuoteRanges([text], quote);
+  if (!range) return null;
   return {
-    before: text.slice(0, start),
-    match: text.slice(start, start + normalizedQuote.length),
-    after: text.slice(start + normalizedQuote.length),
+    before: text.slice(0, range.start),
+    match: text.slice(range.start, range.end),
+    after: text.slice(range.end),
   };
 }
+
+/** Scrollt so, dass die Belegstelle mit etwas Kontext darüber sichtbar ist. */
+function scrollToElement(container: HTMLElement, element: Element) {
+  const top =
+    element.getBoundingClientRect().top -
+    container.getBoundingClientRect().top +
+    container.scrollTop -
+    96;
+  container.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
+/* ------------------------------ Ansicht --------------------------------- */
 
 export function PolicyDocumentViewer({
   original,
@@ -147,6 +181,16 @@ export function PolicyDocumentViewer({
   // Fällt das Original weg — gelöscht nach Aufbewahrungsfrist, Speicher nicht
   // erreichbar —, bleibt der geparste Text die belastbare Ansicht.
   const showOriginal = mode === "original" && original !== null && !originalFailed;
+  const activeBlock = activeEvidence
+    ? blocks?.find(({ id }) => id === activeEvidence.documentBlockId)
+    : undefined;
+  const target = activeEvidence
+    ? {
+        quote: activeEvidence.exactQuote,
+        blockText: activeBlock?.canonicalText,
+        pageNumber: activeEvidence.pageNumber ?? activeBlock?.pageNumber ?? null,
+      }
+    : undefined;
 
   return (
     <>
@@ -178,14 +222,14 @@ export function PolicyDocumentViewer({
         original.kind === "pdf" ? (
           <PdfOriginal
             original={original}
-            activeEvidence={activeEvidence}
+            target={target}
             labels={labels}
             onFailed={() => setOriginalFailed(true)}
           />
         ) : (
           <DocxOriginal
             original={original}
-            activeEvidence={activeEvidence}
+            target={target}
             labels={labels}
             onFailed={() => setOriginalFailed(true)}
           />
@@ -202,46 +246,132 @@ export function PolicyDocumentViewer({
           ) : !blocks ? (
             <p className="result-document-state">{labels.loading}</p>
           ) : (
-            blocks.map((block) => {
-              const isActive = block.id === activeEvidence?.documentBlockId;
-              const highlight = isActive
-                ? splitEvidenceHighlight(block.canonicalText, activeEvidence.exactQuote)
-                : null;
-              return (
-                <article
-                  key={block.id}
-                  ref={(node) => registerBlock(block.id, node)}
-                  tabIndex={-1}
-                  className="result-document-block"
-                  data-active={isActive || undefined}
-                >
-                  {block.headingPath.length > 0 ? (
-                    <small>{block.headingPath.join(" / ")}</small>
-                  ) : null}
-                  <p>
-                    {highlight ? (
-                      <>
-                        {highlight.before}
-                        <mark>{highlight.match}</mark>
-                        {highlight.after}
-                      </>
-                    ) : (
-                      block.canonicalText
-                    )}
-                  </p>
-                  <footer>
-                    {block.pageNumber ? `${labels.page} ${block.pageNumber}` : ""}
-                    {block.pageNumber && block.paragraphNumber ? " · " : ""}
-                    {block.paragraphNumber ? `${labels.paragraph} ${block.paragraphNumber}` : ""}
-                  </footer>
-                </article>
-              );
-            })
+            <DocumentText
+              blocks={blocks}
+              activeEvidence={activeEvidence}
+              pageLabel={labels.page}
+              registerBlock={registerBlock}
+            />
           )}
         </div>
       )}
     </>
   );
+}
+
+type EvidenceTarget = { quote: string; blockText?: string; pageNumber: number | null };
+
+/* -------------------------------- Text ---------------------------------- */
+
+/**
+ * Der ausgelesene Text als zusammenhängendes Dokument: Überschriften,
+ * Absätze, Listen und Tabellenzellen wie in einer Markdown-Fassung, ohne die
+ * Blockgrenzen der Analyse als Karten zu zeigen. Jeder Block bleibt ein
+ * eigenes Element, damit Belegstellen ihn anspringen und markieren können.
+ */
+function DocumentText({
+  blocks,
+  activeEvidence,
+  pageLabel,
+  registerBlock,
+}: {
+  blocks: DocumentBlock[];
+  activeEvidence: ActiveEvidence | undefined;
+  pageLabel: string;
+  registerBlock: (blockId: string, node: HTMLElement | null) => void;
+}) {
+  const content = (block: DocumentBlock) => {
+    const highlight =
+      block.id === activeEvidence?.documentBlockId
+        ? splitEvidenceHighlight(block.canonicalText, activeEvidence.exactQuote)
+        : null;
+    return highlight ? (
+      <>
+        {highlight.before}
+        <mark>{highlight.match}</mark>
+        {highlight.after}
+      </>
+    ) : (
+      block.canonicalText
+    );
+  };
+  const blockProps = (block: DocumentBlock) => ({
+    ref: (node: HTMLElement | null) => registerBlock(block.id, node),
+    tabIndex: -1,
+    className: "result-text-block",
+    "data-active": block.id === activeEvidence?.documentBlockId || undefined,
+  });
+
+  const nodes: ReactNode[] = [];
+  let previousPage: number | null = null;
+  for (let index = 0; index < blocks.length;) {
+    const block = blocks[index];
+    if (!block) break;
+
+    if (block.pageNumber !== null && previousPage !== null && block.pageNumber !== previousPage) {
+      nodes.push(
+        <div key={`page-${block.pageNumber}-${block.id}`} className="result-text-page">
+          {pageLabel} {block.pageNumber}
+        </div>,
+      );
+    }
+    previousPage = block.pageNumber ?? previousPage;
+
+    if (block.blockType === "list_item" || block.blockType === "table_cell") {
+      const group: DocumentBlock[] = [];
+      while (
+        blocks[index]?.blockType === block.blockType &&
+        blocks[index]?.pageNumber === block.pageNumber
+      ) {
+        group.push(blocks[index] as DocumentBlock);
+        index += 1;
+      }
+      nodes.push(
+        block.blockType === "list_item" ? (
+          <ul key={block.id} className="result-text-list">
+            {group.map((item) => (
+              <li
+                key={item.id}
+                {...blockProps(item)}
+                // PDF-Listenpunkte tragen ihr Aufzählungszeichen im Text.
+                data-marker={listMarkerPattern.test(item.canonicalText) || undefined}
+              >
+                {content(item)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div key={block.id} className="result-text-cells">
+            {group.map((cell) => (
+              <p key={cell.id} {...blockProps(cell)}>
+                {content(cell)}
+              </p>
+            ))}
+          </div>
+        ),
+      );
+      continue;
+    }
+
+    if (block.blockType === "heading") {
+      // Der Seitentitel ist h1; die Gliederung des Dokuments beginnt darunter.
+      const Heading = `h${Math.min(6, block.headingPath.length + 2)}` as "h2";
+      nodes.push(
+        <Heading key={block.id} {...blockProps(block)}>
+          {content(block)}
+        </Heading>,
+      );
+    } else {
+      nodes.push(
+        <p key={block.id} {...blockProps(block)}>
+          {content(block)}
+        </p>,
+      );
+    }
+    index += 1;
+  }
+
+  return <article className="result-text-document">{nodes}</article>;
 }
 
 function originalUrl(original: PolicyOriginal, path: "original" | "rendered") {
@@ -253,12 +383,12 @@ function originalUrl(original: PolicyOriginal, path: "original" | "rendered") {
 
 function DocxOriginal({
   original,
-  activeEvidence,
+  target,
   labels,
   onFailed,
 }: {
   original: PolicyOriginal;
-  activeEvidence: ActiveEvidence | undefined;
+  target: EvidenceTarget | undefined;
   labels: PolicyDocumentLabels;
   onFailed: () => void;
 }) {
@@ -290,13 +420,9 @@ function DocxOriginal({
   useEffect(() => {
     const content = contentRef.current;
     if (!content || html === undefined) return;
-    const marked = highlightQuoteInElement(content, activeEvidence?.exactQuote);
-    if (!marked || !scrollRef.current) return;
-    scrollRef.current.scrollTo({
-      top: Math.max(0, marked.offsetTop - 24),
-      behavior: "smooth",
-    });
-  }, [html, activeEvidence?.documentBlockId, activeEvidence?.exactQuote]);
+    const marked = highlightQuoteInElement(content, target?.quote, target?.blockText);
+    if (marked && scrollRef.current) scrollToElement(scrollRef.current, marked);
+  }, [html, target?.quote, target?.blockText]);
 
   return (
     <div className="result-column-scroll result-original-scroll" ref={scrollRef}>
@@ -315,73 +441,74 @@ function DocxOriginal({
   );
 }
 
-/**
- * Markiert das erste Vorkommen des Zitats im gerenderten Dokument. Frühere
- * Markierungen werden vorher entfernt, damit sich Hervorhebungen nie
- * überlappen und immer genau eine Belegstelle sichtbar ist.
- */
-export function highlightQuoteInElement(container: HTMLElement, quote: string | undefined) {
-  for (const previous of Array.from(container.querySelectorAll("mark[data-evidence]"))) {
-    const parent = previous.parentNode;
+const blockElementSelector = "p, li, td, th, h1, h2, h3, h4, h5, h6";
+
+function clearEvidenceHighlight(container: HTMLElement) {
+  for (const mark of Array.from(container.querySelectorAll("mark[data-evidence]"))) {
+    const parent = mark.parentNode;
     if (!parent) continue;
-    parent.replaceChild(document.createTextNode(previous.textContent ?? ""), previous);
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
     parent.normalize();
   }
+  for (const element of Array.from(container.querySelectorAll("[data-evidence-block]"))) {
+    element.removeAttribute("data-evidence-block");
+  }
+}
+
+function wrapText(node: Text, start: number, end: number) {
+  if (end <= start || !node.parentNode) return null;
+  const middle = start > 0 ? node.splitText(start) : node;
+  if (end - start < middle.data.length) middle.splitText(end - start);
+  const mark = document.createElement("mark");
+  mark.dataset.evidence = "true";
+  middle.parentNode?.insertBefore(mark, middle);
+  mark.appendChild(middle);
+  return mark;
+}
+
+/**
+ * Markiert die Belegstelle im gerenderten Word-Dokument: das Zitat gelb, den
+ * Absatz, die Listenzeile oder Zelle des Belegblocks mit einem Rahmen. Ein
+ * Zitat, das Fett- oder Kursivsatz durchquert, bekommt je Textknoten eine
+ * eigene Markierung. Frühere Markierungen werden vorher entfernt, damit sich
+ * Hervorhebungen nie überlappen und immer genau eine Belegstelle sichtbar ist.
+ */
+export function highlightQuoteInElement(
+  container: HTMLElement,
+  quote: string | undefined,
+  blockText?: string,
+): HTMLElement | null {
+  clearEvidenceHighlight(container);
   if (!quote?.trim()) return null;
 
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
-  let joined = "";
-  const offsets: number[] = [];
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = node as Text;
-    offsets.push(joined.length);
-    nodes.push(text);
-    joined += text.data;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text);
+
+  const located = locateEvidence(
+    nodes.map((node) => node.data),
+    quote,
+    blockText,
+  );
+  if (located.block.length === 0) return null;
+
+  let frame: HTMLElement | null = null;
+  for (const { segment } of located.block) {
+    const element = nodes[segment]?.parentElement?.closest<HTMLElement>(blockElementSelector);
+    if (!element || !container.contains(element)) continue;
+    element.dataset.evidenceBlock = "true";
+    frame ??= element;
   }
 
-  const { normalized, offsets: normalizedOffsets } = normalizeWithOffsets(joined);
-  const needle = normalizeForMatching(quote).trim();
-  if (!needle) return null;
-  const normalizedIndex = normalized.indexOf(needle);
-  if (normalizedIndex < 0) return null;
-
-  const start = normalizedOffsets[normalizedIndex];
-  const end = normalizedOffsets[normalizedIndex + needle.length];
-  if (start === undefined || end === undefined || end <= start) return null;
-
-  return wrapRange(nodes, offsets, start, end);
-}
-
-function wrapRange(nodes: Text[], offsets: number[], start: number, end: number) {
-  const range = document.createRange();
-  let anchored = false;
-  for (let index = 0; index < nodes.length; index += 1) {
-    const node = nodes[index];
-    const nodeStart = offsets[index];
-    if (!node || nodeStart === undefined) continue;
-    const nodeEnd = nodeStart + node.data.length;
-    if (!anchored && start >= nodeStart && start <= nodeEnd) {
-      range.setStart(node, start - nodeStart);
-      anchored = true;
-    }
-    if (anchored && end >= nodeStart && end <= nodeEnd) {
-      range.setEnd(node, end - nodeStart);
-      break;
-    }
+  // Von hinten nach vorn, damit das Teilen eines Knotens keine späteren
+  // Positionen verschiebt.
+  let first: HTMLElement | null = null;
+  for (const range of [...located.quote].reverse()) {
+    const node = nodes[range.segment];
+    if (node) first = wrapText(node, range.start, range.end) ?? first;
   }
-  if (!anchored) return null;
-
-  const mark = document.createElement("mark");
-  mark.dataset.evidence = "true";
-  try {
-    range.surroundContents(mark);
-  } catch {
-    // Die Fundstelle überschreitet eine Elementgrenze — dann bleibt das
-    // Dokument unverändert, statt es beim Umschließen zu zerlegen.
-    return null;
-  }
-  return mark;
+  return first ?? frame;
 }
 
 /* -------------------------------- PDF ---------------------------------- */
@@ -392,18 +519,17 @@ type PdfDocumentHandle = Awaited<
 
 function PdfOriginal({
   original,
-  activeEvidence,
+  target,
   labels,
   onFailed,
 }: {
   original: PolicyOriginal;
-  activeEvidence: ActiveEvidence | undefined;
+  target: EvidenceTarget | undefined;
   labels: PolicyDocumentLabels;
   onFailed: () => void;
 }) {
   const [document_, setDocument] = useState<PdfDocumentHandle>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pageRefs = useRef(new Map<number, HTMLDivElement>());
 
   useEffect(() => {
     let cancelled = false;
@@ -436,20 +562,6 @@ function PdfOriginal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [original.policyVersionId, original.draftId]);
 
-  const registerPage = useCallback((pageNumber: number, node: HTMLDivElement | null) => {
-    if (node) pageRefs.current.set(pageNumber, node);
-    else pageRefs.current.delete(pageNumber);
-  }, []);
-
-  const targetPage = activeEvidence?.pageNumber ?? null;
-  useEffect(() => {
-    if (!targetPage) return;
-    const page = pageRefs.current.get(targetPage);
-    const container = scrollRef.current;
-    if (!page || !container) return;
-    container.scrollTo({ top: Math.max(0, page.offsetTop - 16), behavior: "smooth" });
-  }, [targetPage, activeEvidence?.exactQuote, document_]);
-
   const pageNumbers = useMemo(
     () => (document_ ? Array.from({ length: document_.numPages }, (_, index) => index + 1) : []),
     [document_],
@@ -466,8 +578,7 @@ function PdfOriginal({
             document={document_}
             pageNumber={pageNumber}
             scrollRef={scrollRef}
-            quote={targetPage === pageNumber ? activeEvidence?.exactQuote : undefined}
-            registerPage={registerPage}
+            target={target?.pageNumber === pageNumber ? target : undefined}
             label={`${labels.page} ${pageNumber}`}
           />
         ))
@@ -478,24 +589,83 @@ function PdfOriginal({
 
 const maximumRenderScale = 2;
 
+type Box = { left: number; top: number; width: number; height: number };
+
+/** Rechtecke eines Zeichenbereichs innerhalb eines Textabschnitts von pdf.js. */
+function rectsOfRange(span: HTMLElement, start: number, end: number) {
+  const node = span.firstChild;
+  if (node instanceof Text && end <= node.length) {
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, end);
+    return Array.from(range.getClientRects());
+  }
+  return [span.getBoundingClientRect()];
+}
+
+/** Fasst nebeneinanderliegende Rechtecke derselben Zeile zu einem zusammen. */
+function mergeLineBoxes(boxes: Box[]) {
+  const merged: Box[] = [];
+  for (const box of [...boxes].sort(
+    (first, second) => first.top - second.top || first.left - second.left,
+  )) {
+    const line = merged.find(
+      (candidate) =>
+        Math.abs(candidate.top - box.top) < Math.min(candidate.height, box.height) * 0.5 &&
+        box.left <= candidate.left + candidate.width + box.height,
+    );
+    if (!line) {
+      merged.push({ ...box });
+      continue;
+    }
+    const right = Math.max(line.left + line.width, box.left + box.width);
+    const bottom = Math.max(line.top + line.height, box.top + box.height);
+    line.left = Math.min(line.left, box.left);
+    line.top = Math.min(line.top, box.top);
+    line.width = right - line.left;
+    line.height = bottom - line.top;
+  }
+  return merged;
+}
+
+function unionBox(boxes: Box[], padding: number): Box | null {
+  if (boxes.length === 0) return null;
+  const left = Math.min(...boxes.map((box) => box.left)) - padding;
+  const top = Math.min(...boxes.map((box) => box.top)) - padding;
+  const right = Math.max(...boxes.map((box) => box.left + box.width)) + padding;
+  const bottom = Math.max(...boxes.map((box) => box.top + box.height)) + padding;
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+function overlayElement(kind: "block" | "quote", box: Box) {
+  const element = document.createElement("div");
+  element.dataset.kind = kind;
+  Object.assign(element.style, {
+    left: `${box.left}px`,
+    top: `${box.top}px`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
+  });
+  return element;
+}
+
 function PdfPage({
   document: handle,
   pageNumber,
   scrollRef,
-  quote,
-  registerPage,
+  target,
   label,
 }: {
   document: NonNullable<PdfDocumentHandle>;
   pageNumber: number;
   scrollRef: React.RefObject<HTMLDivElement | null>;
-  quote: string | undefined;
-  registerPage: (pageNumber: number, node: HTMLDivElement | null) => void;
+  target: EvidenceTarget | undefined;
   label: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(pageNumber <= 2);
   const [rendered, setRendered] = useState(false);
 
@@ -572,44 +742,72 @@ function PdfPage({
     };
   }, [handle, pageNumber, rendered, visible]);
 
-  // Die Belegstelle wird über der gezeichneten Seite markiert: die Textebene
-  // von pdf.js liegt deckungsgleich darüber, deshalb trifft die Markierung
-  // genau den Wortlaut im Original.
+  // Die Belegstelle wird über der gezeichneten Seite eingezeichnet: ein Rahmen
+  // um den Belegblock und gelbe Flächen genau über den Zeichen des Zitats. Die
+  // Maße stammen aus der deckungsgleichen Textebene von pdf.js, deshalb trifft
+  // die Markierung den Wortlaut im Original — auch mitten in einem Abschnitt.
+  const quote = target?.quote;
+  const blockText = target?.blockText;
   useEffect(() => {
-    const node = textLayerRef.current;
-    if (!node || !rendered) return;
-    for (const marked of Array.from(node.querySelectorAll("[data-evidence]"))) {
-      marked.removeAttribute("data-evidence");
-    }
+    const page = containerRef.current;
+    const layer = textLayerRef.current;
+    const overlay = overlayRef.current;
+    if (!page || !layer || !overlay) return;
+    overlay.replaceChildren();
     if (!quote?.trim()) return;
+
+    const scroll = scrollRef.current;
+    if (!rendered) {
+      // Die Seite zeichnet sich, sobald sie in Sichtweite kommt; danach läuft
+      // dieser Effekt erneut und springt auf die Markierung.
+      scroll?.scrollTo({ top: Math.max(0, page.offsetTop - 16), behavior: "smooth" });
+      return;
+    }
 
     // `markedContent`-Gruppen sind durchsichtige Container; die Textabschnitte
     // liegen darin. Die Dokumentreihenfolge entspricht der Lesereihenfolge.
-    const spans = Array.from(node.querySelectorAll<HTMLElement>("span:not(.markedContent)"));
-    const matched = findQuoteSpans(
+    const spans = Array.from(layer.querySelectorAll<HTMLElement>("span:not(.markedContent)"));
+    const located = locateEvidence(
       spans.map((span) => span.textContent ?? ""),
       quote,
+      blockText,
     );
-    for (const spanIndex of matched) {
-      const span = spans[spanIndex];
-      if (span) span.dataset.evidence = "true";
+    const origin = page.getBoundingClientRect();
+    const boxesOf = (ranges: TextRange[]) =>
+      ranges
+        .flatMap(({ segment, start, end }) => {
+          const span = spans[segment];
+          return span ? rectsOfRange(span, start, end) : [];
+        })
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map((rect) => ({
+          left: rect.left - origin.left,
+          top: rect.top - origin.top,
+          width: rect.width,
+          height: rect.height,
+        }));
+
+    const frame = unionBox(boxesOf(located.block), 4);
+    const marks = mergeLineBoxes(boxesOf(located.quote));
+    if (frame) overlay.append(overlayElement("block", frame));
+    overlay.append(...marks.map((box) => overlayElement("quote", box)));
+
+    const focus = marks[0] ?? frame;
+    if (focus && scroll) {
+      scroll.scrollTo({ top: Math.max(0, page.offsetTop + focus.top - 96), behavior: "smooth" });
     }
-    const first = matched[0] === undefined ? undefined : spans[matched[0]];
-    first?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [quote, rendered]);
+  }, [quote, blockText, rendered, scrollRef]);
 
   return (
     <div
       className="result-pdf-page"
-      ref={(node) => {
-        containerRef.current = node;
-        registerPage(pageNumber, node);
-      }}
+      ref={containerRef}
       style={rendered ? undefined : { aspectRatio: "1 / 1.414" }}
       aria-label={label}
     >
       <canvas ref={canvasRef} />
       <div className="result-pdf-text-layer" ref={textLayerRef} aria-hidden="true" />
+      <div className="result-pdf-overlay" ref={overlayRef} aria-hidden="true" />
     </div>
   );
 }

@@ -34,12 +34,13 @@ export class AnalysisResultNotFoundError extends Error {
   }
 }
 
-export class AnalysisNotCompletedError extends Error {
-  constructor() {
-    super("Only completed analyses can be reviewed.");
-    this.name = "AnalysisNotCompletedError";
-  }
-}
+/*
+ * Prüfen, bestätigen und abhaken geht, sobald ein Ergebnis gespeichert ist —
+ * nicht erst, wenn der ganze Lauf endet. Der Worker schreibt jedes Ergebnis
+ * einmalig nach Bewertung und Verifikation und ändert es danach nicht mehr.
+ * Mit parallel bewerteten Anforderungen stand der Lauf sonst noch auf „running“,
+ * während die Oberfläche fertige Bewertungen zeigte, und jede Bestätigung scheiterte.
+ */
 
 export function requireAssessmentConfirmationPermission(principal: SessionPrincipal) {
   if (!principal.emailVerified) throw new VerifiedEmailRequiredError();
@@ -64,7 +65,6 @@ export async function setAnalysisResultOverride(input: {
     const [target] = await transaction
       .select({
         id: analysisRequirementResults.id,
-        analysisStatus: analyses.status,
         regulatoryId: analysisScopeItems.regulatoryId,
       })
       .from(analysisRequirementResults)
@@ -83,7 +83,6 @@ export async function setAnalysisResultOverride(input: {
       .limit(1);
 
     if (!target) throw new AnalysisResultNotFoundError();
-    if (target.analysisStatus !== "completed") throw new AnalysisNotCompletedError();
 
     await transaction.execute(
       sql`select ${analysisRequirementResults.id}
@@ -144,7 +143,6 @@ export async function setAnalysisResultConfirmation(input: {
     const [target] = await transaction
       .select({
         id: analysisRequirementResults.id,
-        analysisStatus: analyses.status,
         regulatoryId: analysisScopeItems.regulatoryId,
       })
       .from(analysisRequirementResults)
@@ -163,7 +161,6 @@ export async function setAnalysisResultConfirmation(input: {
       .limit(1);
 
     if (!target) throw new AnalysisResultNotFoundError();
-    if (target.analysisStatus !== "completed") throw new AnalysisNotCompletedError();
 
     await transaction.execute(
       sql`select ${analysisRequirementResults.id}
@@ -236,7 +233,6 @@ export async function setAnalysisResultTodo(input: {
     const [target] = await transaction
       .select({
         id: analysisRequirementResults.id,
-        analysisStatus: analyses.status,
         regulatoryId: analysisScopeItems.regulatoryId,
       })
       .from(analysisRequirementResults)
@@ -255,7 +251,6 @@ export async function setAnalysisResultTodo(input: {
       .limit(1);
 
     if (!target) throw new AnalysisResultNotFoundError();
-    if (target.analysisStatus !== "completed") throw new AnalysisNotCompletedError();
 
     await transaction.execute(
       sql`select ${analysisRequirementResults.id}

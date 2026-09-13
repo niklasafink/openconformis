@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-  AnalysisNotCompletedError,
   AnalysisResultNotFoundError,
   AnalysisTodoNotFoundError,
   setAnalysisResultTodo,
@@ -57,9 +56,6 @@ export async function PUT(
       error instanceof AnalysisTodoNotFoundError
     ) {
       return NextResponse.json({ code: "ANALYSIS_TODO_NOT_FOUND" }, { status: 404 });
-    }
-    if (error instanceof AnalysisNotCompletedError) {
-      return NextResponse.json({ code: "ANALYSIS_NOT_COMPLETED" }, { status: 409 });
     }
     return NextResponse.json({ code: "TODO_FAILED" }, { status: 500 });
   }

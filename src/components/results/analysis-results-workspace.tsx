@@ -335,7 +335,7 @@ export function AnalysisResultsWorkspace({
       const block = documentBlockRefs.current.get(documentBlockId);
       if (!container || !block) return;
       block.focus({ preventScroll: true });
-      container.scrollTo({ top: Math.max(0, block.offsetTop - 16), behavior: "smooth" });
+      container.scrollTo({ top: Math.max(0, block.offsetTop - 80), behavior: "smooth" });
     });
   }
 

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-  AnalysisNotCompletedError,
   AnalysisResultNotFoundError,
   setAnalysisResultOverride,
 } from "@/server/analyses/review-analysis";
@@ -74,9 +73,6 @@ export async function PUT(
     }
     if (error instanceof AnalysisResultNotFoundError) {
       return NextResponse.json({ code: "ANALYSIS_RESULT_NOT_FOUND" }, { status: 404 });
-    }
-    if (error instanceof AnalysisNotCompletedError) {
-      return NextResponse.json({ code: "ANALYSIS_NOT_COMPLETED" }, { status: 409 });
     }
     return NextResponse.json({ code: "OVERRIDE_FAILED" }, { status: 500 });
   }

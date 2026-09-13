@@ -428,6 +428,42 @@ describe("requirements without an assessment", () => {
     expect(screen.queryByRole("mark")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("renders the policy text as one readable document instead of block cards", () => {
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="preview"
+        canConfirm={false}
+        canOverride={false}
+        policyName="IKT-Sicherheitsrichtlinie.pdf"
+        organizationContext=""
+        items={[pendingItem]}
+        labels={labels}
+        documentBlocks={[
+          {
+            ...documentBlocks[0]!,
+            id: "h",
+            blockType: "heading",
+            canonicalText: "1 Governance",
+            headingPath: [],
+          },
+          { ...documentBlocks[0]!, id: "p", canonicalText: "Das Leitungsorgan genehmigt." },
+          { ...documentBlocks[0]!, id: "l1", blockType: "list_item", canonicalText: "Punkt eins" },
+          { ...documentBlocks[0]!, id: "l2", blockType: "list_item", canonicalText: "Punkt zwei" },
+          { ...documentBlocks[0]!, id: "p2", canonicalText: "Seite zwei.", pageNumber: 2 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "1 Governance", level: 2 })).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Punkt eins",
+      "Punkt zwei",
+    ]);
+    // Keine Gliederungspfade oder Absatznummern je Block, nur der Seitenwechsel.
+    expect(screen.queryByText("Governance")).not.toBeInTheDocument();
+    expect(screen.getByText("Seite 2")).toBeInTheDocument();
+  });
 });
 
 describe("evidence highlighting", () => {

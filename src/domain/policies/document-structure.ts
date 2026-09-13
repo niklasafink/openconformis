@@ -218,7 +218,7 @@ export function pdfLinesFromText(items: readonly PositionedText[]): PdfLine[] {
   return lines;
 }
 
-const listMarkerPattern = /^(?:[•▪◦●○■□‣∙·–—*-]|\(?[a-zA-Z0-9]{1,3}[.)])\s+/u;
+export const listMarkerPattern = /^(?:[•▪◦●○■□‣∙·–—*-]|\(?[a-zA-Z0-9]{1,3}[.)])\s+/u;
 const pageFurniturePattern = /^(?:(?:seite|page)\s*)?\d{1,4}(?:\s*(?:von|of|\/)\s*\d{1,4})?$/iu;
 
 /**
