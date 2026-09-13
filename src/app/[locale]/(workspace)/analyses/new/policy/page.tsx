@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { PolicyUpload } from "@/components/policies/policy-upload";
 import { routing } from "@/i18n/routing";
+import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { getCurrentPolicySelection } from "@/server/policies/sample-service";
 
 import { chooseSamplePolicy } from "./actions";
@@ -24,7 +25,14 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
   setRequestLocale(locale);
 
   const t = await getTranslations("Policy");
-  const currentSelection = await getCurrentPolicySelection(draft);
+  // Der Draft kommt aus dem Bindungs-Cookie, nicht nur aus der URL: die Sidebar
+  // verlinkt die Schritte ohne `?draft=`. Ohne diese Auflösung stand dort nur
+  // „Bitte zuerst ein Rahmenwerk auswählen", obwohl längst eines gewählt war —
+  // die Beispiel-Policy fand den Draft serverseitig, der Upload nie.
+  const boundDraft =
+    (await getBoundActiveDraft(draft)) ?? (draft ? await getBoundActiveDraft() : null);
+  const draftId = boundDraft?.frameworkSlug ? boundDraft.id : undefined;
+  const currentSelection = await getCurrentPolicySelection(draftId);
 
   return (
     <>
@@ -52,8 +60,8 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
                 </div>
               </div>
               <PolicyUpload
-                draftId={draft}
-                continueHref={`/${locale}/analyses/new/scope${draft ? `?draft=${draft}` : ""}`}
+                draftId={draftId}
+                continueHref={`/${locale}/analyses/new/scope${draftId ? `?draft=${draftId}` : ""}`}
                 labels={{
                   dropzone: t("dropzone"),
                   select: t("selectFile"),
@@ -89,7 +97,7 @@ export default async function PolicyPage({ params, searchParams }: PolicyPagePro
                 </div>
                 <form action={chooseSamplePolicy}>
                   <input type="hidden" name="locale" value={locale} />
-                  {draft ? <input type="hidden" name="draft" value={draft} /> : null}
+                  {draftId ? <input type="hidden" name="draft" value={draftId} /> : null}
                   <button className="button button-primary" type="submit">
                     {currentSelection?.source === "sample" ? t("continue") : t("chooseSample")}
                   </button>

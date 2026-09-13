@@ -59,6 +59,23 @@ test.describe("authenticated analysis setup", () => {
     await expect(page.getByRole("heading", { name: "Prüfungsumfang und Kontext" })).toBeVisible();
   });
 
+  test("offers the upload when the policy step is opened without the draft in the URL", async ({
+    page,
+  }) => {
+    // Die Sidebar verlinkt die Schritte ohne `?draft=`. Der Upload muss den
+    // Draft trotzdem aus dem Bindungs-Cookie finden, wie die Beispiel-Policy.
+    await signUpAndLandOn(page, "/de/analyses/new/framework?framework=dora");
+    await page.getByRole("button", { name: "Weiter" }).click();
+    await expect(page).toHaveURL(/\/de\/analyses\/new\/policy\?/u);
+
+    await page.goto("/de/analyses/new/policy");
+    await expect(page.getByText("Bitte zuerst ein Rahmenwerk auswählen.")).toHaveCount(0);
+    await page
+      .locator('input[type="file"]')
+      .setInputFiles("assets/samples/beispiel-ikt-sicherheitsrichtlinie.docx");
+    await expect(page.getByRole("button", { name: "Sicher hochladen" })).toBeVisible();
+  });
+
   test("shows the locked result at once and connects the key from the header", async ({ page }) => {
     // Wer die Ergebnis-Vorschau erreicht, ist bereits angemeldet (die App lässt
     // niemanden anders bis hierhin). Zwischen Prüfungsumfang und Ergebnis liegt
