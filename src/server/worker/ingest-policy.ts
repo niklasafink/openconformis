@@ -15,7 +15,9 @@ import { persistParsedPolicy } from "./persist-parsed-policy";
 
 export type DocumentIngestionJob = { policyVersionId: string };
 
-const parserVersion = "conformis-parser-v1";
+// v2: Überschriften, Listen und Tabellenzellen samt Überschriftenpfad statt
+// ungegliederter Absätze bzw. eines Blocks pro PDF-Seite.
+const parserVersion = "conformis-parser-v2";
 
 function safeErrorCode(error: unknown) {
   const message = error instanceof Error ? error.message : "INGESTION_FAILED";

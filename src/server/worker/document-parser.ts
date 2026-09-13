@@ -6,6 +6,14 @@ import { join } from "node:path";
 import mammoth from "mammoth";
 
 import {
+  blocksFromDocumentHtml,
+  blocksFromPdfPages,
+  outlineBlocks,
+  pdfLinesFromText,
+  type PdfLine,
+  type StructuredBlockKind,
+} from "@/domain/policies/document-structure";
+import {
   docxMimeType,
   hasDocxPackageEntries,
   hasSupportedFileSignature,
@@ -13,7 +21,9 @@ import {
 } from "@/domain/policies/upload";
 
 export type ParsedDocumentBlock = {
+  kind: StructuredBlockKind;
   text: string;
+  headingPath: string[];
   pageNumber?: number;
   paragraphNumber?: number;
 };
@@ -60,20 +70,27 @@ async function parseDocx(bytes: Uint8Array): Promise<ParsedDocument> {
   }
   if (declaredDocxExpansion(bytes) === 0) throw new Error("DOCX_DIRECTORY_INVALID");
 
-  const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
-  const paragraphs = result.value
-    .split(/\n{2,}/u)
-    .map((value) => value.replace(/\s+/gu, " ").trim())
-    .filter(Boolean);
-  if (paragraphs.length === 0) throw new Error("DOCX_EMPTY");
+  // Dieselbe Umwandlung wie die Originalansicht (`renderDocxToHtml`), damit
+  // Blocktext und angezeigter Wortlaut übereinstimmen. Die Klasse markiert nur
+  // den Dokumenttitel als oberste Gliederungsebene.
+  const result = await mammoth.convertToHtml(
+    { buffer: Buffer.from(bytes) },
+    {
+      styleMap: ["p[style-name='Title'] => h1.title:fresh", "p[style-name='Subtitle'] => h2:fresh"],
+    },
+  );
+  const blocks = outlineBlocks(blocksFromDocumentHtml(result.value));
+  if (blocks.length === 0) throw new Error("DOCX_EMPTY");
 
-  const pageCount = Math.max(1, Math.ceil(result.value.length / 3_000));
+  const characters = blocks.reduce((total, block) => total + block.text.length, 0);
   return {
     detectedMimeType: docxMimeType,
-    pageCount,
+    pageCount: Math.max(1, Math.ceil(characters / 3_000)),
     needsOcr: false,
-    blocks: paragraphs.map((text, index) => ({
+    blocks: blocks.map(({ kind, text, headingPath }, index) => ({
+      kind,
       text,
+      headingPath,
       paragraphNumber: index + 1,
     })),
   };
@@ -99,26 +116,46 @@ async function parsePdf(bytes: Uint8Array): Promise<ParsedDocument> {
   });
   const document = await task.promise;
   const pageCount = document.numPages;
-  const blocks: ParsedDocumentBlock[] = [];
+  const pages: PdfLine[][] = [];
   let extractedCharacters = 0;
 
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
-      const text = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ")
-        .replace(/\s+/gu, " ")
-        .trim();
+      const lines = pdfLinesFromText(
+        content.items.flatMap((item) =>
+          "str" in item
+            ? [
+                {
+                  text: item.str,
+                  x: item.transform[4] ?? 0,
+                  width: item.width,
+                  y: item.transform[5] ?? 0,
+                  height: item.height || Math.hypot(item.transform[2] ?? 0, item.transform[3] ?? 0),
+                  endOfLine: item.hasEOL,
+                },
+              ]
+            : [],
+        ),
+      );
 
-      extractedCharacters += text.length;
-      if (text) blocks.push({ text, pageNumber });
+      extractedCharacters += lines.reduce((total, line) => total + line.text.length, 0);
+      pages.push(lines);
       page.cleanup();
     }
   } finally {
     await task.destroy();
   }
+
+  const paragraphsOnPage = new Map<number, number>();
+  const blocks = outlineBlocks(blocksFromPdfPages(pages)).map(
+    ({ kind, text, headingPath, pageNumber }) => {
+      const paragraphNumber = (paragraphsOnPage.get(pageNumber ?? 0) ?? 0) + 1;
+      paragraphsOnPage.set(pageNumber ?? 0, paragraphNumber);
+      return { kind, text, headingPath, pageNumber, paragraphNumber };
+    },
+  );
 
   return {
     detectedMimeType: pdfMimeType,

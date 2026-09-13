@@ -19,6 +19,15 @@ describe("document parser", () => {
     expect(parsed.pageCount).toBeGreaterThan(0);
     expect(parsed.blocks.length).toBeGreaterThanOrEqual(20);
     expect(parsed.blocks[0]?.text).toContain("IKT-Sicherheitsrichtlinie");
+
+    // Abschnittstitel bleiben Überschriften, und der folgende Text kennt seinen
+    // Abschnitt — die KI sieht sonst nur ungegliederte Absätze.
+    const purposeIndex = parsed.blocks.findIndex(
+      (block) => block.text === "1. Zweck und Zielsetzung",
+    );
+    expect(parsed.blocks[purposeIndex]?.kind).toBe("heading");
+    expect(parsed.blocks[purposeIndex + 1]?.headingPath).toContain("1. Zweck und Zielsetzung");
+    expect(parsed.blocks.some((block) => block.kind === "list_item")).toBe(true);
   });
 });
 
