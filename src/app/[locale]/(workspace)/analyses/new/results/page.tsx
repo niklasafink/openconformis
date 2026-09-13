@@ -112,6 +112,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
       override: null,
       explanation: "",
       missingInformation: [],
+      resolvedTodoIndexes: [],
       confidencePercent: 0,
       verificationStatus: "pending",
       confirmedAt: null,

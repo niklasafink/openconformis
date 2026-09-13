@@ -27,7 +27,9 @@ export async function PageHeader({ actions, eyebrow, status, title }: PageHeader
       <SidebarTrigger aria-label={t("toggleSidebar")} className="md:hidden" />
       {title ? (
         <div className="flex shrink-0 items-baseline gap-3">
-          <h1 className="truncate font-serif text-[26px] leading-none font-normal tracking-tight">
+          {/* `truncate` schneidet am Zeilenkasten ab; mit `leading-none` fielen
+              Unterlängen wie das „g“ weg, deshalb bleibt Luft unter der Grundlinie. */}
+          <h1 className="truncate font-serif text-[26px] leading-[1.25] font-normal tracking-tight">
             {title}
           </h1>
           {eyebrow ? (

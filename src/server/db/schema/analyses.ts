@@ -269,6 +269,12 @@ export const analysisRequirementResults = pgTable(
       .array()
       .default(sql`ARRAY[]::text[]`)
       .notNull(),
+    // Positionen in missingInformation, die ein Mensch als erledigt abgehakt hat.
+    // Die Liste selbst bleibt unverändert; nur der Arbeitsstand ändert sich.
+    resolvedMissingInformation: integer("resolved_missing_information")
+      .array()
+      .default(sql`ARRAY[]::integer[]`)
+      .notNull(),
     confidenceBasisPoints: integer("confidence_basis_points").notNull(),
     verificationStatus: analysisVerificationStatus("verification_status")
       .default("pending")

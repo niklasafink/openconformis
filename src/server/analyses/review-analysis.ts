@@ -213,6 +213,100 @@ export async function setAnalysisResultConfirmation(input: {
   });
 }
 
+export class AnalysisTodoNotFoundError extends Error {
+  constructor() {
+    super("The result has no to-do at this position.");
+    this.name = "AnalysisTodoNotFoundError";
+  }
+}
+
+/**
+ * Hakt eine fehlende Information des Ergebnisses als erledigt ab oder öffnet sie
+ * wieder. Bewertung, Begründung und die Liste selbst bleiben unverändert.
+ */
+export async function setAnalysisResultTodo(input: {
+  analysisId: string;
+  resultId: string;
+  index: number;
+  done: boolean;
+}) {
+  const principal = requireAssessmentOverridePermission(await requireSessionPrincipal());
+
+  return db.transaction(async (transaction) => {
+    const [target] = await transaction
+      .select({
+        id: analysisRequirementResults.id,
+        analysisStatus: analyses.status,
+        regulatoryId: analysisScopeItems.regulatoryId,
+      })
+      .from(analysisRequirementResults)
+      .innerJoin(analyses, eq(analyses.id, analysisRequirementResults.analysisId))
+      .innerJoin(
+        analysisScopeItems,
+        eq(analysisScopeItems.id, analysisRequirementResults.scopeItemId),
+      )
+      .where(
+        and(
+          eq(analysisRequirementResults.id, input.resultId),
+          eq(analysisRequirementResults.analysisId, input.analysisId),
+          eq(analyses.organizationId, principal.organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (!target) throw new AnalysisResultNotFoundError();
+    if (target.analysisStatus !== "completed") throw new AnalysisNotCompletedError();
+
+    await transaction.execute(
+      sql`select ${analysisRequirementResults.id}
+          from ${analysisRequirementResults}
+          where ${analysisRequirementResults.id} = ${target.id}
+          for update`,
+    );
+    const [current] = await transaction
+      .select({
+        missingInformation: analysisRequirementResults.missingInformation,
+        resolved: analysisRequirementResults.resolvedMissingInformation,
+      })
+      .from(analysisRequirementResults)
+      .where(eq(analysisRequirementResults.id, target.id))
+      .limit(1);
+    if (!current) throw new AnalysisResultNotFoundError();
+    if (input.index >= current.missingInformation.length) throw new AnalysisTodoNotFoundError();
+
+    const resolved = nextResolvedTodos(current.resolved, input.index, input.done);
+    if (resolved.length === current.resolved.length) return { resolvedTodoIndexes: resolved };
+
+    await transaction
+      .update(analysisRequirementResults)
+      .set({ resolvedMissingInformation: resolved, updatedAt: new Date() })
+      .where(eq(analysisRequirementResults.id, target.id));
+
+    await appendAuditEvent(transaction, {
+      organizationId: principal.organizationId,
+      actorUserId: principal.userId,
+      action: input.done ? "analysis_result.todo_resolved" : "analysis_result.todo_reopened",
+      targetType: "analysis_requirement_result",
+      targetId: target.id,
+      metadata: {
+        analysisId: input.analysisId,
+        regulatoryId: target.regulatoryId,
+        todoIndex: input.index,
+      },
+    });
+
+    return { resolvedTodoIndexes: resolved };
+  });
+}
+
+/** Sortierte, doppelfreie Positionen nach dem Abhaken oder Wiederöffnen. */
+export function nextResolvedTodos(current: number[], index: number, done: boolean) {
+  const resolved = new Set(current);
+  if (done) resolved.add(index);
+  else resolved.delete(index);
+  return [...resolved].sort((left, right) => left - right);
+}
+
 export function canConfirmAssessment(principal: Pick<SessionPrincipal, "emailVerified" | "roles">) {
   return (
     principal.emailVerified &&

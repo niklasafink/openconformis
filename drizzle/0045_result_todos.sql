@@ -1,0 +1,1 @@
+ALTER TABLE "analysis_requirement_results" ADD COLUMN "resolved_missing_information" integer[] DEFAULT ARRAY[]::integer[] NOT NULL;

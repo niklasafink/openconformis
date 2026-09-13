@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Link, usePathname } from "@/i18n/navigation";
 import type { AppLocale } from "@/i18n/routing";
+import { cn } from "@/lib/utils";
 
 export type WorkflowStep = "framework" | "policy" | "scope" | "results";
 export type ActiveArea = "analysis" | "chat" | "administration";
@@ -84,10 +85,21 @@ function activeAreaOf(pathname: string): ActiveArea | undefined {
   return undefined;
 }
 
+function activeProjectIdOf(pathname: string): string | undefined {
+  const match = /^\/analyses\/([^/]+)/.exec(pathname);
+  return match && match[1] !== "new" ? match[1] : undefined;
+}
+
 function activeStepOf(pathname: string): WorkflowStep | undefined {
   const entries = Object.entries(stepPath) as Array<[WorkflowStep, string]>;
-  return entries.find(([, path]) => pathname === path)?.[0];
+  const step = entries.find(([, path]) => pathname === path)?.[0];
+  // Eine gestartete Analyse zeigt ihr Ergebnis unter eigener URL.
+  return step ?? (activeProjectIdOf(pathname) ? "results" : undefined);
 }
+
+/** Der aktuelle Bildschirm hebt sich deutlich von Hover und Nachbarn ab. */
+const activeItemClass =
+  "data-active:bg-neutral-200/80 data-active:font-medium data-active:text-foreground";
 
 export function AppSidebar({
   labels,
@@ -101,6 +113,7 @@ export function AppSidebar({
   const pathname = usePathname();
   const activeArea = activeAreaOf(pathname);
   const activeStep = activeStepOf(pathname);
+  const activeProjectId = activeProjectIdOf(pathname);
   const activeThreadId = useSearchParams().get("thread") ?? undefined;
   // Die Sidebar bleibt im Layout stehen, `defaultOpen` griffe deshalb nur beim
   // ersten Rendern. Wer aus dem Chat in die Gap-Analyse wechselt, soll ihre
@@ -141,7 +154,12 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={activeArea === "chat"} tooltip={labels.chat}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={activeArea === "chat"}
+                  tooltip={labels.chat}
+                  className={activeItemClass}
+                >
                   <Link
                     href="/chat"
                     locale={locale}
@@ -168,6 +186,14 @@ export function AppSidebar({
                     asChild
                     isActive={activeArea === "analysis"}
                     tooltip={labels.gapAnalysis}
+                    // Ist der aktive Schritt darunter sichtbar, trägt nur er die
+                    // Fläche; eingeklappt markiert der Hauptpunkt den Ort.
+                    className={cn(
+                      activeItemClass,
+                      activeStep &&
+                        analysisOpen &&
+                        "data-active:bg-transparent data-active:hover:bg-sidebar-accent group-data-[collapsible=icon]:data-active:bg-neutral-200/80",
+                    )}
                   >
                     <Link href={stepPath.framework} locale={locale}>
                       <ListChecks className="size-3.5! text-sky-600" />
@@ -185,7 +211,11 @@ export function AppSidebar({
                         const isActive = activeArea === "analysis" && activeStep === step.id;
                         return (
                           <SidebarMenuSubItem key={step.id}>
-                            <SidebarMenuSubButton asChild isActive={isActive}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={isActive}
+                              className={activeItemClass}
+                            >
                               <Link
                                 href={stepPath[step.id]}
                                 locale={locale}
@@ -208,6 +238,7 @@ export function AppSidebar({
                     asChild
                     isActive={activeArea === "administration"}
                     tooltip={labels.administration}
+                    className={activeItemClass}
                   >
                     <Link
                       href="/administration"
@@ -245,10 +276,18 @@ export function AppSidebar({
                         <SidebarMenuButton
                           asChild
                           size="lg"
+                          isActive={project.id === activeProjectId}
                           tooltip={project.title}
-                          className="flex-col items-start gap-0 py-1.5 leading-tight"
+                          className={cn(
+                            "flex-col items-start gap-0 py-1.5 leading-tight",
+                            activeItemClass,
+                          )}
                         >
-                          <Link href={`/analyses/${project.id}`} locale={locale}>
+                          <Link
+                            href={`/analyses/${project.id}`}
+                            locale={locale}
+                            aria-current={project.id === activeProjectId ? "page" : undefined}
+                          >
                             <span className="w-full truncate">{project.title}</span>
                             <span className="w-full truncate text-xs font-normal text-muted-foreground">
                               {project.frameworkSlug} · {project.statusLabel}
@@ -284,8 +323,9 @@ export function AppSidebar({
                       <SidebarMenuItem key={thread.id}>
                         <SidebarMenuButton
                           asChild
-                          isActive={thread.id === activeThreadId}
+                          isActive={activeArea === "chat" && thread.id === activeThreadId}
                           tooltip={thread.title}
+                          className={activeItemClass}
                         >
                           <Link
                             href={{ pathname: "/chat", query: { thread: thread.id } }}
