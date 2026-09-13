@@ -1,32 +1,22 @@
 "use client";
 
-import { ArrowRight, Asterisk, Check, ChevronDown, Cpu, KeyRound, Plus, Zap } from "lucide-react";
+import { ArrowRight, Asterisk, ChevronDown, Cpu, LoaderCircle, Plus } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
-import { aiProviderPublicDetails } from "@/domain/ai/provider";
 import type { Framework } from "@/domain/frameworks/catalog";
 
 type Labels = Record<
@@ -41,24 +31,15 @@ type Labels = Record<
   | "send"
   | "sources"
   | "noSources"
-  | "connectKey"
   | "noKey"
   | "keyConnected"
-  | "changeKey"
   | "apiKey"
   | "connect"
-  | "cancel"
-  | "evaluated"
-  | "unevaluated"
-  | "unevaluatedWarning"
   | "failed"
   | "emptyModels"
-  | "disclaimer"
-  | "quickActions",
+  | "disclaimer",
   string
 >;
-
-type QuickAction = { label: string; prompt: string };
 
 type Citation = {
   citationOrder: number;
@@ -97,7 +78,6 @@ export function ChatWorkspace({
   initialThreadId,
   initialCredentials,
   labels,
-  quickActions,
   userName,
 }: {
   locale: "de" | "en";
@@ -106,7 +86,6 @@ export function ChatWorkspace({
   initialThreadId?: string;
   initialCredentials: Credential[];
   labels: Labels;
-  quickActions: QuickAction[];
   userName?: string;
 }) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -116,12 +95,12 @@ export function ChatWorkspace({
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [keyDialog, setKeyDialog] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [keyError, setKeyError] = useState("");
+  const [connecting, setConnecting] = useState(false);
   const [credentials, setCredentials] = useState(initialCredentials);
-  const [warningAccepted, setWarningAccepted] = useState(false);
   const pendingQuestion = useRef<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedModel = catalogue.models.find((model) => model.id === modelProfileId);
   const selectedFramework = frameworks.find((framework) => framework.id === frameworkSlug);
   const activeCredential = useMemo(
@@ -187,7 +166,9 @@ export function ChatWorkspace({
           credentialId,
           modelProfileId: selectedModel.id,
           modelCatalogueVersion: catalogue.version,
-          unevaluatedWarningAccepted: selectedModel.evaluated || warningAccepted,
+          // Der Chat zeigt keinen eigenen Warnhinweis für nicht evaluierte Modelle;
+          // die Auswahl des Modells gilt als Bestätigung.
+          unevaluatedWarningAccepted: true,
           locale,
         }),
       });
@@ -243,51 +224,48 @@ export function ChatWorkspace({
     event.preventDefault();
     const question = input.trim();
     if (!question || !selectedModel || pending) return;
-    if (!selectedModel.evaluated && !warningAccepted) return;
     setInput("");
     if (!activeCredential) {
       pendingQuestion.current = question;
-      setKeyDialog(true);
+      setKeyOpen(true);
       return;
     }
     await streamQuestion(question, activeCredential.credentialId);
   }
 
-  async function connectCredential(event: FormEvent) {
-    event.preventDefault();
-    if (!selectedModel) return;
-    setError("");
-    const response = await fetch("/api/ai-credentials", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        provider: selectedModel.routeProvider,
-        purpose: "chat",
-        requiredModelId: selectedModel.providerModelId,
-        apiKey,
-      }),
-    });
-    const payload = (await response.json()) as Credential;
-    if (!response.ok || !payload.credentialId) return setError(labels.failed);
-    setCredentials((current) => [...current, payload]);
-    setApiKey("");
-    setKeyDialog(false);
-    const question = pendingQuestion.current;
-    pendingQuestion.current = null;
-    if (question) await streamQuestion(question, payload.credentialId);
-  }
-
-  function applyQuickAction(prompt: string) {
-    setInput(prompt);
-    textareaRef.current?.focus();
+  async function connectCredential() {
+    if (!selectedModel || connecting || apiKey.trim().length < 8) return;
+    setKeyError("");
+    setConnecting(true);
+    try {
+      const response = await fetch("/api/ai-credentials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: selectedModel.routeProvider,
+          purpose: "chat",
+          requiredModelId: selectedModel.providerModelId,
+          apiKey: apiKey.trim(),
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as Partial<Credential>;
+      if (!response.ok || !payload.credentialId) return setKeyError(labels.failed);
+      const credential = payload as Credential;
+      setCredentials((current) => [...current, credential]);
+      setApiKey("");
+      setKeyOpen(false);
+      const question = pendingQuestion.current;
+      pendingQuestion.current = null;
+      if (question) await streamQuestion(question, credential.credentialId);
+    } catch {
+      setKeyError(labels.failed);
+    } finally {
+      setConnecting(false);
+    }
   }
 
   const isEmpty = messages.length === 0;
-  const canSend =
-    Boolean(input.trim()) &&
-    Boolean(selectedModel) &&
-    !pending &&
-    (selectedModel?.evaluated || warningAccepted);
+  const canSend = Boolean(input.trim()) && Boolean(selectedModel) && !pending;
 
   const composer = (
     <form
@@ -295,7 +273,6 @@ export function ChatWorkspace({
       onSubmit={submit}
     >
       <Textarea
-        ref={textareaRef}
         aria-label={labels.placeholder}
         placeholder={labels.title}
         value={input}
@@ -358,21 +335,14 @@ export function ChatWorkspace({
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
               {labels.modelHint}
             </DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={modelProfileId}
-              onValueChange={(value) => {
-                setModelProfileId(value);
-                setWarningAccepted(false);
-              }}
-            >
+            <DropdownMenuRadioGroup value={modelProfileId} onValueChange={setModelProfileId}>
               {catalogue.models.map((model) => (
-                <DropdownMenuRadioItem value={model.id} key={model.id}>
-                  <span className="truncate">
-                    {model.publisher} · {model.name}
-                  </span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {model.evaluated ? labels.evaluated : labels.unevaluated}
-                  </span>
+                <DropdownMenuRadioItem
+                  value={model.id}
+                  key={model.id}
+                  className="data-[state=checked]:bg-accent data-[state=checked]:font-medium"
+                >
+                  <span className="truncate">{model.name}</span>
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -380,13 +350,20 @@ export function ChatWorkspace({
         </DropdownMenu>
 
         <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <Popover
+            open={keyOpen}
+            onOpenChange={(open) => {
+              setKeyOpen(open);
+              if (!open) setKeyError("");
+            }}
+          >
+            <PopoverTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="gap-1 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
+                disabled={!selectedModel}
               >
                 <span>
                   {activeCredential
@@ -395,21 +372,43 @@ export function ChatWorkspace({
                 </span>
                 <ChevronDown className="size-3.5" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" className="min-w-56">
-              {selectedModel ? (
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  {aiProviderPublicDetails[selectedModel.routeProvider].label} ·{" "}
-                  {selectedModel.name}
-                </DropdownMenuLabel>
+            </PopoverTrigger>
+            {/* Eigenes Formular-Verhalten ohne <form>: Das Popover hängt im React-Baum
+                im Composer-Formular, dessen Submit sonst mit ausgelöst würde. */}
+            <PopoverContent align="end" side="bottom" className="grid w-72 gap-2">
+              <Label htmlFor="chat-api-key">{labels.apiKey}</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="chat-api-key"
+                  type="password"
+                  value={apiKey}
+                  placeholder={selectedModel?.name}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void connectCredential();
+                    }
+                  }}
+                  autoComplete="off"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  onClick={() => void connectCredential()}
+                  disabled={connecting || apiKey.trim().length < 8}
+                >
+                  {connecting ? <LoaderCircle className="animate-spin" /> : null}
+                  {labels.connect}
+                </Button>
+              </div>
+              {keyError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {keyError}
+                </p>
               ) : null}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setKeyDialog(true)} disabled={!selectedModel}>
-                <KeyRound />
-                {activeCredential ? labels.changeKey : labels.connectKey}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverContent>
+          </Popover>
           <Button
             type="submit"
             size="icon"
@@ -421,17 +420,6 @@ export function ChatWorkspace({
           </Button>
         </div>
       </div>
-      {selectedModel && !selectedModel.evaluated ? (
-        <label className="mt-3 flex items-start gap-2 border-t pt-3 text-xs leading-relaxed text-muted-foreground">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={warningAccepted}
-            onChange={(event) => setWarningAccepted(event.target.checked)}
-          />
-          {labels.unevaluatedWarning}
-        </label>
-      ) : null}
     </form>
   );
 
@@ -444,7 +432,7 @@ export function ChatWorkspace({
             <span>{userName ? labels.greeting.replace("{name}", userName) : labels.title}</span>
           </h1>
           <div className="w-full max-w-[880px]">{composer}</div>
-          <p className="mt-4 text-sm text-muted-foreground">{labels.disclaimer}</p>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">{labels.disclaimer}</p>
           {catalogue.models.length === 0 ? (
             <p className="mt-2 text-sm text-destructive" role="alert">
               {labels.emptyModels}
@@ -454,31 +442,6 @@ export function ChatWorkspace({
             <p className="mt-2 text-sm text-destructive" role="alert">
               {error}
             </p>
-          ) : null}
-
-          {quickActions.length > 0 ? (
-            <section
-              className="mt-16 flex flex-col items-center gap-4"
-              aria-label={labels.quickActions}
-            >
-              <h2 className="flex items-center gap-1.5 text-sm font-medium">
-                <Zap aria-hidden="true" className="size-4 text-blue-600" />
-                {labels.quickActions}
-              </h2>
-              <div className="flex flex-wrap justify-center gap-2">
-                {quickActions.map((action) => (
-                  <Button
-                    key={action.label}
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-full bg-card px-4 text-[15px] font-normal shadow-none"
-                    onClick={() => applyQuickAction(action.prompt)}
-                  >
-                    {action.label}
-                  </Button>
-                ))}
-              </div>
-            </section>
           ) : null}
         </div>
       ) : (
@@ -537,7 +500,9 @@ export function ChatWorkspace({
           <div className="sticky bottom-0 bg-gradient-to-t from-background via-background to-transparent px-4 pt-6 pb-4">
             <div className="mx-auto w-full max-w-[880px]">
               {composer}
-              <p className="mt-2 text-center text-xs text-muted-foreground">{labels.disclaimer}</p>
+              <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+                {labels.disclaimer}
+              </p>
               {error ? (
                 <p className="mt-1 text-center text-sm text-destructive" role="alert">
                   {error}
@@ -547,45 +512,6 @@ export function ChatWorkspace({
           </div>
         </>
       )}
-
-      <Dialog open={keyDialog && Boolean(selectedModel)} onOpenChange={setKeyDialog}>
-        <DialogContent className="sm:max-w-md">
-          <form onSubmit={connectCredential} className="grid gap-4">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <KeyRound className="size-4" />
-                {labels.connectKey}
-              </DialogTitle>
-              {selectedModel ? (
-                <DialogDescription>
-                  {aiProviderPublicDetails[selectedModel.routeProvider].label} ·{" "}
-                  {selectedModel.name}
-                </DialogDescription>
-              ) : null}
-            </DialogHeader>
-            <div className="grid gap-2">
-              <Label htmlFor="chat-api-key">{labels.apiKey}</Label>
-              <Input
-                id="chat-api-key"
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                autoComplete="off"
-                required
-                minLength={8}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setKeyDialog(false)}>
-                {labels.cancel}
-              </Button>
-              <Button type="submit" disabled={apiKey.length < 8}>
-                <Check /> {labels.connect}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -52,11 +52,6 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
             ...credential,
             expiresAt: credential.expiresAt.toISOString(),
           }))}
-          quickActions={[
-            { label: t("quickSummary"), prompt: t("quickSummaryPrompt") },
-            { label: t("quickDefinition"), prompt: t("quickDefinitionPrompt") },
-            { label: t("quickDeadline"), prompt: t("quickDeadlinePrompt") },
-          ]}
           labels={{
             title: t("title"),
             greeting: t("greeting", { name: "{name}" }),
@@ -69,20 +64,13 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
             send: t("send"),
             sources: t("sources"),
             noSources: t("noSources"),
-            connectKey: t("connectKey"),
             noKey: t("noKey"),
             keyConnected: t("keyConnected", { lastFour: "{lastFour}" }),
-            changeKey: t("changeKey"),
             apiKey: t("apiKey"),
             connect: t("connect"),
-            cancel: t("cancel"),
-            evaluated: t("evaluated"),
-            unevaluated: t("unevaluated"),
-            unevaluatedWarning: t("unevaluatedWarning"),
             failed: t("failed"),
             emptyModels: t("emptyModels"),
             disclaimer: t("disclaimer"),
-            quickActions: t("quickActions"),
           }}
         />
       </div>
