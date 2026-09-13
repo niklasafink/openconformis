@@ -31,7 +31,7 @@ test.describe("authenticated analysis setup", () => {
     await page.getByRole("button", { name: "Auswählen", exact: true }).click();
     await expect(page).toHaveURL(/\/de\/analyses\/new\/scope\?/u);
     await expect(page.getByRole("heading", { name: "Prüfungsumfang und Kontext" })).toBeVisible();
-    await expect(page.locator(".scope-count")).toContainText("10/10 einschlägig");
+    await expect(page.getByRole("checkbox", { name: /^einschlägig: /u })).toHaveCount(10);
     await expect(page.getByText("Art. 5 Abs. 2 DORA", { exact: true }).first()).toBeVisible();
   });
 
@@ -86,12 +86,17 @@ test.describe("authenticated analysis setup", () => {
     await signUpAndLandOn(page, "/de/analyses/new/framework?framework=dora");
     await page.getByRole("button", { name: "Weiter" }).click();
     await page.getByRole("button", { name: "Auswählen", exact: true }).click();
-    const unevaluatedWarning = page.locator(".scope-model-warning input");
-    await expect(unevaluatedWarning).toBeVisible();
-    await unevaluatedWarning.check();
-    await page.getByRole("button", { name: "Umfang bestätigen" }).click();
+    // Im Prüfungsumfang abgewählte Anforderungen stehen im Ergebnis ohne Häkchen.
+    await page.getByRole("checkbox", { name: "einschlägig: Art. 5 Abs. 2 DORA" }).uncheck();
+    await page.getByRole("button", { name: "Weiter" }).click();
 
     await expect(page).toHaveURL(/\/de\/analyses\/new\/results\?/u);
+    await expect(
+      page.getByRole("checkbox", { name: "Art. 5 Abs. 2 DORA auswählen" }),
+    ).not.toBeChecked();
+    await expect(
+      page.getByRole("checkbox", { name: "Art. 5 Abs. 4 DORA auswählen" }),
+    ).toBeChecked();
     // Das Ergebnis steht sofort, ohne dass eine Überlagerung es verdeckt.
     await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);

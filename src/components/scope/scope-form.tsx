@@ -3,8 +3,6 @@
 import { ArrowRight, ChevronDown, Info, Pencil } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
-import { aiProviderPublicDetails } from "@/domain/ai/provider";
 import type { PublishedRequirement } from "@/server/catalogue/service";
 import type { InstitutionSize } from "@/server/drafts/scope-selection";
 
@@ -17,8 +15,6 @@ type ScopeFormProps = {
   initialContext: string;
   initialIncludedKeys: string[];
   query: string;
-  modelCatalogue: AnalysisModelCatalogue;
-  initialModelProfileId?: string;
   labels: {
     size: string;
     sizeHelp: string;
@@ -33,11 +29,7 @@ type ScopeFormProps = {
     context: string;
     contextPlaceholder: string;
     included: string;
-    start: string;
-    model: string;
-    evaluated: string;
-    unevaluated: string;
-    unevaluatedWarning: string;
+    continue: string;
   };
 };
 
@@ -50,18 +42,11 @@ export function ScopeForm({
   initialContext,
   initialIncludedKeys,
   query,
-  modelCatalogue,
-  initialModelProfileId,
   labels,
 }: ScopeFormProps) {
   const [institutionSize, setInstitutionSize] = useState<InstitutionSize>(initialSize);
   const [included, setIncluded] = useState(() => new Set(initialIncludedKeys));
   const [openRequirement, setOpenRequirement] = useState<string | null>(null);
-  const initialModel =
-    modelCatalogue.models.find((model) => model.id === initialModelProfileId) ??
-    modelCatalogue.models[0];
-  const [modelProfileId, setModelProfileId] = useState(initialModel?.id ?? "");
-  const [unevaluatedWarningAccepted, setUnevaluatedWarningAccepted] = useState(false);
   const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const visibleRequirements = useMemo(
     () =>
@@ -75,14 +60,6 @@ export function ScopeForm({
   const selectedRequirement = requirements.find(
     (requirement) => requirement.externalKey === openRequirement,
   );
-  const selectedModel = modelCatalogue.models.find((model) => model.id === modelProfileId);
-  const modelsByPublisher = useMemo(() => {
-    const groups = new Map<string, typeof modelCatalogue.models>();
-    for (const model of modelCatalogue.models) {
-      groups.set(model.publisher, [...(groups.get(model.publisher) ?? []), model]);
-    }
-    return [...groups.entries()];
-  }, [modelCatalogue]);
 
   function toggleRequirement(key: string) {
     setIncluded((current) => {
@@ -100,67 +77,6 @@ export function ScopeForm({
       {[...included].map((key) => (
         <input key={key} type="hidden" name="includedRequirement" value={key} />
       ))}
-      <input type="hidden" name="modelCatalogueVersion" value={modelCatalogue.version} />
-      <input
-        type="hidden"
-        name="unevaluatedWarningAccepted"
-        value={String(Boolean(selectedModel?.evaluated) || unevaluatedWarningAccepted)}
-      />
-
-      <div className="scope-actions">
-        <div className="scope-model-control">
-          <label htmlFor="analysis-model">{labels.model}</label>
-          <select
-            id="analysis-model"
-            name="modelProfileId"
-            value={modelProfileId}
-            onChange={(event) => {
-              setModelProfileId(event.target.value);
-              setUnevaluatedWarningAccepted(false);
-            }}
-          >
-            {modelsByPublisher.map(([publisher, models]) => (
-              <optgroup key={publisher} label={publisher}>
-                {models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name} · {aiProviderPublicDetails[model.routeProvider].label} ·{" "}
-                    {model.evaluated ? labels.evaluated : labels.unevaluated}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-        <span className="scope-count">
-          <strong>
-            {included.size}/{requirements.length}
-          </strong>{" "}
-          {labels.included}
-        </span>
-        <button
-          className="button button-primary"
-          type="submit"
-          disabled={
-            included.size === 0 ||
-            !selectedModel ||
-            (!selectedModel.evaluated && !unevaluatedWarningAccepted)
-          }
-        >
-          {labels.start}
-          <ArrowRight size={16} aria-hidden="true" />
-        </button>
-      </div>
-
-      {selectedModel && !selectedModel.evaluated ? (
-        <label className="scope-model-warning">
-          <input
-            type="checkbox"
-            checked={unevaluatedWarningAccepted}
-            onChange={(event) => setUnevaluatedWarningAccepted(event.target.checked)}
-          />
-          <span>{labels.unevaluatedWarning}</span>
-        </label>
-      ) : null}
 
       <section className="scope-size-section" aria-labelledby="institution-size-label">
         <div className="scope-section-heading">
@@ -245,6 +161,13 @@ export function ScopeForm({
           placeholder={labels.contextPlaceholder}
         />
       </section>
+
+      <div className="scope-actions">
+        <button className="button button-primary" type="submit" disabled={included.size === 0}>
+          {labels.continue}
+          <ArrowRight size={16} aria-hidden="true" />
+        </button>
+      </div>
 
       {selectedRequirement ? (
         <div className="scope-detail-backdrop" role="presentation">

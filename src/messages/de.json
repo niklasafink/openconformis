@@ -152,11 +152,7 @@
     "context": "Unternehmenskontext",
     "contextPlaceholder": "Optionaler Kontext zu Governance, Verantwortlichkeiten oder vorhandenen Nachweisen",
     "included": "einschlägig",
-    "start": "Umfang bestätigen",
-    "model": "Modell",
-    "evaluated": "Evaluiert",
-    "unevaluated": "Nicht geprüft",
-    "unevaluatedWarning": "Dieses Modell wurde noch nicht mit dem regulatorischen Gold-Datensatz geprüft. Auswahl trotzdem verwenden."
+    "continue": "Weiter"
   },
   "Chat": {
     "title": "Wie kann ich helfen?",

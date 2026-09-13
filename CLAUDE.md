@@ -24,9 +24,10 @@ Der frühere statische Wireframe wurde nach Prüfung seiner Referenzen entfernt.
    Konto kommt niemand hinein.
 1. Rahmenwerk wählen. Nur veröffentlichte, verfügbare Rahmenwerke sind auswählbar.
 2. Eigene Policy hochladen oder Beispiel-Policy wählen; die Auswahl ist exklusiv.
-3. Prüfungsumfang und Unternehmenskontext festlegen, Modell auswählen.
+3. Prüfungsumfang und Unternehmenskontext festlegen.
 4. Das Ergebnis ist zunächst eine gesperrte Vorschau ohne Modellaufruf; der Nutzer
-   verbindet seinen eigenen Schlüssel und startet erst dann die echte Analyse.
+   wählt dort Modell und eigenen Schlüssel und startet erst dann die echte Analyse.
+   Die Häkchen der Anforderungsliste entsprechen dem gespeicherten Umfang.
 5. Persistierten Fortschritt anzeigen, Ergebnisse und Belege prüfen, menschlich bestätigen,
    bei Bedarf Status begründet überschreiben und nach Excel exportieren.
 

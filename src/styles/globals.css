@@ -840,20 +840,6 @@
   padding-top: 38px;
 }
 
-.scope-page-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.scope-page-meta span:first-child {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
 .scope-form {
   display: grid;
   gap: 20px;
@@ -1112,65 +1098,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-}
-
-.scope-model-control {
-  display: flex;
-  height: 36px;
-  align-items: center;
-  gap: 8px;
-}
-
-.scope-model-control label {
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.scope-model-control select {
-  width: min(300px, 28vw);
-  height: 36px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  padding: 0 30px 0 10px;
-  color: var(--text-primary);
-  font: inherit;
-}
-
-.scope-model-warning {
-  display: flex;
-  align-items: flex-start;
-  justify-self: end;
-  gap: 8px;
-  max-width: 640px;
-  margin-top: -12px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.scope-model-warning input {
-  width: 15px;
-  height: 15px;
-  margin-top: 1px;
-  accent-color: var(--selection);
-}
-
-.scope-count {
-  display: inline-flex;
-  height: 36px;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0 12px;
-  color: var(--text-secondary);
-}
-
-.scope-count strong {
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
 }
 
 .scope-detail-backdrop {

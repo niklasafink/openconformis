@@ -1,6 +1,9 @@
 "use server";
 
-import { persistDraftModelSelection } from "@/server/drafts/scope-selection";
+import {
+  persistDraftModelSelection,
+  persistDraftRequirementSelection,
+} from "@/server/drafts/scope-selection";
 
 export type ModelSelectionResult =
   | { ok: true; providerModelId: string; routeProvider: string; evaluated: boolean }
@@ -33,5 +36,24 @@ export async function selectAnalysisModel(input: {
     };
   } catch (error) {
     return { ok: false, code: error instanceof Error ? error.message : "MODEL_SELECTION_FAILED" };
+  }
+}
+
+/**
+ * Übernimmt die Häkchen der Anforderungsliste in den Prüfungsumfang, bevor die
+ * Analyse startet. Der Start liest den Umfang aus dem Draft und friert ihn ein.
+ */
+export async function selectAnalysisRequirements(input: {
+  draftId: string;
+  requirementKeys: string[];
+}): Promise<{ ok: true } | { ok: false; code: string }> {
+  try {
+    await persistDraftRequirementSelection({
+      expectedDraftId: input.draftId,
+      includedRequirementKeys: input.requirementKeys,
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, code: error instanceof Error ? error.message : "SCOPE_NOT_SAVED" };
   }
 }

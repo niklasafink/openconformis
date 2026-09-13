@@ -4,7 +4,10 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { appendAuditEvent } from "@/server/audit/event";
-import { resolveAnalysisModelSelection } from "@/server/ai/model-catalogue";
+import {
+  getAnalysisModelCatalogue,
+  resolveAnalysisModelSelection,
+} from "@/server/ai/model-catalogue";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { db, isDatabaseConfigured } from "@/server/db/client";
 import { draftAnalysisScopes, draftRequirementSelections } from "@/server/db/schema/application";
@@ -68,14 +71,17 @@ export async function getDraftScopeSelection(
   };
 }
 
+/**
+ * Speichert Institutsgröße, Kontext und einschlägige Anforderungen. Der Schritt
+ * wählt kein Modell mehr; das geschieht im Ergebnis neben dem Schlüsselfeld.
+ * Fehlt noch eine Modellroute, erhält der Draft eine Vorbelegung, damit das
+ * Ergebnis sofort stehen kann.
+ */
 export async function persistDraftScope(input: {
   expectedDraftId: string;
   institutionSize: InstitutionSize;
   organizationContext: string;
   includedRequirementKeys: string[];
-  modelProfileId: string;
-  modelCatalogueVersion: string;
-  unevaluatedWarningAccepted: boolean;
 }) {
   if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
   const draft = await getBoundActiveDraft(input.expectedDraftId);
@@ -86,13 +92,7 @@ export async function persistDraftScope(input: {
 
   const release = await getPublishedFrameworkRelease(draft.frameworkSlug);
   if (!release) throw new Error("FRAMEWORK_RELEASE_NOT_FOUND");
-
-  const knownKeys = new Set(release.requirements.map((requirement) => requirement.externalKey));
-  const includedKeys = [...new Set(input.includedRequirementKeys)];
-  if (includedKeys.some((key) => !knownKeys.has(key))) {
-    throw new Error("UNKNOWN_REQUIREMENT");
-  }
-  if (includedKeys.length === 0) throw new Error("SCOPE_EMPTY");
+  const includedKeys = validatedIncludedKeys(release, input.includedRequirementKeys);
 
   const [policy] = await db
     .select({ id: draftPolicySelections.id })
@@ -107,13 +107,18 @@ export async function persistDraftScope(input: {
     .limit(1);
   if (!policy) throw new Error("POLICY_NOT_READY");
 
-  const resolvedModel = await resolveAnalysisModelSelection({
-    modelProfileId: input.modelProfileId,
-    catalogueVersion: input.modelCatalogueVersion,
-  });
-  if (!resolvedModel.model.evaluated && !input.unevaluatedWarningAccepted) {
-    throw new Error("UNEVALUATED_MODEL_WARNING_REQUIRED");
-  }
+  const [existingModelSelection, catalogue] = await Promise.all([
+    db.query.draftModelSelections.findFirst({
+      where: eq(draftModelSelections.anonymousDraftId, draft.id),
+    }),
+    getAnalysisModelCatalogue(),
+  ]);
+  // Vorbelegung bevorzugt ein evaluiertes Modell. Ein ungeprüftes gilt erst mit
+  // dem Klick auf „Analyse starten" als bestätigt.
+  const defaultModel = existingModelSelection
+    ? null
+    : (catalogue.models.find((model) => model.evaluated) ?? catalogue.models[0]);
+  if (!existingModelSelection && !defaultModel) throw new Error("MODEL_CATALOGUE_INVALID");
 
   const now = new Date();
   await db.transaction(async (transaction) => {
@@ -141,47 +146,21 @@ export async function persistDraftScope(input: {
       .returning({ id: draftAnalysisScopes.id });
     if (!scope) throw new Error("SCOPE_NOT_SAVED");
 
-    const allKeys = release.requirements.map((requirement) => requirement.externalKey);
-    await transaction
-      .delete(draftRequirementSelections)
-      .where(
-        and(
-          eq(draftRequirementSelections.draftScopeId, scope.id),
-          inArray(draftRequirementSelections.requirementExternalKey, allKeys),
-        ),
-      );
-    await transaction.insert(draftRequirementSelections).values(
-      allKeys.map((requirementExternalKey) => ({
-        draftScopeId: scope.id,
-        requirementExternalKey,
-        included: includedKeys.includes(requirementExternalKey),
-      })),
-    );
-    await transaction
-      .insert(draftModelSelections)
-      .values({
-        anonymousDraftId: draft.id,
-        routeProvider: resolvedModel.model.routeProvider,
-        modelProfileId: resolvedModel.model.id,
-        providerModelId: resolvedModel.model.providerModelId,
-        modelCatalogueVersion: resolvedModel.catalogue.version,
-        evaluated: resolvedModel.model.evaluated,
-        unevaluatedWarningAccepted:
-          !resolvedModel.model.evaluated && input.unevaluatedWarningAccepted,
-      })
-      .onConflictDoUpdate({
-        target: draftModelSelections.anonymousDraftId,
-        set: {
-          routeProvider: resolvedModel.model.routeProvider,
-          modelProfileId: resolvedModel.model.id,
-          providerModelId: resolvedModel.model.providerModelId,
-          modelCatalogueVersion: resolvedModel.catalogue.version,
-          evaluated: resolvedModel.model.evaluated,
-          unevaluatedWarningAccepted:
-            !resolvedModel.model.evaluated && input.unevaluatedWarningAccepted,
-          updatedAt: now,
-        },
-      });
+    await replaceRequirementSelections(transaction, scope.id, release, includedKeys);
+    if (defaultModel) {
+      await transaction
+        .insert(draftModelSelections)
+        .values({
+          anonymousDraftId: draft.id,
+          routeProvider: defaultModel.routeProvider,
+          modelProfileId: defaultModel.id,
+          providerModelId: defaultModel.providerModelId,
+          modelCatalogueVersion: catalogue.version,
+          evaluated: defaultModel.evaluated,
+          unevaluatedWarningAccepted: false,
+        })
+        .onConflictDoNothing({ target: draftModelSelections.anonymousDraftId });
+    }
     await appendAuditEvent(transaction, {
       anonymousDraftId: draft.id,
       action: "draft.scope_saved",
@@ -191,15 +170,91 @@ export async function persistDraftScope(input: {
         institutionSize: input.institutionSize,
         includedRequirementCount: includedKeys.length,
         releaseContentHash: release.contentHash,
-        modelProfileId: resolvedModel.model.id,
-        modelCatalogueChanged: resolvedModel.catalogueChanged,
-        unevaluatedWarningAccepted:
-          !resolvedModel.model.evaluated && input.unevaluatedWarningAccepted,
+        ...(defaultModel ? { defaultModelProfileId: defaultModel.id } : {}),
       },
     });
   });
 
   return { includedRequirementCount: includedKeys.length };
+}
+
+/**
+ * Übernimmt die Häkchen aus dem Ergebnis vor dem Start in den gespeicherten
+ * Umfang. Beide Bildschirme zeigen damit dieselbe Auswahl, und der Start friert
+ * genau sie ein. Größe und Kontext bleiben unberührt.
+ */
+export async function persistDraftRequirementSelection(input: {
+  expectedDraftId: string;
+  includedRequirementKeys: string[];
+}) {
+  if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
+  const draft = await getBoundActiveDraft(input.expectedDraftId);
+  if (!draft?.frameworkSlug) throw new Error("DRAFT_NOT_FOUND");
+
+  const [release, scope] = await Promise.all([
+    getPublishedFrameworkRelease(draft.frameworkSlug),
+    db.query.draftAnalysisScopes.findFirst({
+      where: eq(draftAnalysisScopes.anonymousDraftId, draft.id),
+    }),
+  ]);
+  if (!release) throw new Error("FRAMEWORK_RELEASE_NOT_FOUND");
+  if (!scope || scope.frameworkReleaseKey !== release.id) throw new Error("SCOPE_NOT_FOUND");
+  const includedKeys = validatedIncludedKeys(release, input.includedRequirementKeys);
+
+  await db.transaction(async (transaction) => {
+    await replaceRequirementSelections(transaction, scope.id, release, includedKeys);
+    await transaction
+      .update(draftAnalysisScopes)
+      .set({ updatedAt: new Date() })
+      .where(eq(draftAnalysisScopes.id, scope.id));
+    await appendAuditEvent(transaction, {
+      anonymousDraftId: draft.id,
+      action: "draft.requirements_selected",
+      targetType: "draft_analysis_scope",
+      targetId: scope.id,
+      metadata: {
+        includedRequirementCount: includedKeys.length,
+        releaseContentHash: release.contentHash,
+      },
+    });
+  });
+
+  return { includedRequirementCount: includedKeys.length };
+}
+
+type FrameworkRelease = NonNullable<Awaited<ReturnType<typeof getPublishedFrameworkRelease>>>;
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function validatedIncludedKeys(release: FrameworkRelease, keys: readonly string[]) {
+  const knownKeys = new Set(release.requirements.map((requirement) => requirement.externalKey));
+  const includedKeys = [...new Set(keys)];
+  if (includedKeys.some((key) => !knownKeys.has(key))) throw new Error("UNKNOWN_REQUIREMENT");
+  if (includedKeys.length === 0) throw new Error("SCOPE_EMPTY");
+  return includedKeys;
+}
+
+async function replaceRequirementSelections(
+  transaction: Transaction,
+  scopeId: string,
+  release: FrameworkRelease,
+  includedKeys: readonly string[],
+) {
+  const allKeys = release.requirements.map((requirement) => requirement.externalKey);
+  await transaction
+    .delete(draftRequirementSelections)
+    .where(
+      and(
+        eq(draftRequirementSelections.draftScopeId, scopeId),
+        inArray(draftRequirementSelections.requirementExternalKey, allKeys),
+      ),
+    );
+  await transaction.insert(draftRequirementSelections).values(
+    allKeys.map((requirementExternalKey) => ({
+      draftScopeId: scopeId,
+      requirementExternalKey,
+      included: includedKeys.includes(requirementExternalKey),
+    })),
+  );
 }
 
 /**

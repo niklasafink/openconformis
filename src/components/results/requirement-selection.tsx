@@ -26,19 +26,22 @@ export function useRequirementSelection() {
 
 /**
  * Welche Anforderungen eine neue Analyse „nur Auswahl" prüft. Die Liste links
- * setzt die Häkchen, die Kopfzeile startet damit; anfangs ist alles ausgewählt.
+ * setzt die Häkchen, die Kopfzeile startet damit. Ohne Vorgabe ist anfangs
+ * alles ausgewählt; die Vorschau übernimmt den gespeicherten Prüfungsumfang.
  */
 export function RequirementSelectionProvider({
   children,
+  initialSelectedKeys,
   labels,
   requirementKeys,
 }: Readonly<{
   children: ReactNode;
+  initialSelectedKeys?: readonly string[];
   labels: RequirementSelectionLabels;
   requirementKeys: readonly string[];
 }>) {
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(
-    () => new Set(requirementKeys),
+    () => new Set(initialSelectedKeys ?? requirementKeys),
   );
 
   return (

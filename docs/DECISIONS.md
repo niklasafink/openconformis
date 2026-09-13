@@ -446,3 +446,13 @@ longer shows the unevaluated-model sentence; clicking start counts as acknowledg
 own bordered entry and no longer offers a new analysis.
 
 Decision: accepted.
+
+Amendment (2026-09-13, scope): the scope step no longer carries the framework and
+policy line, the model select, the "n/n einschlägig" counter, the unevaluated-model
+checkbox or "Umfang bestätigen". A plain "Weiter" at the end saves size, context and
+selected requirements. Without a stored model route the draft gets a default (the first
+evaluated catalogue model, otherwise the first model, `unevaluatedWarningAccepted:
+false`); the model is chosen next to the API key in the result. The locked result lists
+every requirement with checkboxes preset from the saved scope; before
+`POST /api/analyses/start` the checked keys are written back to the draft scope, so both
+screens show the same selection and the start freezes exactly it.

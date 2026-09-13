@@ -152,11 +152,7 @@
     "context": "Company context",
     "contextPlaceholder": "Optional context on governance, responsibilities, or existing evidence",
     "included": "applicable",
-    "start": "Confirm scope",
-    "model": "Model",
-    "evaluated": "Evaluated",
-    "unevaluated": "Not evaluated",
-    "unevaluatedWarning": "This model has not yet been tested against the regulatory gold set. Use it anyway."
+    "continue": "Continue"
   },
   "Chat": {
     "title": "How can I help?",

@@ -18,18 +18,12 @@ export async function saveScopeAndContinue(formData: FormData) {
     .getAll("includedRequirement")
     .map(String)
     .filter(Boolean);
-  const modelProfileId = String(formData.get("modelProfileId") ?? "");
-  const modelCatalogueVersion = String(formData.get("modelCatalogueVersion") ?? "");
-  const unevaluatedWarningAccepted = formData.get("unevaluatedWarningAccepted") === "true";
 
   await persistDraftScope({
     expectedDraftId: draftId,
     institutionSize,
     organizationContext,
     includedRequirementKeys,
-    modelProfileId,
-    modelCatalogueVersion,
-    unevaluatedWarningAccepted,
   });
 
   redirect(`/${localeValue}/analyses/new/results?draft=${encodeURIComponent(draftId)}`);

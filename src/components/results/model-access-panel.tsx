@@ -10,6 +10,7 @@ import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 import type { AppLocale } from "@/i18n/routing";
 
 import { ModelKeyForm } from "./model-key-form";
+import { useRequirementSelection } from "./requirement-selection";
 
 export type ModelAccessLabels = Readonly<{
   panelTitle: string;
@@ -45,6 +46,10 @@ type ModelAccessPanelProps = Readonly<{
     modelCatalogueVersion: string;
     unevaluatedWarningAccepted: boolean;
   }) => Promise<ModelSelectionResult>;
+  selectRequirementsAction: (input: {
+    draftId: string;
+    requirementKeys: string[];
+  }) => Promise<{ ok: true } | { ok: false; code: string }>;
 }>;
 
 export function postJson(url: string, body: unknown) {
@@ -91,8 +96,13 @@ export function ModelAccessPanel({
   labels,
   locale,
   selectModelAction,
+  selectRequirementsAction,
 }: ModelAccessPanelProps) {
   const router = useRouter();
+  const selection = useRequirementSelection();
+  const selectedKeys = selection
+    ? selection.requirementKeys.filter((key) => selection.selectedKeys.has(key))
+    : null;
   const [modelProfileId, setModelProfileId] = useState(
     catalogue.models.some(({ id }) => id === initialModelProfileId)
       ? initialModelProfileId
@@ -174,6 +184,15 @@ export function ModelAccessPanel({
       }
       if (!credentialId) return;
 
+      // Die Häkchen der Liste sind der Umfang, den der Start einfriert.
+      if (selectedKeys) {
+        const saved = await selectRequirementsAction({ draftId, requirementKeys: selectedKeys });
+        if (!saved.ok) {
+          setError(`${labels.startFailed} (${saved.code})`);
+          return;
+        }
+      }
+
       const response = await postJson("/api/analyses/start", { draftId, credentialId });
       const analysis = (await response.json().catch(() => ({}))) as {
         analysisId?: string;
@@ -206,6 +225,7 @@ export function ModelAccessPanel({
         <ModelKeyForm
           apiKey={apiKey}
           catalogue={catalogue}
+          disabled={selectedKeys?.length === 0}
           error={error}
           keyOptional={connected}
           keyPlaceholder={connected ? `••••${credential?.lastFour ?? ""}` : undefined}

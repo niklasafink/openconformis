@@ -8,6 +8,7 @@ import {
   type ResultItem,
 } from "@/components/results/analysis-results-workspace";
 import { ModelAccessPanel, type ActiveCredential } from "@/components/results/model-access-panel";
+import { RequirementSelectionProvider } from "@/components/results/requirement-selection";
 import { loadAnalysisResultLabels } from "@/components/results/result-labels";
 import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
@@ -22,7 +23,7 @@ import { getDraftScopeSelection } from "@/server/drafts/scope-selection";
 import { originalDocumentKind } from "@/server/policies/original-document";
 import { getCurrentPolicyPreview } from "@/server/policies/sample-service";
 
-import { selectAnalysisModel } from "./actions";
+import { selectAnalysisModel, selectAnalysisRequirements } from "./actions";
 
 type ResultsPageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -49,9 +50,10 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     if (startedAnalysisId) redirect(`/${locale}/analyses/${startedAnalysisId}`);
   }
 
-  const [navigation, t, resultLabels, boundDraft, scope, policyPreview] = await Promise.all([
+  const [navigation, t, run, resultLabels, boundDraft, scope, policyPreview] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("ResultsPreview"),
+    getTranslations("AnalysisRun"),
     loadAnalysisResultLabels(),
     getBoundActiveDraft(draft),
     getDraftScopeSelection(draft),
@@ -90,35 +92,34 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     ? null
     : originalDocumentKind(policyPreview.selection.mimeType ?? null);
 
-  const includedKeys = new Set(scope.includedRequirementKeys);
   // Vor dem Lauf steht jede Anforderung auf „noch nicht bewertet". Es gibt hier
   // bewusst keine geschätzte Ampel: erst der echte Lauf erzeugt Status,
-  // Begründung und Belegstellen.
-  const items: ResultItem[] = doraDemoRelease.requirements
-    .filter((requirement) => includedKeys.has(requirement.externalKey))
-    .map((requirement) => ({
-      id: `preview-${requirement.externalKey}`,
-      regulatoryId: requirement.regulatoryId,
-      title: requirement.title,
-      legalText: requirement.legalText,
-      subrequirements: requirement.subrequirements.map((subrequirement) => ({
-        externalKey: subrequirement.externalKey,
-        regulatoryId: subrequirement.regulatoryId,
-        title: subrequirement.title,
-        legalText: subrequirement.legalText,
-      })),
-      aiStatus: "no_assessment_possible",
-      status: "no_assessment_possible",
-      override: null,
-      explanation: "",
-      missingInformation: [],
-      resolvedTodoIndexes: [],
-      confidencePercent: 0,
-      verificationStatus: "pending",
-      confirmedAt: null,
-      evidence: [],
-      pending: true,
-    }));
+  // Begründung und Belegstellen. Die Liste zeigt alle Anforderungen; die im
+  // Prüfungsumfang abgewählten stehen ohne Häkchen und lassen sich zurückholen.
+  const items: ResultItem[] = doraDemoRelease.requirements.map((requirement) => ({
+    id: `preview-${requirement.externalKey}`,
+    requirementKey: requirement.externalKey,
+    regulatoryId: requirement.regulatoryId,
+    title: requirement.title,
+    legalText: requirement.legalText,
+    subrequirements: requirement.subrequirements.map((subrequirement) => ({
+      externalKey: subrequirement.externalKey,
+      regulatoryId: subrequirement.regulatoryId,
+      title: subrequirement.title,
+      legalText: subrequirement.legalText,
+    })),
+    aiStatus: "no_assessment_possible",
+    status: "no_assessment_possible",
+    override: null,
+    explanation: "",
+    missingInformation: [],
+    resolvedTodoIndexes: [],
+    confidencePercent: 0,
+    verificationStatus: "pending",
+    confirmedAt: null,
+    evidence: [],
+    pending: true,
+  }));
   const documentBlocks: DocumentBlock[] = policyPreview.blocks.map(
     ({
       id,
@@ -142,7 +143,16 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
   );
 
   return (
-    <>
+    <RequirementSelectionProvider
+      requirementKeys={items.flatMap(({ requirementKey }) =>
+        requirementKey ? [requirementKey] : [],
+      )}
+      initialSelectedKeys={scope.includedRequirementKeys}
+      labels={{
+        selectAll: run("selectAll"),
+        select: run("selectRequirement", { requirement: "{requirement}" }),
+      }}
+    >
       <PageHeader
         title={navigation("results")}
         eyebrow={t("step")}
@@ -155,6 +165,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
               initialModelProfileId={scope.modelSelection.modelProfileId}
               locale={locale}
               selectModelAction={selectAnalysisModel}
+              selectRequirementsAction={selectAnalysisRequirements}
               labels={{
                 panelTitle: t("panelTitle"),
                 model: t("model"),
@@ -193,6 +204,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           }
         />
       </div>
-    </>
+    </RequirementSelectionProvider>
   );
 }

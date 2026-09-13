@@ -8,7 +8,6 @@ import { LanguageMenu } from "@/components/shell/language-menu";
 import { ScopeForm } from "@/components/scope/scope-form";
 import { Input } from "@/components/ui/input";
 import { routing } from "@/i18n/routing";
-import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { getDraftScopeSelection } from "@/server/drafts/scope-selection";
@@ -28,12 +27,11 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [t, boundDraft, selection, savedScope, modelCatalogue] = await Promise.all([
+  const [t, boundDraft, selection, savedScope] = await Promise.all([
     getTranslations("Scope"),
     getBoundActiveDraft(draft),
     getCurrentPolicySelection(draft),
     getDraftScopeSelection(draft),
-    getAnalysisModelCatalogue(),
   ]);
   // Ohne aktiven Draft (kein Rahmenwerk oder keine Policy gewählt) lässt sich der
   // Umfang nicht rekonstruieren. Der Sidebar-Schritt ist immer sichtbar, auch
@@ -79,12 +77,6 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
       />
       <div className="workspace-content min-w-0">
         <div className="setup-page scope-setup-page">
-          <div className="scope-page-meta">
-            <span>{release.frameworkSlug.toLocaleUpperCase(locale)}</span>
-            <span aria-hidden="true">·</span>
-            <span>{selection.filename}</span>
-          </div>
-
           <ScopeForm
             action={saveScopeAndContinue}
             draftId={boundDraft.id}
@@ -94,8 +86,6 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
             initialContext={savedScope?.organizationContext ?? ""}
             initialIncludedKeys={initialIncludedKeys}
             query={q}
-            modelCatalogue={modelCatalogue}
-            initialModelProfileId={savedScope?.modelSelection?.modelProfileId}
             labels={{
               size: t("size"),
               sizeHelp: t("sizeHelp"),
@@ -110,11 +100,7 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
               context: t("context"),
               contextPlaceholder: t("contextPlaceholder"),
               included: t("included"),
-              start: t("start"),
-              model: t("model"),
-              evaluated: t("evaluated"),
-              unevaluated: t("unevaluated"),
-              unevaluatedWarning: t("unevaluatedWarning"),
+              continue: t("continue"),
             }}
           />
         </div>
