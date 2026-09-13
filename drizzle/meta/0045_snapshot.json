@@ -131,12 +131,8 @@
           "name": "anonymous_drafts_claimed_by_user_id_users_id_fk",
           "tableFrom": "anonymous_drafts",
           "tableTo": "users",
-          "columnsFrom": [
-            "claimed_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["claimed_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -264,12 +260,8 @@
           "name": "audit_events_organization_id_organizations_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -277,12 +269,8 @@
           "name": "audit_events_actor_user_id_users_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -290,12 +278,8 @@
           "name": "audit_events_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -413,12 +397,8 @@
           "name": "draft_analysis_scopes_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "draft_analysis_scopes",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -517,12 +497,8 @@
           "name": "draft_requirement_selections_draft_scope_id_draft_analysis_scopes_id_fk",
           "tableFrom": "draft_requirement_selections",
           "tableTo": "draft_analysis_scopes",
-          "columnsFrom": [
-            "draft_scope_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["draft_scope_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -800,12 +776,8 @@
           "name": "ai_credentials_owner_user_id_users_id_fk",
           "tableFrom": "ai_credentials",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -813,12 +785,8 @@
           "name": "ai_credentials_organization_id_organizations_id_fk",
           "tableFrom": "ai_credentials",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1051,12 +1019,8 @@
           "name": "ai_model_evaluations_model_profile_id_ai_model_profiles_id_fk",
           "tableFrom": "ai_model_evaluations",
           "tableTo": "ai_model_profiles",
-          "columnsFrom": [
-            "model_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["model_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1064,12 +1028,8 @@
           "name": "ai_model_evaluations_created_by_user_id_users_id_fk",
           "tableFrom": "ai_model_evaluations",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1077,12 +1037,8 @@
           "name": "ai_model_evaluations_published_by_user_id_users_id_fk",
           "tableFrom": "ai_model_evaluations",
           "tableTo": "users",
-          "columnsFrom": [
-            "published_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["published_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1411,12 +1367,8 @@
           "name": "analysis_instructions_created_by_user_id_users_id_fk",
           "tableFrom": "analysis_instructions",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1424,12 +1376,8 @@
           "name": "analysis_instructions_published_by_user_id_users_id_fk",
           "tableFrom": "analysis_instructions",
           "tableTo": "users",
-          "columnsFrom": [
-            "published_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["published_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1538,12 +1486,8 @@
           "name": "draft_model_selections_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "draft_model_selections",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1932,12 +1876,8 @@
           "name": "analyses_organization_id_organizations_id_fk",
           "tableFrom": "analyses",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1945,12 +1885,8 @@
           "name": "analyses_owner_user_id_users_id_fk",
           "tableFrom": "analyses",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1958,12 +1894,8 @@
           "name": "analyses_source_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "analyses",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "source_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1971,12 +1903,8 @@
           "name": "analyses_policy_version_id_policy_versions_id_fk",
           "tableFrom": "analyses",
           "tableTo": "policy_versions",
-          "columnsFrom": [
-            "policy_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["policy_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1984,12 +1912,8 @@
           "name": "analyses_ai_credential_id_ai_credentials_id_fk",
           "tableFrom": "analyses",
           "tableTo": "ai_credentials",
-          "columnsFrom": [
-            "ai_credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ai_credential_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1997,12 +1921,8 @@
           "name": "analyses_assessment_instruction_id_analysis_instructions_id_fk",
           "tableFrom": "analyses",
           "tableTo": "analysis_instructions",
-          "columnsFrom": [
-            "assessment_instruction_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["assessment_instruction_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2010,12 +1930,8 @@
           "name": "analyses_verification_instruction_id_analysis_instructions_id_fk",
           "tableFrom": "analyses",
           "tableTo": "analysis_instructions",
-          "columnsFrom": [
-            "verification_instruction_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["verification_instruction_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2160,12 +2076,8 @@
           "name": "analysis_assessment_cache_organization_id_organizations_id_fk",
           "tableFrom": "analysis_assessment_cache",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2307,12 +2219,8 @@
           "name": "analysis_evidence_result_id_analysis_requirement_results_id_fk",
           "tableFrom": "analysis_evidence",
           "tableTo": "analysis_requirement_results",
-          "columnsFrom": [
-            "result_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["result_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2320,12 +2228,8 @@
           "name": "analysis_evidence_document_block_id_document_blocks_id_fk",
           "tableFrom": "analysis_evidence",
           "tableTo": "document_blocks",
-          "columnsFrom": [
-            "document_block_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_block_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2521,12 +2425,8 @@
           "name": "analysis_model_invocations_analysis_id_analyses_id_fk",
           "tableFrom": "analysis_model_invocations",
           "tableTo": "analyses",
-          "columnsFrom": [
-            "analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["analysis_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2534,12 +2434,8 @@
           "name": "analysis_model_invocations_scope_item_id_analysis_scope_items_id_fk",
           "tableFrom": "analysis_model_invocations",
           "tableTo": "analysis_scope_items",
-          "columnsFrom": [
-            "scope_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scope_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2741,12 +2637,8 @@
           "name": "analysis_requirement_results_analysis_id_analyses_id_fk",
           "tableFrom": "analysis_requirement_results",
           "tableTo": "analyses",
-          "columnsFrom": [
-            "analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["analysis_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2754,12 +2646,8 @@
           "name": "analysis_requirement_results_scope_item_id_analysis_scope_items_id_fk",
           "tableFrom": "analysis_requirement_results",
           "tableTo": "analysis_scope_items",
-          "columnsFrom": [
-            "scope_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scope_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2767,12 +2655,8 @@
           "name": "analysis_requirement_results_confirmed_by_user_id_users_id_fk",
           "tableFrom": "analysis_requirement_results",
           "tableTo": "users",
-          "columnsFrom": [
-            "confirmed_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["confirmed_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2907,12 +2791,8 @@
           "name": "analysis_requirement_verifications_result_id_analysis_requirement_results_id_fk",
           "tableFrom": "analysis_requirement_verifications",
           "tableTo": "analysis_requirement_results",
-          "columnsFrom": [
-            "result_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["result_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2995,12 +2875,8 @@
           "name": "analysis_result_overrides_result_id_analysis_requirement_results_id_fk",
           "tableFrom": "analysis_result_overrides",
           "tableTo": "analysis_requirement_results",
-          "columnsFrom": [
-            "result_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["result_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3008,12 +2884,8 @@
           "name": "analysis_result_overrides_actor_user_id_users_id_fk",
           "tableFrom": "analysis_result_overrides",
           "tableTo": "users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3150,12 +3022,8 @@
           "name": "analysis_retrieval_packets_analysis_id_analyses_id_fk",
           "tableFrom": "analysis_retrieval_packets",
           "tableTo": "analyses",
-          "columnsFrom": [
-            "analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["analysis_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3163,12 +3031,8 @@
           "name": "analysis_retrieval_packets_scope_item_id_analysis_scope_items_id_fk",
           "tableFrom": "analysis_retrieval_packets",
           "tableTo": "analysis_scope_items",
-          "columnsFrom": [
-            "scope_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scope_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3330,12 +3194,8 @@
           "name": "analysis_scope_items_analysis_id_analyses_id_fk",
           "tableFrom": "analysis_scope_items",
           "tableTo": "analyses",
-          "columnsFrom": [
-            "analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["analysis_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3438,12 +3298,8 @@
           "name": "invitations_organization_id_organizations_id_fk",
           "tableFrom": "invitations",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3451,12 +3307,8 @@
           "name": "invitations_inviter_id_users_id_fk",
           "tableFrom": "invitations",
           "tableTo": "users",
-          "columnsFrom": [
-            "inviter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3561,12 +3413,8 @@
           "name": "members_organization_id_organizations_id_fk",
           "tableFrom": "members",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3574,12 +3422,8 @@
           "name": "members_user_id_users_id_fk",
           "tableFrom": "members",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3659,9 +3503,7 @@
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -3725,9 +3567,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -3793,12 +3633,8 @@
           "name": "catalogue_administrators_user_id_users_id_fk",
           "tableFrom": "catalogue_administrators",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3806,12 +3642,8 @@
           "name": "catalogue_administrators_granted_by_user_id_users_id_fk",
           "tableFrom": "catalogue_administrators",
           "tableTo": "users",
-          "columnsFrom": [
-            "granted_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["granted_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3901,12 +3733,8 @@
           "name": "regulatory_framework_localizations_framework_id_regulatory_frameworks_id_fk",
           "tableFrom": "regulatory_framework_localizations",
           "tableTo": "regulatory_frameworks",
-          "columnsFrom": [
-            "framework_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["framework_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4104,12 +3932,8 @@
           "name": "regulatory_framework_releases_framework_id_regulatory_frameworks_id_fk",
           "tableFrom": "regulatory_framework_releases",
           "tableTo": "regulatory_frameworks",
-          "columnsFrom": [
-            "framework_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["framework_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4117,12 +3941,8 @@
           "name": "regulatory_framework_releases_published_by_user_id_users_id_fk",
           "tableFrom": "regulatory_framework_releases",
           "tableTo": "users",
-          "columnsFrom": [
-            "published_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["published_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4392,12 +4212,8 @@
           "name": "regulatory_requirements_release_id_regulatory_framework_releases_id_fk",
           "tableFrom": "regulatory_requirements",
           "tableTo": "regulatory_framework_releases",
-          "columnsFrom": [
-            "release_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["release_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4576,12 +4392,8 @@
           "name": "regulatory_subrequirements_release_id_regulatory_framework_releases_id_fk",
           "tableFrom": "regulatory_subrequirements",
           "tableTo": "regulatory_framework_releases",
-          "columnsFrom": [
-            "release_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["release_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4589,12 +4401,8 @@
           "name": "regulatory_subrequirements_parent_requirement_id_regulatory_requirements_id_fk",
           "tableFrom": "regulatory_subrequirements",
           "tableTo": "regulatory_requirements",
-          "columnsFrom": [
-            "parent_requirement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_requirement_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4713,12 +4521,8 @@
           "name": "chat_citations_message_id_chat_messages_id_fk",
           "tableFrom": "chat_citations",
           "tableTo": "chat_messages",
-          "columnsFrom": [
-            "message_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["message_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4726,12 +4530,8 @@
           "name": "chat_citations_requirement_id_regulatory_requirements_id_fk",
           "tableFrom": "chat_citations",
           "tableTo": "regulatory_requirements",
-          "columnsFrom": [
-            "requirement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requirement_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4739,12 +4539,8 @@
           "name": "chat_citations_subrequirement_id_regulatory_subrequirements_id_fk",
           "tableFrom": "chat_citations",
           "tableTo": "regulatory_subrequirements",
-          "columnsFrom": [
-            "subrequirement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["subrequirement_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4752,12 +4548,8 @@
           "name": "chat_citations_document_block_id_document_blocks_id_fk",
           "tableFrom": "chat_citations",
           "tableTo": "document_blocks",
-          "columnsFrom": [
-            "document_block_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_block_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4913,12 +4705,8 @@
           "name": "chat_messages_thread_id_chat_threads_id_fk",
           "tableFrom": "chat_messages",
           "tableTo": "chat_threads",
-          "columnsFrom": [
-            "thread_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["thread_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5063,12 +4851,8 @@
           "name": "chat_threads_organization_id_organizations_id_fk",
           "tableFrom": "chat_threads",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5076,12 +4860,8 @@
           "name": "chat_threads_owner_user_id_users_id_fk",
           "tableFrom": "chat_threads",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5089,12 +4869,8 @@
           "name": "chat_threads_analysis_id_analyses_id_fk",
           "tableFrom": "chat_threads",
           "tableTo": "analyses",
-          "columnsFrom": [
-            "analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["analysis_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5102,12 +4878,8 @@
           "name": "chat_threads_policy_version_id_policy_versions_id_fk",
           "tableFrom": "chat_threads",
           "tableTo": "policy_versions",
-          "columnsFrom": [
-            "policy_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["policy_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5115,12 +4887,8 @@
           "name": "chat_threads_framework_release_id_regulatory_framework_releases_id_fk",
           "tableFrom": "chat_threads",
           "tableTo": "regulatory_framework_releases",
-          "columnsFrom": [
-            "framework_release_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["framework_release_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5293,12 +5061,8 @@
           "name": "document_blocks_policy_version_id_policy_versions_id_fk",
           "tableFrom": "document_blocks",
           "tableTo": "policy_versions",
-          "columnsFrom": [
-            "policy_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["policy_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5384,12 +5148,8 @@
           "name": "draft_policy_selections_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "draft_policy_selections",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5397,12 +5157,8 @@
           "name": "draft_policy_selections_policy_version_id_policy_versions_id_fk",
           "tableFrom": "draft_policy_selections",
           "tableTo": "policy_versions",
-          "columnsFrom": [
-            "policy_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["policy_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -5526,12 +5282,8 @@
           "name": "policies_organization_id_organizations_id_fk",
           "tableFrom": "policies",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5539,12 +5291,8 @@
           "name": "policies_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "policies",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5552,12 +5300,8 @@
           "name": "policies_owner_user_id_users_id_fk",
           "tableFrom": "policies",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5698,12 +5442,8 @@
           "name": "policy_upload_intents_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "policy_upload_intents",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5711,12 +5451,8 @@
           "name": "policy_upload_intents_policy_version_id_policy_versions_id_fk",
           "tableFrom": "policy_upload_intents",
           "tableTo": "policy_versions",
-          "columnsFrom": [
-            "policy_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["policy_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6119,12 +5855,8 @@
           "name": "policy_versions_policy_id_policies_id_fk",
           "tableFrom": "policy_versions",
           "tableTo": "policies",
-          "columnsFrom": [
-            "policy_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["policy_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6132,12 +5864,8 @@
           "name": "policy_versions_organization_id_organizations_id_fk",
           "tableFrom": "policy_versions",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6145,12 +5873,8 @@
           "name": "policy_versions_anonymous_draft_id_anonymous_drafts_id_fk",
           "tableFrom": "policy_versions",
           "tableTo": "anonymous_drafts",
-          "columnsFrom": [
-            "anonymous_draft_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["anonymous_draft_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6158,12 +5882,8 @@
           "name": "policy_versions_uploaded_by_user_id_users_id_fk",
           "tableFrom": "policy_versions",
           "tableTo": "users",
-          "columnsFrom": [
-            "uploaded_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["uploaded_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -6273,95 +5993,52 @@
     "public.anonymous_draft_status": {
       "name": "anonymous_draft_status",
       "schema": "public",
-      "values": [
-        "active",
-        "claimed",
-        "expired",
-        "revoked"
-      ]
+      "values": ["active", "claimed", "expired", "revoked"]
     },
     "public.institution_size": {
       "name": "institution_size",
       "schema": "public",
-      "values": [
-        "small",
-        "medium",
-        "large"
-      ]
+      "values": ["small", "medium", "large"]
     },
     "public.ai_credential_purpose": {
       "name": "ai_credential_purpose",
       "schema": "public",
-      "values": [
-        "analysis",
-        "chat"
-      ]
+      "values": ["analysis", "chat"]
     },
     "public.ai_credential_status": {
       "name": "ai_credential_status",
       "schema": "public",
-      "values": [
-        "active",
-        "revoked",
-        "expired",
-        "deleted"
-      ]
+      "values": ["active", "revoked", "expired", "deleted"]
     },
     "public.ai_evaluation_status": {
       "name": "ai_evaluation_status",
       "schema": "public",
-      "values": [
-        "draft",
-        "published"
-      ]
+      "values": ["draft", "published"]
     },
     "public.ai_model_lifecycle": {
       "name": "ai_model_lifecycle",
       "schema": "public",
-      "values": [
-        "unevaluated",
-        "candidate",
-        "certified",
-        "deprecated",
-        "blocked"
-      ]
+      "values": ["unevaluated", "candidate", "certified", "deprecated", "blocked"]
     },
     "public.ai_model_recommendation": {
       "name": "ai_model_recommendation",
       "schema": "public",
-      "values": [
-        "quality",
-        "balanced",
-        "economy"
-      ]
+      "values": ["quality", "balanced", "economy"]
     },
     "public.ai_route_provider": {
       "name": "ai_route_provider",
       "schema": "public",
-      "values": [
-        "openrouter",
-        "requesty",
-        "anthropic",
-        "google",
-        "openai"
-      ]
+      "values": ["openrouter", "requesty", "anthropic", "google", "openai"]
     },
     "public.analysis_instruction_kind": {
       "name": "analysis_instruction_kind",
       "schema": "public",
-      "values": [
-        "assessment",
-        "verification"
-      ]
+      "values": ["assessment", "verification"]
     },
     "public.analysis_instruction_status": {
       "name": "analysis_instruction_status",
       "schema": "public",
-      "values": [
-        "draft",
-        "published",
-        "archived"
-      ]
+      "values": ["draft", "published", "archived"]
     },
     "public.analysis_result_status": {
       "name": "analysis_result_status",
@@ -6390,122 +6067,67 @@
     "public.analysis_status": {
       "name": "analysis_status",
       "schema": "public",
-      "values": [
-        "queued",
-        "running",
-        "completed",
-        "failed",
-        "cancelled"
-      ]
+      "values": ["queued", "running", "completed", "failed", "cancelled"]
     },
     "public.analysis_verification_status": {
       "name": "analysis_verification_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "not_selected",
-        "passed",
-        "needs_review",
-        "rejected"
-      ]
+      "values": ["pending", "not_selected", "passed", "needs_review", "rejected"]
     },
     "public.analysis_verification_verdict": {
       "name": "analysis_verification_verdict",
       "schema": "public",
-      "values": [
-        "confirm",
-        "reject",
-        "uncertain"
-      ]
+      "values": ["confirm", "reject", "uncertain"]
     },
     "public.analysis_evidence_support": {
       "name": "analysis_evidence_support",
       "schema": "public",
-      "values": [
-        "supports",
-        "contradicts",
-        "context"
-      ]
+      "values": ["supports", "contradicts", "context"]
     },
     "public.model_invocation_status": {
       "name": "model_invocation_status",
       "schema": "public",
-      "values": [
-        "started",
-        "succeeded",
-        "failed"
-      ]
+      "values": ["started", "succeeded", "failed"]
     },
     "public.framework_availability": {
       "name": "framework_availability",
       "schema": "public",
-      "values": [
-        "included",
-        "locked"
-      ]
+      "values": ["included", "locked"]
     },
     "public.framework_content_classification": {
       "name": "framework_content_classification",
       "schema": "public",
-      "values": [
-        "demo",
-        "official_source",
-        "derived_mapping"
-      ]
+      "values": ["demo", "official_source", "derived_mapping"]
     },
     "public.framework_release_status": {
       "name": "framework_release_status",
       "schema": "public",
-      "values": [
-        "draft",
-        "published",
-        "archived"
-      ]
+      "values": ["draft", "published", "archived"]
     },
     "public.chat_citation_source": {
       "name": "chat_citation_source",
       "schema": "public",
-      "values": [
-        "framework_requirement",
-        "framework_subrequirement",
-        "policy_block"
-      ]
+      "values": ["framework_requirement", "framework_subrequirement", "policy_block"]
     },
     "public.chat_message_role": {
       "name": "chat_message_role",
       "schema": "public",
-      "values": [
-        "user",
-        "assistant"
-      ]
+      "values": ["user", "assistant"]
     },
     "public.chat_message_status": {
       "name": "chat_message_status",
       "schema": "public",
-      "values": [
-        "completed",
-        "failed"
-      ]
+      "values": ["completed", "failed"]
     },
     "public.document_block_type": {
       "name": "document_block_type",
       "schema": "public",
-      "values": [
-        "title",
-        "heading",
-        "paragraph",
-        "list_item",
-        "table_cell"
-      ]
+      "values": ["title", "heading", "paragraph", "list_item", "table_cell"]
     },
     "public.policy_lifecycle_status": {
       "name": "policy_lifecycle_status",
       "schema": "public",
-      "values": [
-        "active",
-        "deleting",
-        "deleted"
-      ]
+      "values": ["active", "deleting", "deleted"]
     },
     "public.policy_parse_status": {
       "name": "policy_parse_status",
@@ -6528,20 +6150,12 @@
     "public.policy_upload_intent_status": {
       "name": "policy_upload_intent_status",
       "schema": "public",
-      "values": [
-        "issued",
-        "uploaded",
-        "expired",
-        "revoked"
-      ]
+      "values": ["issued", "uploaded", "expired", "revoked"]
     },
     "public.policy_version_source": {
       "name": "policy_version_source",
       "schema": "public",
-      "values": [
-        "sample",
-        "upload"
-      ]
+      "values": ["sample", "upload"]
     }
   },
   "schemas": {},
