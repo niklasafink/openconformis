@@ -74,17 +74,27 @@ export async function analysisWorkflow(analysisId: string) {
     const { workflowRunId } = getWorkflowMetadata();
     const prepared = await prepareAnalysisStep(analysisId, workflowRunId);
     if (prepared.status !== "running") return prepared;
-    for (let index = 0; index < prepared.scopeItemIds.length; index += 1) {
-      const scopeItemId = prepared.scopeItemIds[index];
-      if (!scopeItemId) continue;
-      const step = await analyzeRequirementStep(
-        analysisId,
-        scopeItemId,
-        index,
-        prepared.scopeItemIds.length,
+    const { scopeItemIds, concurrency } = prepared;
+    // Anforderungen sind voneinander unabhängig. Nacheinander bewertet dauerte ein
+    // Lauf mit zehn Anforderungen sechs bis zehn Minuten; parallel bestimmt die
+    // langsamste Anforderung eines Blocks die Dauer.
+    for (let start = 0; start < scopeItemIds.length; start += concurrency) {
+      const settled = await Promise.allSettled(
+        scopeItemIds
+          .slice(start, start + concurrency)
+          .map((scopeItemId, offset) =>
+            analyzeRequirementStep(analysisId, scopeItemId, start + offset, scopeItemIds.length),
+          ),
       );
+      // Erst den ganzen Block abwarten: laufende Nachbarn sollen ihr Ergebnis
+      // speichern, bevor der Lauf als fehlgeschlagen markiert wird.
+      const failed = settled.find((result) => result.status === "rejected");
+      if (failed) throw failed.reason;
       // Gestoppt: keine weiteren Anforderungen bewerten, nichts als Fehler melden.
-      if (step.status === "cancelled") return step;
+      const cancelled = settled.find(
+        (result) => result.status === "fulfilled" && result.value.status === "cancelled",
+      );
+      if (cancelled?.status === "fulfilled") return cancelled.value;
     }
     return await finalizeAnalysisStep(analysisId);
   } catch (error) {

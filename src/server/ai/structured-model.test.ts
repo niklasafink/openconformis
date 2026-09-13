@@ -68,6 +68,27 @@ describe("readProviderJson", () => {
     });
   });
 
+  it("waits for OpenRouter's in-flight credit reservation, but not for missing credit", async () => {
+    const waiting = new Response(
+      JSON.stringify({
+        error: {
+          message:
+            "This request would exceed your available credits given your current in-flight requests. Retry after in-flight requests complete.",
+        },
+      }),
+      { status: 402 },
+    );
+    await expect(readProviderJson(waiting)).rejects.toMatchObject({ retryable: true });
+
+    const exhausted = new Response(
+      JSON.stringify({ error: { message: "Insufficient credits." } }),
+      {
+        status: 402,
+      },
+    );
+    await expect(readProviderJson(exhausted)).rejects.toMatchObject({ retryable: false });
+  });
+
   it("states the status even when the body carries no message", async () => {
     const response = new Response("not json at all", { status: 502 });
     try {

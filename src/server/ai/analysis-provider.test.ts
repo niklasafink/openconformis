@@ -11,6 +11,7 @@ vi.mock("./provider-routing", () => ({
   getAnalysisProviderConfiguration: () => ({
     baseUrl: "https://openrouter.ai/api/v1",
     maxOutputTokens: 4000,
+    reasoningEffort: "low",
     zeroDataRetention: true,
   }),
   requestProviderStructured: mocks.request,
@@ -62,6 +63,22 @@ describe("analysis always uses its owner's temporary credential", () => {
     expect(mocks.request).toHaveBeenCalledWith(
       "openrouter",
       expect.objectContaining({ apiKey: "own-key" }),
+    );
+  });
+
+  it("applies the operator's reasoning effort and a larger budget only when a retry asks for it", async () => {
+    mocks.credential.mockImplementation(async (_, useSecret) => useSecret("own-key"));
+    await requestStructuredForAnalysis(analysis, request);
+    await requestStructuredForAnalysis(analysis, { ...request, maxOutputTokens: 8000 });
+    expect(mocks.request).toHaveBeenNthCalledWith(
+      1,
+      "openrouter",
+      expect.objectContaining({ maxOutputTokens: 4000, reasoningEffort: "low" }),
+    );
+    expect(mocks.request).toHaveBeenNthCalledWith(
+      2,
+      "openrouter",
+      expect.objectContaining({ maxOutputTokens: 8000 }),
     );
   });
 

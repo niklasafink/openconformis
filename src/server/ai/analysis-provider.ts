@@ -14,7 +14,13 @@ type AnalysisCredentialBinding = {
 
 export async function requestStructuredForAnalysis<T>(
   analysis: AnalysisCredentialBinding,
-  request: Omit<StructuredModelRequest<T>, "apiKey" | "baseUrl" | "maxOutputTokens">,
+  request: Omit<
+    StructuredModelRequest<T>,
+    "apiKey" | "baseUrl" | "maxOutputTokens" | "reasoningEffort"
+  > & {
+    /** Nur für einen Wiederholungsversuch nach abgeschnittener Antwort. */
+    maxOutputTokens?: number;
+  },
 ) {
   if (!analysis.aiCredentialId) throw new TemporaryCredentialError("ANALYSIS_CREDENTIAL_MISSING");
   const provider = getAnalysisProviderConfiguration(analysis.routeProvider);
@@ -31,7 +37,8 @@ export async function requestStructuredForAnalysis<T>(
       requestProviderStructured(analysis.routeProvider, {
         ...request,
         baseUrl: provider.baseUrl,
-        maxOutputTokens: provider.maxOutputTokens,
+        maxOutputTokens: request.maxOutputTokens ?? provider.maxOutputTokens,
+        reasoningEffort: provider.reasoningEffort,
         zeroDataRetention: provider.zeroDataRetention,
         apiKey,
       }),

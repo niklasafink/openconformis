@@ -19,6 +19,8 @@ export type StructuredModelRequest<T> = {
    */
   zeroDataRetention?: boolean;
   maxOutputTokens: number;
+  /** Denktiefe für Modelle mit Reasoning; Anbieter ohne Steuerung ignorieren sie. */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
   timeoutMilliseconds?: number;
 };
 
@@ -172,9 +174,13 @@ export async function readProviderJson(response: Response) {
     } catch {
       detail = undefined;
     }
+    // OpenRouter reserviert Guthaben für laufende Anfragen. Laufen Anforderungen
+    // parallel, lehnt es weitere mit 402 ab, bis die anderen fertig sind — ein
+    // Wartefall, kein fehlendes Guthaben.
+    const waitsForInFlightRequests = response.status === 402 && /in-flight/iu.test(detail ?? "");
     throw new ModelProviderError(
       "PROVIDER_HTTP_ERROR",
-      retryableProviderStatus(response.status),
+      waitsForInFlightRequests || retryableProviderStatus(response.status),
       detail ? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`,
     );
   }

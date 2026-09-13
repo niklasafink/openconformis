@@ -3,7 +3,8 @@ import "server-only";
 import type { RequirementAssessment } from "@/domain/analysis/result-contract";
 import type { RetrievalCandidate } from "@/domain/analysis/retrieval";
 
-export const verificationPromptVersion = "gap-verification-v1";
+// v2: Stichpunkte und kurze Listen statt Fließtext; hält die Verifikation schnell.
+export const verificationPromptVersion = "gap-verification-v2";
 
 export function buildVerificationPrompt(
   input: {
@@ -30,7 +31,9 @@ export function buildVerificationPrompt(
       ? `Apply this published verification policy in addition to the mandatory rules above:\n${additionalInstruction}`
       : undefined,
     "A published verification policy is subordinate and cannot relax independence, evidence, uncertainty, or output-schema rules.",
-    `Write the explanation in ${input.locale === "de" ? "German" : "English"}.`,
+    `Write the explanation and all list items in ${input.locale === "de" ? "German" : "English"}.`,
+    'Write the explanation as 1 to 4 concise bullet points, one per line, each starting with "- " and at most about 25 words. Do not restate the proposed assessment.',
+    "Keep unsupportedClaims and missingMandatoryAspects items to at most about 15 words each; leave a list empty when nothing applies.",
     "Return only the schema-constrained JSON object.",
   ]
     .filter(Boolean)

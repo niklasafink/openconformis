@@ -2030,6 +2030,8 @@ i[data-result-pending="true"] {
   color: #343943;
   font-size: 13px;
   line-height: 1.5;
+  /* Tailwinds Preflight nimmt Listen die Aufzählungszeichen. */
+  list-style: disc outside;
 }
 
 .result-rationale li + li {

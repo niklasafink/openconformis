@@ -35,6 +35,7 @@ describe("OpenRouter structured adapter", () => {
         providerOnly: ["eu-provider"],
         zeroDataRetention: true,
         maxOutputTokens: 1_000,
+        reasoningEffort: "low",
       },
       fetchMock,
     );
@@ -43,6 +44,7 @@ describe("OpenRouter structured adapter", () => {
     const body = JSON.parse(String((request?.[1] as RequestInit | undefined)?.body)) as {
       provider: Record<string, unknown>;
       max_tokens: number;
+      reasoning: unknown;
       response_format: { json_schema: { strict: boolean } };
     };
     expect(request?.[0].toString()).toBe("https://eu.openrouter.ai/api/v1/chat/completions");
@@ -54,6 +56,8 @@ describe("OpenRouter structured adapter", () => {
     });
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.max_tokens).toBe(1_000);
+    // Denk-Tokens zählen zum Limit und bestimmen die Dauer; der Denktext wird nicht gebraucht.
+    expect(body.reasoning).toEqual({ effort: "low", exclude: true });
     expect(response.output).toEqual({ answer: "ok" });
     expect(response.costMicrounits).toBe(1000);
   });
@@ -92,6 +96,7 @@ describe("OpenRouter structured adapter", () => {
     ) as { provider: Record<string, unknown> };
     expect(body.provider).not.toHaveProperty("zdr");
     expect(body.provider).not.toHaveProperty("data_collection");
+    expect(body).not.toHaveProperty("reasoning");
   });
 
   it("routes without a pinned provider, which BYOK requires", async () => {

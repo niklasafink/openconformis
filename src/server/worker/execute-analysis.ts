@@ -31,6 +31,7 @@ import {
 import {
   getAnalysisProviderConfiguration,
   isAnalysisProviderAvailable,
+  maximumOutputTokens,
 } from "@/server/ai/provider-routing";
 import { requestStructuredForAnalysis } from "@/server/ai/analysis-provider";
 import { buildVerificationPrompt } from "@/server/ai/verification-prompt";
@@ -264,6 +265,20 @@ function invocationContext(
   return `${item.scope.regulatoryId}, ${stageLabel} (${german ? "Versuch" : "attempt"} ${attempt}), ${modelId}`;
 }
 
+const truncatedRetryInstruction =
+  "A prior output was cut off at the output limit. Think briefly and keep the explanation, quotes and lists short.";
+
+/**
+ * Nach einer abgeschnittenen Antwort bekommt der zweite Versuch doppelt so viel
+ * Raum. Denk-Tokens zählen mit, und wie viele ein Modell braucht, schwankt.
+ */
+function largerOutputBudget(analysis: AnalysisRecord) {
+  return Math.min(
+    getAnalysisProviderConfiguration(analysis.routeProvider).maxOutputTokens * 2,
+    maximumOutputTokens,
+  );
+}
+
 function requirementFromScope(scope: ScopeRecord["scope"]) {
   return {
     regulatoryId: scope.regulatoryId,
@@ -394,15 +409,18 @@ async function assessItem(
     }
   }
   let previousFailure: string | undefined;
+  let truncated = false;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const attemptPrompt =
       attempt === 1
         ? prompt
         : {
             ...prompt,
-            system: `${prompt.system}\nA prior output failed deterministic schema or citation validation${
-              previousFailure ? `: ${previousFailure}` : ""
-            }. Re-check every field and copy quotes exactly.`,
+            system: truncated
+              ? `${prompt.system}\n${truncatedRetryInstruction}`
+              : `${prompt.system}\nA prior output failed deterministic schema or citation validation${
+                  previousFailure ? `: ${previousFailure}` : ""
+                }. Re-check every field and copy quotes exactly.`,
           };
     const invocationId = await startInvocation({
       analysisId: analysis.id,
@@ -423,6 +441,7 @@ async function assessItem(
         schemaName: "requirement_assessment",
         jsonSchema: { ...requirementAssessmentJsonSchema },
         outputSchema: requirementAssessmentSchema,
+        maxOutputTokens: truncated ? largerOutputBudget(analysis) : undefined,
       });
       outputHash = createContentHash(response.output);
       if (response.output.status === "not_applicable") {
@@ -466,6 +485,10 @@ async function assessItem(
       );
       await failInvocation(invocationId, startedAt, failure, outputHash, analysis.id);
       if (error instanceof ModelProviderError) {
+        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE" && attempt === 1) {
+          truncated = true;
+          continue;
+        }
         if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
         previousFailure = error.detail;
         continue;
@@ -524,6 +547,7 @@ async function verifyItem(
     user: prompt.user,
     schema: verificationResultJsonSchema,
   });
+  let truncated = false;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const invocationId = await startInvocation({
       analysisId: analysis.id,
@@ -540,11 +564,14 @@ async function verifyItem(
         system:
           attempt === 1
             ? prompt.system
-            : `${prompt.system}\nA prior output failed schema validation. Return every required field exactly once.`,
+            : truncated
+              ? `${prompt.system}\n${truncatedRetryInstruction}`
+              : `${prompt.system}\nA prior output failed schema validation. Return every required field exactly once.`,
         user: prompt.user,
         schemaName: "assessment_verification",
         jsonSchema: { ...verificationResultJsonSchema },
         outputSchema: verificationResultSchema,
+        maxOutputTokens: truncated ? largerOutputBudget(analysis) : undefined,
       });
       const outputHash = createContentHash(response.output);
       await finishInvocation(invocationId, startedAt, response, outputHash);
@@ -556,7 +583,15 @@ async function verifyItem(
       );
       await failInvocation(invocationId, startedAt, failure, undefined, analysis.id);
       if (error instanceof ModelProviderError) {
+        // Eine abgeschnittene Verifikation kippt nicht den ganzen Lauf: bleibt sie
+        // auch mit doppeltem Budget unvollständig, gilt sie als „unsicher" und das
+        // Ergebnis geht zur menschlichen Prüfung.
+        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
+          truncated = true;
+          continue;
+        }
         if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
+        truncated = false;
         continue;
       }
       throw error;
@@ -589,8 +624,8 @@ async function persistItemResult(input: {
   const effectiveAssessment = rejected
     ? noAssessmentPossible(
         input.analysis.locale === "de"
-          ? `Die unabhängige Verifikation hat die vorgeschlagene Bewertung nicht bestätigt: ${input.verification?.result.explanation}`
-          : `Independent verification did not confirm the proposed assessment: ${input.verification?.result.explanation}`,
+          ? `Die unabhängige Verifikation hat die vorgeschlagene Bewertung nicht bestätigt:\n${input.verification?.result.explanation}`
+          : `Independent verification did not confirm the proposed assessment:\n${input.verification?.result.explanation}`,
         [
           ...(input.verification?.result.unsupportedClaims ?? []),
           ...(input.verification?.result.missingMandatoryAspects ?? []),
@@ -676,6 +711,15 @@ function deleteAnalysisCredential(analysis: Pick<AnalysisRecord, "sourceDraftId"
   });
 }
 
+/** Wie viele Anforderungen eines Laufs gleichzeitig beim Anbieter liegen. */
+function requirementConcurrency() {
+  const value = Number.parseInt(process.env.ANALYSIS_REQUIREMENT_CONCURRENCY?.trim() || "8", 10);
+  if (!Number.isInteger(value) || value < 1 || value > 20) {
+    throw new Error("ANALYSIS_CONCURRENCY_INVALID");
+  }
+  return value;
+}
+
 async function claimAnalysisWorkflow(analysisId: string, workflowRunId?: string) {
   if (!workflowRunId) return true;
 
@@ -723,6 +767,7 @@ export async function prepareAnalysisExecution(analysisId: string, workflowRunId
     analysisId: analysis.id,
     status: "running" as const,
     scopeItemIds: items.map(({ scope }) => scope.id),
+    concurrency: requirementConcurrency(),
   };
 }
 
@@ -762,11 +807,19 @@ export async function executeAnalysisScopeItem(input: {
     });
   }
 
+  // Parallel bewertete Anforderungen enden in beliebiger Reihenfolge. Der
+  // Fortschritt zählt deshalb gespeicherte Ergebnisse und fällt nie zurück.
+  const [processed] = await db
+    .select({ count: sql<number>`count(*)::integer` })
+    .from(analysisRequirementResults)
+    .where(eq(analysisRequirementResults.analysisId, analysis.id));
+  const progressPercent =
+    35 + Math.round((Math.min(processed?.count ?? 0, input.total) / input.total) * 55);
   await db
     .update(analyses)
     .set({
       stage: "verification",
-      progressPercent: 35 + Math.round(((input.index + 1) / input.total) * 55),
+      progressPercent: sql`greatest(${analyses.progressPercent}, ${progressPercent})`,
       updatedAt: new Date(),
     })
     .where(and(eq(analyses.id, analysis.id), eq(analyses.status, "running")));

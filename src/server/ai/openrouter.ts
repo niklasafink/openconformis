@@ -85,6 +85,11 @@ export async function requestOpenRouterStructured<T>(
         ],
         temperature: 0,
         max_tokens: request.maxOutputTokens,
+        // Modelle ohne Reasoning ignorieren das Feld. Der Denktext selbst wird
+        // nicht gebraucht und bleibt aus der Antwort.
+        ...(request.reasoningEffort
+          ? { reasoning: { effort: request.reasoningEffort, exclude: true } }
+          : {}),
         stream: false,
         response_format: {
           type: "json_schema",

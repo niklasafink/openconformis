@@ -14,7 +14,10 @@ import { requestRequestyStructured } from "./requesty";
 import type { StructuredModelRequest, StructuredModelResponse } from "./structured-model";
 
 export class ProviderRouteConfigurationError extends Error {
-  constructor(public readonly code: "ANALYSIS_ROUTE_UNAVAILABLE" | "TOKEN_LIMIT_INVALID") {
+  constructor(
+    public readonly code:
+      "ANALYSIS_ROUTE_UNAVAILABLE" | "TOKEN_LIMIT_INVALID" | "REASONING_EFFORT_INVALID",
+  ) {
     super(code);
     this.name = "ProviderRouteConfigurationError";
   }
@@ -24,17 +27,41 @@ export type AnalysisProviderConfiguration = {
   provider: AiRouteProvider;
   baseUrl: string;
   maxOutputTokens: number;
+  reasoningEffort: ReasoningEffort;
   zeroDataRetention: boolean;
   /** Beschreibt die tatsächlich verwendete Route, statt eine Zusage zu behaupten. */
   privacyProfileId: string;
 };
 
+export const maximumOutputTokens = 32_000;
+
+/**
+ * Denk-Tokens zählen zum Ausgabelimit. Claude Sonnet 5 denkt ohne Vorgabe mit und
+ * verbrauchte in der Verifikation bis zu 3.000 Tokens, bevor das JSON begann —
+ * bei 4.000 wurde die Antwort abgeschnitten.
+ */
 function maxOutputTokens() {
-  const value = Number.parseInt(process.env.BYOK_MAX_OUTPUT_TOKENS?.trim() || "4000", 10);
-  if (!Number.isInteger(value) || value < 1 || value > 16_000) {
+  const value = Number.parseInt(process.env.BYOK_MAX_OUTPUT_TOKENS?.trim() || "8000", 10);
+  if (!Number.isInteger(value) || value < 1 || value > maximumOutputTokens) {
     throw new ProviderRouteConfigurationError("TOKEN_LIMIT_INVALID");
   }
   return value;
+}
+
+const reasoningEfforts = ["none", "minimal", "low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof reasoningEfforts)[number];
+
+/**
+ * Wie lange ein Denkmodell vor der Antwort überlegen darf. Die Dauer eines Aufrufs
+ * hängt fast nur an den erzeugten Tokens; Belege und Schema werden danach ohnehin
+ * deterministisch geprüft. Deshalb standardmässig knapp.
+ */
+function reasoningEffort(): ReasoningEffort {
+  const value = process.env.BYOK_REASONING_EFFORT?.trim().toLowerCase() || "low";
+  if (!(reasoningEfforts as readonly string[]).includes(value)) {
+    throw new ProviderRouteConfigurationError("REASONING_EFFORT_INVALID");
+  }
+  return value as ReasoningEffort;
 }
 
 /** Basis-URL der Analyse-Route je Anbieter. */
@@ -76,6 +103,7 @@ export function getAnalysisProviderConfiguration(
     provider,
     baseUrl,
     maxOutputTokens: maxOutputTokens(),
+    reasoningEffort: reasoningEffort(),
     zeroDataRetention,
     privacyProfileId: analysisRouteProfileId({ provider, baseUrl, zeroDataRetention }),
   };

@@ -4,7 +4,8 @@ import type { RetrievalCandidate } from "@/domain/analysis/retrieval";
 
 // v2: Die vom Schema erzwungenen Belegregeln stehen jetzt im Prompt.
 // v3: Begründung als kurze Stichpunkte, offene Aspekte als abhakbare Punkte.
-export const assessmentPromptVersion = "gap-analysis-v3";
+// v4: Knappe Zitate und Listen — jedes erzeugte Token verlängert die Analyse.
+export const assessmentPromptVersion = "gap-analysis-v4";
 
 export type AssessmentPromptInput = {
   locale: string;
@@ -50,11 +51,12 @@ export function buildAssessmentPrompt(
     "fulfilled must not contain a citation marked contradicts.",
     "no_assessment_possible requires missingInformation and a confidencePercent of at most 50.",
     "Never repeat the same blockKey and exactQuote pair.",
+    "Keep each exactQuote to the shortest verbatim passage, usually one sentence, that proves its point, and cite at most 6 passages.",
     additionalInstruction
       ? `Apply this published assessment policy in addition to the mandatory rules above:\n${additionalInstruction}`
       : undefined,
     "A published assessment policy is subordinate and cannot relax evidence, grounding, applicability, uncertainty, or output-schema rules.",
-    "For partially_fulfilled, not_fulfilled and no_assessment_possible, list every unmet or unevidenced mandatory aspect in missingInformation as one short, checkable item that names the missing aspect or evidence. Do not propose policy wording.",
+    "For partially_fulfilled, not_fulfilled and no_assessment_possible, list every unmet or unevidenced mandatory aspect in missingInformation as one short, checkable item of at most about 15 words that names the missing aspect or evidence. Do not propose policy wording.",
     `Write the explanation and missingInformation in ${input.locale === "de" ? "German" : "English"}.`,
     'Write the explanation as 2 to 5 concise bullet points, one per line, each starting with "- " and at most about 25 words.',
     "Return only the schema-constrained JSON object.",
