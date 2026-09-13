@@ -1,26 +1,18 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
-import { useId, useMemo, type FormEvent } from "react";
+import { useId, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
+import { cn } from "@/lib/utils";
 
 export type ModelKeyFormLabels = Readonly<{
   model: string;
-  unevaluated: string;
+  selected: string;
   unevaluatedWarning: string;
   apiKey: string;
 }>;
@@ -70,21 +62,10 @@ export function ModelKeyForm({
 }: ModelKeyFormProps) {
   const id = useId();
   const model = catalogue.models.find((candidate) => candidate.id === modelProfileId);
-  const modelsByPublisher = useMemo(() => {
-    const groups = new Map<string, AnalysisModelCatalogue["models"]>();
-    for (const candidate of catalogue.models) {
-      groups.set(candidate.publisher, [...(groups.get(candidate.publisher) ?? []), candidate]);
-    }
-    return [...groups.entries()];
-  }, [catalogue]);
+  const keyProvided = keyOptional || apiKey.trim().length >= 8;
 
   const warningRequired = Boolean(model && !model.evaluated && !warningAccepted);
-  const canSubmit =
-    Boolean(model) &&
-    !pending &&
-    !disabled &&
-    !warningRequired &&
-    (keyOptional || apiKey.trim().length >= 8);
+  const canSubmit = Boolean(model) && !pending && !disabled && !warningRequired && keyProvided;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,30 +75,37 @@ export function ModelKeyForm({
   return (
     <form className="grid gap-4" onSubmit={submit}>
       <div className="grid gap-1.5">
-        <Label htmlFor={`${id}-model`}>{labels.model}</Label>
-        <Select
-          value={model?.id ?? ""}
-          onValueChange={onModelChange}
-          disabled={pending || disabled}
-        >
-          <SelectTrigger id={`${id}-model`} className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {modelsByPublisher.map(([publisher, models]) => (
-              <SelectGroup key={publisher}>
-                <SelectLabel>{publisher}</SelectLabel>
-                {models.map((candidate) => (
-                  <SelectItem key={candidate.id} value={candidate.id}>
-                    {candidate.evaluated
-                      ? candidate.name
-                      : `${candidate.name} · ${labels.unevaluated}`}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Nur die Modellnamen untereinander; das gewählte trägt „Ausgewählt",
+            sobald ein Schlüssel dafür vorliegt. */}
+        <div role="radiogroup" aria-label={labels.model} className="grid gap-0.5">
+          {catalogue.models.map((candidate) => {
+            const checked = candidate.id === model?.id;
+            return (
+              <button
+                key={candidate.id}
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                disabled={pending || disabled}
+                onClick={() => {
+                  if (!checked) onModelChange(candidate.id);
+                }}
+                className={cn(
+                  "flex h-9 items-center justify-between gap-3 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50",
+                  checked && "bg-accent font-medium",
+                )}
+              >
+                <span className="truncate">{candidate.name}</span>
+                {checked && keyProvided ? (
+                  <span className="flex shrink-0 items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                    <span aria-hidden="true" className="model-access-light" />
+                    {labels.selected}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
         {model && !model.evaluated ? (
           <Label className="mt-1 flex items-start gap-2 text-xs leading-snug font-normal text-muted-foreground">
             <Checkbox

@@ -158,7 +158,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
               labels={{
                 panelTitle: t("panelTitle"),
                 model: t("model"),
-                unevaluated: t("unevaluated"),
+                selected: t("selected"),
                 unevaluatedWarning: t("unevaluatedWarning"),
                 apiKey: t("apiKey"),
                 keyFailed: t("keyFailed"),

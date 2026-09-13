@@ -57,7 +57,7 @@ const labels = {
 const accessLabels = {
   panelTitle: "Modellzugang",
   model: "Modell",
-  unevaluated: "ungeprüft",
+  selected: "Ausgewählt",
   unevaluatedWarning: "Dieses Modell ist nicht evaluiert.",
   apiKey: "API-Key",
   keyFailed: "Der Schlüssel konnte nicht bestätigt werden.",
@@ -158,9 +158,11 @@ describe("analysis run header", () => {
     renderHeader({ status: "completed", stage: "completed", progressPercent: 100 });
 
     fireEvent.click(screen.getByTitle("Modellzugang"));
-    fireEvent.change(await screen.findByLabelText("API-Key"), {
-      target: { value: "sk-or-v1-secret-key" },
-    });
+    // Ohne Schlüssel ist das Modell nur markiert, noch nicht „Ausgewählt".
+    const keyInput = await screen.findByLabelText("API-Key");
+    expect(screen.getByRole("radio", { checked: true })).not.toHaveTextContent("Ausgewählt");
+    fireEvent.change(keyInput, { target: { value: "sk-or-v1-secret-key" } });
+    expect(screen.getByRole("radio", { checked: true })).toHaveTextContent("Ausgewählt");
     fireEvent.click(screen.getByRole("button", { name: "Analyse starten" }));
 
     await waitFor(() =>

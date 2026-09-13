@@ -153,7 +153,7 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
                 labels={{
                   panelTitle: access("panelTitle"),
                   model: access("model"),
-                  unevaluated: access("unevaluated"),
+                  selected: access("selected"),
                   unevaluatedWarning: access("unevaluatedWarning"),
                   apiKey: access("apiKey"),
                   keyFailed: access("keyFailed"),

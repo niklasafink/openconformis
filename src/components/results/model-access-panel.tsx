@@ -14,7 +14,7 @@ import { ModelKeyForm } from "./model-key-form";
 export type ModelAccessLabels = Readonly<{
   panelTitle: string;
   model: string;
-  unevaluated: string;
+  selected: string;
   unevaluatedWarning: string;
   apiKey: string;
   keyFailed: string;
