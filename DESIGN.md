@@ -338,10 +338,11 @@ the URL and analysis state. Reloading must preserve progress and selection.
   1. requirement list,
   2. assessment detail,
   3. source document.
-- Suggested initial widths: 25% / 38% / 37%, with minimums 300 / 440 / 440 px.
-- At widths below 1280 px, the source document becomes a switchable panel rather
+- Fixed widths 20% / 40% / 40%, so the source document stays readable.
+- The workspace is compact: 13 px body text, 12 px secondary text, tight paddings.
+- At widths below 1200 px, the source document becomes a switchable panel rather
   than forcing unusable columns.
-- Requirement list typography is at least 14 px and its header stays sticky.
+- The requirement list header stays sticky.
 - Selected row is obvious but quiet.
 - Detail sections are outlined, rounded groups and can collapse independently.
 - Source group contains requirement, linked sub-requirements and company context.
