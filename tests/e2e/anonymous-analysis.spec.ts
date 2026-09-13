@@ -103,7 +103,10 @@ test.describe("authenticated analysis setup", () => {
     await accessPanel.click();
     await expect(page.getByLabel(/API-Key$/u)).toBeVisible();
     await expect(page.getByRole("button", { name: "Analyse starten" })).toBeDisabled();
-    await expect(page.getByRole("radiogroup", { name: "Modell" })).toBeVisible();
+    // Die Modelle stehen untereinander in einem Dropdown, das gewählte mit Häkchen.
+    await page.getByRole("button", { name: "Modell", exact: true }).click();
+    await expect(page.getByRole("menuitemradio", { checked: true })).toBeVisible();
+    await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u }).click();

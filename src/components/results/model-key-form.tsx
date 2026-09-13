@@ -1,13 +1,19 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { ChevronDown, LoaderCircle } from "lucide-react";
 import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
-import { cn } from "@/lib/utils";
 
 export type ModelKeyFormLabels = Readonly<{
   model: string;
@@ -61,36 +67,44 @@ export function ModelKeyForm({
 
   return (
     <div className="grid gap-4">
-      {/* Nur die Modellnamen untereinander; das gewählte trägt „Ausgewählt",
-          sobald ein Schlüssel dafür vorliegt. */}
-      <div role="radiogroup" aria-label={labels.model} className="grid gap-0.5">
-        {catalogue.models.map((candidate) => {
-          const checked = candidate.id === model?.id;
-          return (
-            <button
-              key={candidate.id}
+      {/* Die Modelle untereinander in einem Dropdown, nur mit ihrem Namen; das
+          gewählte trägt das Häkchen und leuchtet grün, sobald ein Schlüssel vorliegt. */}
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${id}-model`}>{labels.model}</Label>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              id={`${id}-model`}
               type="button"
-              role="radio"
-              aria-checked={checked}
-              disabled={pending}
-              onClick={() => {
-                if (!checked) onModelChange(candidate.id);
-              }}
-              className={cn(
-                "flex h-9 items-center justify-between gap-3 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50",
-                checked && "bg-accent font-medium",
-              )}
+              variant="outline"
+              className="w-full justify-between gap-2 font-normal"
+              data-key-provided={Boolean(model) && keyProvided}
+              disabled={pending || catalogue.models.length === 0}
             >
-              <span className="truncate">{candidate.name}</span>
-              {checked && keyProvided ? (
-                <span className="flex shrink-0 items-center gap-1.5 text-xs font-normal text-muted-foreground">
+              <span className="flex min-w-0 items-center gap-2">
+                {model && keyProvided ? (
                   <span aria-hidden="true" className="model-access-light" />
-                  {labels.selected}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+                ) : null}
+                <span className="truncate">{model?.name ?? labels.model}</span>
+              </span>
+              <ChevronDown aria-hidden="true" className="text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={model?.id ?? ""}
+              onValueChange={(value) => {
+                if (value !== model?.id) onModelChange(value);
+              }}
+            >
+              {catalogue.models.map((candidate) => (
+                <DropdownMenuRadioItem value={candidate.id} key={candidate.id}>
+                  <span className="truncate">{candidate.name}</span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid gap-1.5">

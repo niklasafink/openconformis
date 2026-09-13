@@ -164,11 +164,13 @@ describe("analysis run header", () => {
     renderHeader({ status: "completed", stage: "completed", progressPercent: 100 });
 
     fireEvent.click(screen.getByTitle("Modellzugang"));
-    // Ohne Schlüssel ist das Modell nur markiert, noch nicht „Ausgewählt".
+    // Das Dropdown nennt das gewählte Modell; grün wird es erst mit einem Schlüssel.
     const keyInput = await screen.findByLabelText("API-Key");
-    expect(screen.getByRole("radio", { checked: true })).not.toHaveTextContent("Ausgewählt");
+    const modelTrigger = screen.getByLabelText("Modell");
+    expect(modelTrigger).toHaveTextContent("Claude Sonnet 5");
+    expect(modelTrigger).toHaveAttribute("data-key-provided", "false");
     fireEvent.change(keyInput, { target: { value: "sk-or-v1-secret-key" } });
-    expect(screen.getByRole("radio", { checked: true })).toHaveTextContent("Ausgewählt");
+    expect(modelTrigger).toHaveAttribute("data-key-provided", "true");
     // Die Eingabetaste im Schlüsselfeld startet nichts; erst der Klick zählt.
     fireEvent.keyDown(keyInput, { key: "Enter", code: "Enter" });
     expect(fetch).not.toHaveBeenCalled();
