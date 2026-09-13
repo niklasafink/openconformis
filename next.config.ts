@@ -16,8 +16,11 @@ const nextConfig: NextConfig = {
     process.env.APP_ENV === "test" ? `.next-e2e${process.env.E2E_DIST_SUFFIX ?? ""}` : ".next",
   serverExternalPackages: ["@napi-rs/canvas", "tesseract.js"],
   outputFileTracingIncludes: {
-    "/*": [
-      "./assets/samples/**/*",
+    "/*": ["./assets/samples/**/*"],
+    // Parser und OCR laufen nur im Dokument-Workflow, also nur in der Step-Route.
+    // Unter "/*" landeten die ~20 MB in jeder Function jedes aufbewahrten
+    // Deployments und trieben den Functions Storage über 8 GB.
+    "/.well-known/workflow/v1/step": [
       // Der Parser lädt diesen Worker zur Laufzeit über seinen aufgelösten
       // Pfad; ohne ihn im Paket scheitert jedes PDF in der Serverumgebung.
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",

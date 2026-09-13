@@ -5,6 +5,11 @@
   "buildCommand": "pnpm build",
   "regions": ["fra1"],
   "fluid": true,
+  "git": {
+    "deploymentEnabled": {
+      "dependabot/**": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/maintenance",
