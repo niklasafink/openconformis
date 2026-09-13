@@ -65,13 +65,42 @@ function bindingFromRecord(record: {
   };
 }
 
-export async function createTemporaryCredential(input: {
+type CredentialConnectInput = {
   provider: string;
   purpose: string;
   bindingId: string;
   requiredModelId: string;
   secret: string;
-}) {
+};
+
+type SessionUser = Awaited<ReturnType<typeof requireAuthenticatedSessionUser>>;
+
+export async function createTemporaryCredential(input: CredentialConnectInput) {
+  return connectTemporaryCredential(input, async (user, purpose) => {
+    if (purpose !== "analysis") return user.sessionId;
+    const boundDraft = await getBoundActiveDraft(input.bindingId);
+    if (!boundDraft || boundDraft.id !== input.bindingId) {
+      throw new TemporaryCredentialError("BYOK_BINDING_NOT_FOUND");
+    }
+    return boundDraft.id;
+  });
+}
+
+/**
+ * Schlüssel für den Neustart einer Analyse. Den Draft des neuen Laufs legt der
+ * Server selbst an, einen Bindungs-Cookie gibt es dafür nicht. Der Aufrufer muss
+ * das Eigentum an der Ausgangsanalyse vorher geprüft haben.
+ */
+export async function createRerunAnalysisCredential(
+  input: Omit<CredentialConnectInput, "purpose">,
+) {
+  return connectTemporaryCredential({ ...input, purpose: "analysis" }, async () => input.bindingId);
+}
+
+async function connectTemporaryCredential(
+  input: CredentialConnectInput,
+  resolveBindingId: (user: SessionUser, purpose: AiCredentialPurpose) => Promise<string>,
+) {
   const user = await requireAuthenticatedSessionUser();
   const provider = aiRouteProviderSchema.parse(input.provider);
   const purpose = aiCredentialPurposeSchema.parse(input.purpose);
@@ -90,14 +119,7 @@ export async function createTemporaryCredential(input: {
     throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");
   }
 
-  let bindingId = user.sessionId;
-  if (purpose === "analysis") {
-    const boundDraft = await getBoundActiveDraft(input.bindingId);
-    if (!boundDraft || boundDraft.id !== input.bindingId) {
-      throw new TemporaryCredentialError("BYOK_BINDING_NOT_FOUND");
-    }
-    bindingId = boundDraft.id;
-  }
+  const bindingId = await resolveBindingId(user, purpose);
 
   const validation = await validateProviderCredential({
     provider,

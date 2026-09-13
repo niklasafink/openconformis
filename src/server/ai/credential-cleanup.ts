@@ -7,6 +7,31 @@ import { appendAuditEvent } from "@/server/audit/event";
 import { db } from "@/server/db/client";
 import { aiCredentials } from "@/server/db/schema/ai";
 
+/** Löscht einen einzelnen Schlüssel, etwa wenn der Lauf, für den er gedacht war, nicht entsteht. */
+export async function deleteTemporaryCredential(input: {
+  credentialId: string;
+  ownerUserId: string;
+}) {
+  const now = new Date();
+  await db
+    .update(aiCredentials)
+    .set({
+      status: "deleted",
+      encryptedSecret: null,
+      nonce: null,
+      authenticationTag: null,
+      deletedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(aiCredentials.id, input.credentialId),
+        eq(aiCredentials.ownerUserId, input.ownerUserId),
+        inArray(aiCredentials.status, ["active", "expired"]),
+      ),
+    );
+}
+
 export async function deleteTemporaryCredentialsForBinding(input: {
   purpose: AiCredentialPurpose;
   bindingId: string;

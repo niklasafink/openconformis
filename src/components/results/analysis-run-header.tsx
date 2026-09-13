@@ -1,11 +1,12 @@
 "use client";
 
-import { Bell, X } from "lucide-react";
-import Link from "next/link";
+import { Bell, Square, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { createContext, useContext, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 
 import {
   useAnalysisRunState,
@@ -13,6 +14,13 @@ import {
   type AnalysisStage,
   type AnalysisStatus,
 } from "./analysis-run-live";
+import {
+  describeKeyFailure,
+  postJson,
+  ReachabilityLight,
+  type ModelAccessLabels,
+} from "./model-access-panel";
+import { ModelKeyForm } from "./model-key-form";
 
 export type AnalysisRunHeaderLabels = Readonly<{
   status: Record<AnalysisStatus, string>;
@@ -27,11 +35,17 @@ export type AnalysisRunHeaderLabels = Readonly<{
   dismiss: string;
   showNotice: string;
   newAnalysis: string;
+  cancelledNotice: string;
+  stop: string;
+  stopping: string;
+  stopFailed: string;
+  restart: string;
 }>;
 
 type RunNotice = { title: string; message: string };
 
 type AnalysisRunHeaderValue = {
+  analysisId: string;
   state: AnalysisRunState;
   pollingFailed: boolean;
   notice: RunNotice | null;
@@ -39,7 +53,9 @@ type AnalysisRunHeaderValue = {
   dismiss: () => void;
   restore: () => void;
   labels: AnalysisRunHeaderLabels;
-  newAnalysisHref: string;
+  markCancelled: () => void;
+  rerunOpen: boolean;
+  setRerunOpen: (open: boolean) => void;
 };
 
 const AnalysisRunHeaderContext = createContext<AnalysisRunHeaderValue | null>(null);
@@ -71,8 +87,9 @@ function readStoredDismissal(key: string) {
 
 /**
  * Gemeinsamer Laufzustand der Kopfzeile. Fortschritt und Fehlermeldung stehen
- * links neben dem Titel, die Benachrichtigungen rechts — beide lesen denselben
- * Abruf, damit eine weggeklickte Meldung sofort in der Glocke landet.
+ * links neben dem Titel, Stoppen, Neustart und Benachrichtigungen rechts — alle
+ * lesen denselben Abruf, damit eine weggeklickte Meldung sofort in der Glocke
+ * landet und ein gestoppter Lauf überall zugleich als gestoppt erscheint.
  */
 export function AnalysisRunHeaderProvider({
   analysisId,
@@ -80,16 +97,21 @@ export function AnalysisRunHeaderProvider({
   failure,
   initialState,
   labels,
-  newAnalysisHref,
 }: Readonly<{
   analysisId: string;
   children: ReactNode;
   failure: { code: string | null; detail: string | null };
   initialState: AnalysisRunState;
   labels: AnalysisRunHeaderLabels;
-  newAnalysisHref: string;
 }>) {
-  const { state, pollingFailed } = useAnalysisRunState(analysisId, initialState);
+  const { state: polledState, pollingFailed } = useAnalysisRunState(analysisId, initialState);
+  // Nach dem Stoppen sofort als gestoppt zeigen; der nächste Abruf bestätigt es.
+  const [cancelledLocally, setCancelledLocally] = useState(false);
+  const state: AnalysisRunState =
+    cancelledLocally && (polledState.status === "queued" || polledState.status === "running")
+      ? { ...polledState, status: "cancelled" }
+      : polledState;
+  const [rerunOpen, setRerunOpen] = useState(false);
   // Das Wegklicken gilt je Analyse und übersteht ein Neuladen. Die Meldung
   // enthält keine Geheimnisse, nur den Text des Anbieters.
   const storageKey = `openconformis:dismissed-run-notice:${analysisId}`;
@@ -114,16 +136,19 @@ export function AnalysisRunHeaderProvider({
   }
 
   const notice: RunNotice | null =
-    state.status === "failed" || state.status === "cancelled"
-      ? {
-          title: labels.status[state.status],
-          message: failure.detail || failure.code || labels.failureUnknown,
-        }
-      : null;
+    state.status === "cancelled"
+      ? { title: labels.status.cancelled, message: labels.cancelledNotice }
+      : state.status === "failed"
+        ? {
+            title: labels.status.failed,
+            message: failure.detail || failure.code || labels.failureUnknown,
+          }
+        : null;
 
   return (
     <AnalysisRunHeaderContext.Provider
       value={{
+        analysisId,
         state,
         pollingFailed,
         notice,
@@ -131,7 +156,9 @@ export function AnalysisRunHeaderProvider({
         dismiss: () => setDismissed(true),
         restore: () => setDismissed(false),
         labels,
-        newAnalysisHref,
+        markCancelled: () => setCancelledLocally(true),
+        rerunOpen,
+        setRerunOpen,
       }}
     >
       {children}
@@ -144,7 +171,7 @@ export function AnalysisRunHeaderStatus({
   assessed,
   total,
 }: Readonly<{ assessed: number; total: number }>) {
-  const { dismiss, dismissed, labels, newAnalysisHref, notice, pollingFailed, state } =
+  const { dismiss, dismissed, labels, notice, pollingFailed, setRerunOpen, state } =
     useAnalysisRunHeader();
   const assessedTitle = labels.assessedCount
     .replace("{assessed}", String(assessed))
@@ -174,12 +201,13 @@ export function AnalysisRunHeaderStatus({
           <span className="min-w-0 truncate" title={notice.message}>
             {notice.message}
           </span>
-          <Link
-            href={newAnalysisHref}
+          <button
+            type="button"
             className="shrink-0 font-medium text-foreground underline underline-offset-2"
+            onClick={() => setRerunOpen(true)}
           >
             {labels.newAnalysis}
-          </Link>
+          </button>
           <Button
             type="button"
             variant="ghost"
@@ -201,21 +229,178 @@ export function AnalysisRunHeaderStatus({
   );
 }
 
+/** „Analyse stoppen": nur sichtbar, solange der Lauf wartet oder läuft. */
+export function AnalysisStopButton() {
+  const router = useRouter();
+  const { analysisId, labels, markCancelled, state } = useAnalysisRunHeader();
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  if (state.status !== "queued" && state.status !== "running") return null;
+
+  async function stop() {
+    setPending(true);
+    setFailed(false);
+    try {
+      const response = await postJson(`/api/analyses/${analysisId}/cancel`, {});
+      if (!response.ok) throw new Error("ANALYSIS_CANCEL_FAILED");
+      markCancelled();
+      router.refresh();
+    } catch {
+      setFailed(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={pending}
+      aria-invalid={failed || undefined}
+      title={failed ? labels.stopFailed : undefined}
+      onClick={() => void stop()}
+    >
+      <Square aria-hidden="true" className="fill-current" />
+      {pending ? labels.stopping : labels.stop}
+    </Button>
+  );
+}
+
+/**
+ * „Neue Analyse" und API-Key öffnen dasselbe schlichte Feld: Modell und
+ * Schlüssel. Der Start legt einen neuen Lauf mit derselben hinterlegten Datei
+ * und demselben Umfang an; ein noch laufender Lauf wird dabei gestoppt.
+ */
+export function AnalysisRerunControls({
+  catalogue,
+  initialModelProfileId,
+  labels,
+  lastFour,
+  locale,
+}: Readonly<{
+  catalogue: AnalysisModelCatalogue;
+  initialModelProfileId: string;
+  labels: ModelAccessLabels;
+  /** Letzte vier Zeichen des Schlüssels dieses Laufs; `null`, wenn keiner mehr hinterlegt ist. */
+  lastFour: string | null;
+  locale: string;
+}>) {
+  const router = useRouter();
+  const header = useAnalysisRunHeader();
+  const [modelProfileId, setModelProfileId] = useState(
+    catalogue.models.some(({ id }) => id === initialModelProfileId)
+      ? initialModelProfileId
+      : (catalogue.models[0]?.id ?? ""),
+  );
+  const [apiKey, setApiKey] = useState("");
+  const [warningAccepted, setWarningAccepted] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const running = header.state.status === "queued" || header.state.status === "running";
+
+  async function restart() {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await postJson(`/api/analyses/${header.analysisId}/rerun`, {
+        modelProfileId,
+        modelCatalogueVersion: catalogue.version,
+        unevaluatedWarningAccepted: warningAccepted,
+        apiKey: apiKey.trim(),
+      });
+      const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
+        analysisId?: string;
+        code?: string;
+        message?: string;
+      };
+      if (!response.ok || !payload.analysisId) {
+        setError(describeKeyFailure(labels, payload, response.status));
+        return;
+      }
+      setApiKey("");
+      header.setRerunOpen(false);
+      router.push(`/${locale}/analyses/${payload.analysisId}`);
+    } catch {
+      setError(`${labels.keyErrors.NETWORK_ERROR ?? labels.startFailed} (NETWORK_ERROR)`);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Popover open={header.rerunOpen} onOpenChange={header.setRerunOpen}>
+      <PopoverAnchor asChild>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-expanded={header.rerunOpen}
+            onClick={() => header.setRerunOpen(!header.rerunOpen)}
+          >
+            {header.labels.newAnalysis}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title={labels.panelTitle}
+            aria-expanded={header.rerunOpen}
+            onClick={() => header.setRerunOpen(!header.rerunOpen)}
+          >
+            <ReachabilityLight connected={lastFour !== null} />
+            {labels.apiKey}
+          </Button>
+        </div>
+      </PopoverAnchor>
+      <PopoverContent align="end" className="w-80 p-4">
+        <ModelKeyForm
+          apiKey={apiKey}
+          catalogue={catalogue}
+          error={error}
+          keyPlaceholder={lastFour !== null ? `••••${lastFour}` : undefined}
+          labels={labels}
+          modelProfileId={modelProfileId}
+          onApiKeyChange={setApiKey}
+          onModelChange={(id) => {
+            setModelProfileId(id);
+            setWarningAccepted(false);
+            setError(null);
+          }}
+          onSubmit={() => void restart()}
+          onWarningAcceptedChange={setWarningAccepted}
+          pending={pending}
+          submitLabel={running ? header.labels.restart : labels.start}
+          submittingLabel={labels.starting}
+          warningAccepted={warningAccepted}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** Glocke rechts in der Kopfzeile: sammelt Meldungen, auch weggeklickte. */
 export function AnalysisNotificationsButton() {
-  const { dismissed, labels, newAnalysisHref, notice, restore } = useAnalysisRunHeader();
+  const { dismissed, labels, notice, restore, setRerunOpen } = useAnalysisRunHeader();
+  const [open, setOpen] = useState(false);
   const count = notice ? 1 : 0;
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
         <Button
           type="button"
           variant="outline"
           size="icon-sm"
           className="relative"
           aria-label={count ? `${labels.notifications} (${count})` : labels.notifications}
+          aria-expanded={open}
           title={labels.notifications}
+          onClick={() => setOpen(!open)}
         >
           <Bell aria-hidden="true" />
           {count ? (
@@ -224,7 +409,7 @@ export function AnalysisNotificationsButton() {
             </span>
           ) : null}
         </Button>
-      </PopoverTrigger>
+      </PopoverAnchor>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="border-b px-3 py-2 text-sm font-medium">{labels.notifications}</div>
         {notice ? (
@@ -237,8 +422,15 @@ export function AnalysisNotificationsButton() {
                   {labels.showNotice}
                 </Button>
               ) : null}
-              <Button asChild size="sm">
-                <Link href={newAnalysisHref}>{labels.newAnalysis}</Link>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setOpen(false);
+                  setRerunOpen(true);
+                }}
+              >
+                {labels.newAnalysis}
               </Button>
             </div>
           </div>

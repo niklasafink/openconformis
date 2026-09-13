@@ -1,41 +1,22 @@
 "use client";
 
-import { ExternalLink, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import type { ModelSelectionResult } from "@/app/[locale]/(workspace)/analyses/new/results/actions";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
-import { aiProviderPublicDetails } from "@/domain/ai/provider";
 import type { AppLocale } from "@/i18n/routing";
+
+import { ModelKeyForm } from "./model-key-form";
 
 export type ModelAccessLabels = Readonly<{
   panelTitle: string;
   model: string;
-  evaluated: string;
   unevaluated: string;
   unevaluatedWarning: string;
   apiKey: string;
-  keyLink: string;
-  connect: string;
-  connecting: string;
-  connected: string;
-  notConnected: string;
-  unreachable: string;
   keyFailed: string;
   /** Ursache je Fehlercode der Schlüsselverbindung. */
   keyErrors: Readonly<Record<string, string>>;
@@ -43,7 +24,6 @@ export type ModelAccessLabels = Readonly<{
   start: string;
   starting: string;
   startFailed: string;
-  replaceKey: string;
 }>;
 
 /** Aktiver Schlüssel dieses Drafts, so wie ihn der Server beim Rendern kennt. */
@@ -68,9 +48,7 @@ type ModelAccessPanelProps = Readonly<{
   }) => Promise<ModelSelectionResult>;
 }>;
 
-type Reachability = "connected" | "not_connected" | "unreachable";
-
-function postJson(url: string, body: unknown) {
+export function postJson(url: string, body: unknown) {
   return fetch(url, {
     method: "POST",
     credentials: "same-origin",
@@ -79,49 +57,32 @@ function postJson(url: string, body: unknown) {
   });
 }
 
-/** Kleines Statuslicht: grün, sobald der eigene Schlüssel das gewählte Modell trägt. */
-function ReachabilityLight({ state }: { state: Reachability }) {
-  return <span aria-hidden="true" data-reachability={state} className="model-access-light" />;
+/** Fehlermeldung zu einem Code: erst der eigene Text, dann der des Servers. */
+export function describeKeyFailure(
+  labels: Pick<ModelAccessLabels, "keyErrors" | "keyFailed">,
+  payload: { code?: string; message?: string; detail?: string },
+  status: number,
+) {
+  const code = payload.code ?? "CREDENTIAL_CONNECTION_FAILED";
+  const reason = labels.keyErrors[code] ?? payload.message ?? labels.keyFailed;
+  const detail = payload.detail ? `, ${payload.detail}` : "";
+  return `${reason} (${code}, HTTP ${status}${detail})`;
 }
 
-/**
- * Schlüsselstatus einer bereits gestarteten Analyse. Modell und Draft sind
- * eingefroren, deshalb gibt es hier nichts zu wählen oder zu starten — nur die
- * Auskunft, ob der an den Lauf gebundene Schlüssel noch hinterlegt ist.
- */
-export function ModelAccessStatus({
-  lastFour,
-  labels,
-}: Readonly<{
-  /** Letzte vier Zeichen des aktiven Schlüssels; `null`, wenn keiner mehr hinterlegt ist. */
-  lastFour: string | null;
-  labels: Pick<ModelAccessLabels, "panelTitle" | "apiKey" | "connected" | "notConnected">;
-}>) {
-  const reachability: Reachability = lastFour === null ? "not_connected" : "connected";
+/** Kleines Statuslicht: grün, sobald ein bestätigter Schlüssel hinterlegt ist. */
+export function ReachabilityLight({ connected }: { connected: boolean }) {
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
-          <ReachabilityLight state={reachability} />
-          {labels.apiKey}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64">
-        <div className="flex items-center gap-2 text-sm">
-          <ReachabilityLight state={reachability} />
-          <span className="truncate text-muted-foreground">
-            {lastFour === null ? labels.notConnected : `${labels.connected} · ••••${lastFour}`}
-          </span>
-        </div>
-      </PopoverContent>
-    </Popover>
+    <span
+      aria-hidden="true"
+      data-reachability={connected ? "connected" : "not_connected"}
+      className="model-access-light"
+    />
   );
 }
 
 /**
- * Zugangsfeld oben rechts: Statuslicht, Modellwahl und Schlüsseleingabe. Es
- * steht neben dem Ergebnis statt als Dialog davor — das Ergebnis bleibt beim
- * Eintragen des Schlüssels sichtbar, und der Lauf startet von hier aus.
+ * Zugangsfeld oben rechts im Ergebnis vor dem Start: Modell und API-Key. Es
+ * steht neben dem Ergebnis statt als Dialog davor, und der Lauf startet von hier.
  */
 export function ModelAccessPanel({
   catalogue,
@@ -133,43 +94,24 @@ export function ModelAccessPanel({
   selectModelAction,
 }: ModelAccessPanelProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [modelProfileId, setModelProfileId] = useState(initialModelProfileId);
+  const [modelProfileId, setModelProfileId] = useState(
+    catalogue.models.some(({ id }) => id === initialModelProfileId)
+      ? initialModelProfileId
+      : (catalogue.models[0]?.id ?? ""),
+  );
   const [credential, setCredential] = useState(initialCredential);
   const [apiKey, setApiKey] = useState("");
   const [warningAccepted, setWarningAccepted] = useState(false);
-  const [pending, setPending] = useState<"model" | "key" | "start" | null>(null);
-  const [failure, setFailure] = useState<{ message: string; unreachable: boolean } | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const model = catalogue.models.find(({ id }) => id === modelProfileId) ?? catalogue.models[0];
-  const modelsByPublisher = useMemo(() => {
-    const groups = new Map<string, AnalysisModelCatalogue["models"]>();
-    for (const candidate of catalogue.models) {
-      groups.set(candidate.publisher, [...(groups.get(candidate.publisher) ?? []), candidate]);
-    }
-    return [...groups.entries()];
-  }, [catalogue]);
-
+  const model = catalogue.models.find(({ id }) => id === modelProfileId);
   // Grün heißt: für genau dieses Modell liegt ein bestätigter Schlüssel vor.
-  // Ein Schlüssel, den der Anbieter für die gewählte Route nicht akzeptiert,
-  // ist kein Zugang — auch wenn er für ein anderes Modell trägt.
   const connected = Boolean(
     model && credential?.accessibleModelIds.includes(model.providerModelId),
   );
-  const reachability: Reachability = connected
-    ? "connected"
-    : failure?.unreachable
-      ? "unreachable"
-      : "not_connected";
-  const warningRequired = Boolean(model && !model.evaluated && !warningAccepted);
-  const statusText = connected
-    ? `${labels.connected} · ••••${credential?.lastFour ?? ""}`
-    : reachability === "unreachable"
-      ? labels.unreachable
-      : labels.notConnected;
 
   async function saveModel(nextModelProfileId: string, unevaluatedWarningAccepted: boolean) {
-    setPending("model");
     try {
       const result = await selectModelAction({
         draftId,
@@ -177,11 +119,9 @@ export function ModelAccessPanel({
         modelCatalogueVersion: catalogue.version,
         unevaluatedWarningAccepted,
       });
-      if (!result.ok) setFailure({ message: labels.modelFailed, unreachable: false });
+      return result.ok;
     } catch {
-      setFailure({ message: labels.modelFailed, unreachable: false });
-    } finally {
-      setPending(null);
+      return false;
     }
   }
 
@@ -189,205 +129,99 @@ export function ModelAccessPanel({
     const nextModel = catalogue.models.find(({ id }) => id === nextModelProfileId);
     setModelProfileId(nextModelProfileId);
     setWarningAccepted(false);
-    setFailure(null);
-    // Ein ungeprüftes Modell braucht die Bestätigung, bevor der Server es
-    // übernimmt. Gespeichert wird es, sobald das Häkchen gesetzt ist.
-    if (!nextModel || !nextModel.evaluated) return;
-    await saveModel(nextModelProfileId, false);
+    setError(null);
+    // Ein ungeprüftes Modell übernimmt der Server erst mit bestätigtem Hinweis.
+    if (nextModel?.evaluated && !(await saveModel(nextModelProfileId, false))) {
+      setError(labels.modelFailed);
+    }
   }
 
   async function acceptWarning(accepted: boolean) {
     setWarningAccepted(accepted);
-    if (accepted) await saveModel(modelProfileId, true);
+    if (accepted && !(await saveModel(modelProfileId, true))) setError(labels.modelFailed);
   }
 
-  async function connect() {
+  async function connectAndStart() {
     if (!model || pending) return;
-    setPending("key");
-    setFailure(null);
+    setPending(true);
+    setError(null);
     try {
-      const response = await postJson("/api/ai-credentials", {
-        provider: model.routeProvider,
-        purpose: "analysis",
-        bindingId: draftId,
-        requiredModelId: model.providerModelId,
-        apiKey: apiKey.trim(),
-      });
-      // Eine Antwort ohne JSON (etwa eine Plattform-Fehlerseite) ist ein eigener
-      // Fehlerfall und darf nicht als falscher Schlüssel erscheinen.
-      const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
-        credentialId?: string;
-        code?: string;
-        detail?: string;
-      };
-      if (!response.ok || !payload.credentialId) {
-        const code = payload.code ?? "CREDENTIAL_CONNECTION_FAILED";
-        const reason = labels.keyErrors[code] ?? labels.keyFailed;
-        const detail = payload.detail ? `, ${payload.detail}` : "";
-        setFailure({
-          message: `${reason} (${code}, HTTP ${response.status}${detail})`,
-          unreachable: code === "PROVIDER_UNAVAILABLE",
+      let credentialId = connected ? credential?.credentialId : undefined;
+      if (apiKey.trim()) {
+        const response = await postJson("/api/ai-credentials", {
+          provider: model.routeProvider,
+          purpose: "analysis",
+          bindingId: draftId,
+          requiredModelId: model.providerModelId,
+          apiKey: apiKey.trim(),
         });
-        return;
+        // Eine Antwort ohne JSON (etwa eine Plattform-Fehlerseite) ist ein eigener
+        // Fehlerfall und darf nicht als falscher Schlüssel erscheinen.
+        const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
+          credentialId?: string;
+          code?: string;
+          detail?: string;
+        };
+        if (!response.ok || !payload.credentialId) {
+          setError(describeKeyFailure(labels, payload, response.status));
+          return;
+        }
+        credentialId = payload.credentialId;
+        setCredential({
+          credentialId,
+          lastFour: apiKey.trim().slice(-4),
+          accessibleModelIds: [model.providerModelId],
+        });
+        setApiKey("");
       }
-      setCredential({
-        credentialId: payload.credentialId,
-        lastFour: apiKey.trim().slice(-4),
-        accessibleModelIds: [model.providerModelId],
-      });
-      setApiKey("");
-    } catch {
-      setFailure({
-        message: `${labels.keyErrors.NETWORK_ERROR ?? labels.unreachable} (NETWORK_ERROR)`,
-        unreachable: true,
-      });
-    } finally {
-      setPending(null);
-    }
-  }
+      if (!credentialId) return;
 
-  async function start() {
-    if (!credential || pending) return;
-    setPending("start");
-    setFailure(null);
-    try {
-      const response = await postJson("/api/analyses/start", {
-        draftId,
-        credentialId: credential.credentialId,
-      });
-      const analysis = (await response.json()) as {
+      const response = await postJson("/api/analyses/start", { draftId, credentialId });
+      const analysis = (await response.json().catch(() => ({}))) as {
         analysisId?: string;
         message?: string;
         code?: string;
       };
       if (!response.ok || !analysis.analysisId) {
-        // Die Begründung des Servers hat Vorrang: sie benennt den konkreten
-        // Zustand, der lokale Text kennt nur die Fallgruppe.
+        // Die Begründung des Servers hat Vorrang: sie benennt den konkreten Zustand.
         if (analysis.code === "BYOK_CREDENTIAL_INVALID") setCredential(null);
-        setFailure({ message: analysis.message ?? labels.startFailed, unreachable: false });
+        setError(analysis.message ?? labels.startFailed);
         return;
       }
       router.replace(`/${locale}/analyses/${analysis.analysisId}`);
     } catch {
-      setFailure({ message: labels.startFailed, unreachable: false });
+      setError(`${labels.keyErrors.NETWORK_ERROR ?? labels.startFailed} (NETWORK_ERROR)`);
     } finally {
-      setPending(null);
+      setPending(false);
     }
   }
 
-  const provider = model ? aiProviderPublicDetails[model.routeProvider] : undefined;
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
-          <ReachabilityLight state={reachability} />
+          <ReachabilityLight connected={connected} />
           {labels.apiKey}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3">
-        <div className="flex items-center gap-2 text-sm">
-          <ReachabilityLight state={reachability} />
-          <span className="truncate text-muted-foreground">{statusText}</span>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="analysis-model">{labels.model}</Label>
-          <Select
-            value={model?.id ?? ""}
-            onValueChange={changeModel}
-            disabled={pending === "start"}
-          >
-            <SelectTrigger id="analysis-model" size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              {modelsByPublisher.map(([publisher, models]) => (
-                <SelectGroup key={publisher}>
-                  <SelectLabel>{publisher}</SelectLabel>
-                  {models.map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.name} ·{" "}
-                      {candidate.evaluated ? labels.evaluated : labels.unevaluated}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {model && !model.evaluated ? (
-          <Label className="flex items-start gap-2 text-xs leading-snug font-normal text-muted-foreground">
-            <Checkbox
-              checked={warningAccepted}
-              onCheckedChange={(checked) => acceptWarning(checked === true)}
-            />
-            <span>{labels.unevaluatedWarning}</span>
-          </Label>
-        ) : null}
-
-        <form
-          className="space-y-1.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void connect();
-          }}
-        >
-          <Label htmlFor="analysis-api-key">
-            {provider?.label} {labels.apiKey}
-          </Label>
-          <Input
-            id="analysis-api-key"
-            type="password"
-            required
-            minLength={8}
-            maxLength={20_000}
-            autoComplete="off"
-            className="h-8"
-            placeholder={connected ? labels.replaceKey : undefined}
-            disabled={Boolean(pending) || warningRequired}
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-          />
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <a
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              href={provider?.credentialHelpUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {labels.keyLink}
-              <ExternalLink size={12} aria-hidden="true" />
-            </a>
-            <Button type="submit" variant="outline" size="sm" disabled={Boolean(pending)}>
-              {pending === "key" ? labels.connecting : labels.connect}
-            </Button>
-          </div>
-        </form>
-
-        {failure ? (
-          <p className="text-xs text-destructive" role="alert">
-            {failure.message}
-          </p>
-        ) : null}
-
-        <Button
-          type="button"
-          size="sm"
-          className="w-full"
-          disabled={!connected || Boolean(pending) || warningRequired}
-          onClick={() => void start()}
-        >
-          {pending === "start" ? (
-            <>
-              <LoaderCircle size={14} aria-hidden="true" className="animate-spin" />
-              {labels.starting}
-            </>
-          ) : (
-            labels.start
-          )}
-        </Button>
+      <PopoverContent align="end" className="w-80 p-4">
+        <ModelKeyForm
+          apiKey={apiKey}
+          catalogue={catalogue}
+          error={error}
+          keyOptional={connected}
+          keyPlaceholder={connected ? `••••${credential?.lastFour ?? ""}` : undefined}
+          labels={labels}
+          modelProfileId={modelProfileId}
+          onApiKeyChange={setApiKey}
+          onModelChange={(id) => void changeModel(id)}
+          onSubmit={() => void connectAndStart()}
+          onWarningAcceptedChange={(accepted) => void acceptWarning(accepted)}
+          pending={pending}
+          submitLabel={labels.start}
+          submittingLabel={labels.starting}
+          warningAccepted={warningAccepted}
+        />
       </PopoverContent>
     </Popover>
   );

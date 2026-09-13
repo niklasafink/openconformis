@@ -73,11 +73,18 @@ export async function analysisWorkflow(analysisId: string) {
   try {
     const { workflowRunId } = getWorkflowMetadata();
     const prepared = await prepareAnalysisStep(analysisId, workflowRunId);
-    if (prepared.status === "completed" || prepared.status === "duplicate") return prepared;
+    if (prepared.status !== "running") return prepared;
     for (let index = 0; index < prepared.scopeItemIds.length; index += 1) {
       const scopeItemId = prepared.scopeItemIds[index];
       if (!scopeItemId) continue;
-      await analyzeRequirementStep(analysisId, scopeItemId, index, prepared.scopeItemIds.length);
+      const step = await analyzeRequirementStep(
+        analysisId,
+        scopeItemId,
+        index,
+        prepared.scopeItemIds.length,
+      );
+      // Gestoppt: keine weiteren Anforderungen bewerten, nichts als Fehler melden.
+      if (step.status === "cancelled") return step;
     }
     return await finalizeAnalysisStep(analysisId);
   } catch (error) {

@@ -670,6 +670,11 @@ export async function prepareAnalysisExecution(analysisId: string, workflowRunId
     await deleteAnalysisCredential(analysis);
     return { analysisId: analysis.id, status: "completed" as const, scopeItemIds: [] };
   }
+  // Vom Nutzer gestoppt: kein Fehler, der Lauf endet still.
+  if (analysis.status === "cancelled") {
+    await deleteAnalysisCredential(analysis);
+    return { analysisId: analysis.id, status: "cancelled" as const, scopeItemIds: [] };
+  }
   if (analysis.status !== "queued" && analysis.status !== "running") {
     throw new Error("ANALYSIS_NOT_EXECUTABLE");
   }
@@ -697,6 +702,7 @@ export async function executeAnalysisScopeItem(input: {
 }) {
   const analysis = await loadAnalysis(input.analysisId);
   if (analysis.status === "completed") return { status: "completed" as const };
+  if (analysis.status === "cancelled") return { status: "cancelled" as const };
   if (analysis.status !== "running") throw new Error("ANALYSIS_NOT_RUNNING");
   const item = await loadAnalysisItem(analysis.id, input.scopeItemId);
 
@@ -741,6 +747,7 @@ export async function finalizeAnalysisExecution(analysisId: string) {
     await deleteAnalysisCredential(analysis);
     return { analysisId, status: "completed" as const };
   }
+  if (analysis.status === "cancelled") return { analysisId, status: "cancelled" as const };
   if (analysis.status !== "running") throw new Error("ANALYSIS_NOT_RUNNING");
 
   await db.transaction(async (transaction) => {

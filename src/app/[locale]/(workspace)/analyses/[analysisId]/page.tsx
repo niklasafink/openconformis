@@ -4,16 +4,18 @@ import { notFound, redirect } from "next/navigation";
 
 import {
   AnalysisNotificationsButton,
+  AnalysisRerunControls,
   AnalysisRunHeaderProvider,
   AnalysisRunHeaderStatus,
+  AnalysisStopButton,
 } from "@/components/results/analysis-run-header";
 import { AnalysisRunLive } from "@/components/results/analysis-run-live";
 import { AnalysisResultsWorkspace } from "@/components/results/analysis-results-workspace";
-import { ModelAccessStatus } from "@/components/results/model-access-panel";
 import { loadAnalysisResultLabels } from "@/components/results/result-labels";
 import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
+import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
 import {
   getOwnedAnalysisResultWorkspace,
@@ -49,18 +51,19 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
   const analysis = await getOwnedAnalysisStatus({ analysisId, ownerUserId: user.id });
   if (!analysis) notFound();
 
-  const [navigation, t, access, resultLabels, results, credentials] = await Promise.all([
+  const [navigation, t, access, resultLabels, results, credentials, catalogue] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("AnalysisRun"),
     getTranslations("ResultsPreview"),
     loadAnalysisResultLabels(),
     getOwnedAnalysisResultWorkspace({ analysisId, ownerUserId: user.id }),
     listActiveTemporaryCredentials("analysis").catch(() => []),
+    getAnalysisModelCatalogue(),
   ]);
   // Grün, solange der an diesen Lauf gebundene Schlüssel noch hinterlegt ist.
-  const boundCredential = analysis.sourceDraftId
-    ? credentials.find((credential) => credential.bindingId === analysis.sourceDraftId)
-    : undefined;
+  const boundCredential = credentials.find(
+    (credential) => credential.bindingId === analysis.sourceDraftId,
+  );
   const sameOrganization = principal?.organizationId === results?.organizationId;
   // Ohne Original — gelöscht nach Aufbewahrungsfrist — bleibt nur der
   // ausgelesene Text; der Umschalter entfällt dann.
@@ -110,6 +113,11 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     dismiss: t("dismiss"),
     showNotice: t("showNotice"),
     newAnalysis: t("newAnalysis"),
+    cancelledNotice: t("cancelledNotice"),
+    stop: t("stop"),
+    stopping: t("stopping"),
+    stopFailed: t("stopFailed"),
+    restart: t("restart"),
   };
 
   return (
@@ -123,7 +131,6 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
           progressPercent: analysis.progressPercent,
         }}
         labels={runHeaderLabels}
-        newAnalysisHref={`/${locale}/analyses/new/framework`}
       >
         <PageHeader
           title={navigation("results")}
@@ -137,16 +144,27 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
           }
           actions={
             <>
-              <AnalysisNotificationsButton />
-              <ModelAccessStatus
+              <AnalysisStopButton />
+              <AnalysisRerunControls
+                catalogue={catalogue}
+                initialModelProfileId={analysis.modelProfileId}
                 lastFour={boundCredential ? (boundCredential.lastFour ?? "") : null}
+                locale={locale}
                 labels={{
                   panelTitle: access("panelTitle"),
+                  model: access("model"),
+                  unevaluated: access("unevaluated"),
+                  unevaluatedWarning: access("unevaluatedWarning"),
                   apiKey: access("apiKey"),
-                  connected: access("connected"),
-                  notConnected: access("notConnected"),
+                  keyFailed: access("keyFailed"),
+                  keyErrors: access.raw("keyErrors") as Record<string, string>,
+                  modelFailed: access("modelFailed"),
+                  start: access("start"),
+                  starting: access("starting"),
+                  startFailed: access("startFailed"),
                 }}
               />
+              <AnalysisNotificationsButton />
               <LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />
             </>
           }

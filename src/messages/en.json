@@ -203,12 +203,6 @@
     "unevaluated": "not evaluated",
     "unevaluatedWarning": "This model is not evaluated. Results may be unreliable.",
     "apiKey": "API key",
-    "keyLink": "Create an API key",
-    "connect": "Connect",
-    "connecting": "Checking …",
-    "connected": "Connected",
-    "notConnected": "No key connected",
-    "unreachable": "Provider unreachable",
     "keyFailed": "The key or model access could not be confirmed.",
     "keyErrors": {
       "UNTRUSTED_ORIGIN": "Request from an untrusted address: NEXT_PUBLIC_APP_URL does not match the domain in use.",
@@ -238,8 +232,7 @@
     "modelFailed": "The model could not be applied.",
     "start": "Start analysis",
     "starting": "Starting analysis …",
-    "startFailed": "The analysis could not be started. Please try again.",
-    "replaceKey": "Enter a new key"
+    "startFailed": "The analysis could not be started. Please try again."
   },
   "AnalysisRun": {
     "title": "Analysis of your policy",
@@ -327,7 +320,12 @@
     "noNotifications": "No notifications",
     "dismiss": "Dismiss message",
     "showNotice": "Show again",
-    "newAnalysis": "New analysis"
+    "newAnalysis": "New analysis",
+    "cancelledNotice": "The analysis was stopped.",
+    "stop": "Stop analysis",
+    "stopping": "Stopping …",
+    "stopFailed": "The analysis could not be stopped. Please try again.",
+    "restart": "Restart analysis"
   },
   "Auth": {
     "signInTitle": "Log in",

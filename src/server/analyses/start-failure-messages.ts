@@ -37,6 +37,10 @@ const startFailureMessages: Record<string, string> = {
     "Ihr Arbeitsbereich konnte nicht ermittelt werden. Melden Sie sich erneut an.",
   UNTRUSTED_ORIGIN: "Die Anfrage kam von einer nicht vertrauenswürdigen Adresse.",
   INVALID_ANALYSIS_START: "Die Anfrage war unvollständig. Bitte laden Sie die Seite neu.",
+  ANALYSIS_NOT_FOUND: "Die Analyse wurde nicht gefunden. Bitte laden Sie die Seite neu.",
+  UNEVALUATED_MODEL_WARNING_REQUIRED:
+    "Das gewählte Modell ist nicht evaluiert. Bestätigen Sie den Warnhinweis, bevor Sie starten.",
+  RATE_LIMITED: "Zu viele Starts in kurzer Zeit. Bitte versuchen Sie es später erneut.",
   ANALYSIS_START_FAILED:
     "Der Start ist an einem unerwarteten Fehler gescheitert. Die Einzelheiten stehen im Serverprotokoll.",
 };

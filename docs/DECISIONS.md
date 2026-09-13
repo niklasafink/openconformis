@@ -412,3 +412,27 @@ account; the application no longer enforces or claims it.
 
 Decision: accepted. Amends the AI-routing privacy enforcement described in D-025;
 the hosted topology's own database/storage region (D-016) is unaffected.
+
+## D-027 Restart and stop an analysis from its result
+
+Product direction (2026-09-13): "Neue Analyse" on a result no longer sends the user
+back to framework selection. It opens the same compact field as the API-key button —
+only model and API key — and starts a new run with the same stored policy version,
+the frozen scope snapshot and the company context of the source run. A running run
+can be stopped from the header ("Analyse stoppen").
+
+Implementation: `POST /api/analyses/[analysisId]/rerun` validates the key first, then
+stops the source run if it is still queued or running, and creates a new analysis
+with its own server-created, already-claimed draft row. Each run keeps its own draft
+because `analyses.source_draft_id` is unique and credentials are bound to that draft;
+the draft is never reachable through a binding cookie. Scope items are copied from
+the source run's snapshot, not from the current catalogue. A repeated request while a
+later run of the same policy is still open reuses that run instead of creating a second
+one. `POST /api/analyses/[analysisId]/cancel` sets the run to `cancelled`, deletes its
+key and cancels the workflow run; workflow steps end quietly on `cancelled`.
+
+Consequences: the source run stays unchanged as its own record. Model, route and
+instruction versions are frozen per run as before; a restart is a new run, not a
+change to the old one. No migration is required.
+
+Decision: accepted.

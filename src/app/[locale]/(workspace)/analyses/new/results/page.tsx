@@ -158,23 +158,15 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
               labels={{
                 panelTitle: t("panelTitle"),
                 model: t("model"),
-                evaluated: t("evaluated"),
                 unevaluated: t("unevaluated"),
                 unevaluatedWarning: t("unevaluatedWarning"),
                 apiKey: t("apiKey"),
-                keyLink: t("keyLink"),
-                connect: t("connect"),
-                connecting: t("connecting"),
-                connected: t("connected"),
-                notConnected: t("notConnected"),
-                unreachable: t("unreachable"),
                 keyFailed: t("keyFailed"),
                 keyErrors: t.raw("keyErrors") as Record<string, string>,
                 modelFailed: t("modelFailed"),
                 start: t("start"),
                 starting: t("starting"),
                 startFailed: t("startFailed"),
-                replaceKey: t("replaceKey"),
               }}
             />
             <LanguageMenu locale={locale} pathname="/analyses/new/results" />

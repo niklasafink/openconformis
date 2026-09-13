@@ -96,13 +96,11 @@ test.describe("authenticated analysis setup", () => {
     await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    // Ohne verbundenen Schlüssel meldet das Zugangsfeld rot und die Analyse
-    // lässt sich nicht starten.
-    // Der Knopf trägt den Modellnamen; stabil ansprechbar ist er über den Titel.
+    // Das Zugangsfeld zeigt nur Modell und API-Key; ohne Schlüssel lässt sich
+    // die Analyse nicht starten.
     const accessPanel = page.getByTitle("Modellzugang");
     await expect(accessPanel).toBeVisible();
     await accessPanel.click();
-    await expect(page.getByText("Kein Schlüssel hinterlegt")).toBeVisible();
     await expect(page.getByLabel(/API-Key$/u)).toBeVisible();
     await expect(page.getByRole("button", { name: "Analyse starten" })).toBeDisabled();
     await expect(page.getByRole("combobox")).toBeVisible();
