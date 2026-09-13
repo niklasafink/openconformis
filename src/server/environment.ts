@@ -8,6 +8,11 @@ function unquote(value: string) {
     .trim();
 }
 
+/** Einzelner Umgebungswert ohne Leerraum und mitkopierte Anführungszeichen. */
+export function configuredValue(name: string) {
+  return unquote(process.env[name] ?? "");
+}
+
 /**
  * Kommagetrennte Umgebungsliste als Menge; Leerraum, umschließende
  * Anführungszeichen und leere Einträge zählen nicht.

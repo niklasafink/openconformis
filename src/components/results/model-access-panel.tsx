@@ -37,14 +37,13 @@ export type ModelAccessLabels = Readonly<{
   notConnected: string;
   unreachable: string;
   keyFailed: string;
-  modelNotAccessible: string;
-  routeBlocked: string;
+  /** Ursache je Fehlercode der Schlüsselverbindung. */
+  keyErrors: Readonly<Record<string, string>>;
   modelFailed: string;
   start: string;
   starting: string;
   startFailed: string;
   replaceKey: string;
-  hint: string;
 }>;
 
 /** Aktiver Schlüssel dieses Drafts, so wie ihn der Server beim Rendern kennt. */
@@ -180,19 +179,21 @@ export function ModelAccessPanel({
         requiredModelId: model.providerModelId,
         apiKey: apiKey.trim(),
       });
-      const payload = (await response.json()) as { credentialId?: string; code?: string };
+      // Eine Antwort ohne JSON (etwa eine Plattform-Fehlerseite) ist ein eigener
+      // Fehlerfall und darf nicht als falscher Schlüssel erscheinen.
+      const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
+        credentialId?: string;
+        code?: string;
+        detail?: string;
+      };
       if (!response.ok || !payload.credentialId) {
-        const unreachable = response.status === 503 || payload.code === "PROVIDER_UNAVAILABLE";
-        // Ein gesperrter Anbieter oder ein nicht freigegebenes Modell ist kein
-        // falscher Schlüssel; die Meldung benennt den tatsächlichen Grund.
-        const message = unreachable
-          ? labels.unreachable
-          : response.status === 409
-            ? labels.routeBlocked
-            : payload.code === "MODEL_NOT_ACCESSIBLE"
-              ? labels.modelNotAccessible
-              : labels.keyFailed;
-        setFailure({ message, unreachable });
+        const code = payload.code ?? "CREDENTIAL_CONNECTION_FAILED";
+        const reason = labels.keyErrors[code] ?? labels.keyFailed;
+        const detail = payload.detail ? `, ${payload.detail}` : "";
+        setFailure({
+          message: `${reason} (${code}, HTTP ${response.status}${detail})`,
+          unreachable: code === "PROVIDER_UNAVAILABLE",
+        });
         return;
       }
       setCredential({
@@ -202,7 +203,10 @@ export function ModelAccessPanel({
       });
       setApiKey("");
     } catch {
-      setFailure({ message: labels.unreachable, unreachable: true });
+      setFailure({
+        message: `${labels.keyErrors.NETWORK_ERROR ?? labels.unreachable} (NETWORK_ERROR)`,
+        unreachable: true,
+      });
     } finally {
       setPending(null);
     }
@@ -350,8 +354,6 @@ export function ModelAccessPanel({
             labels.start
           )}
         </Button>
-
-        <p className="text-xs leading-snug text-muted-foreground">{labels.hint}</p>
       </PopoverContent>
     </Popover>
   );

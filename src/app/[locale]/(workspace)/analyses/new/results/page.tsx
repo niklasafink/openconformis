@@ -168,14 +168,12 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
                 notConnected: t("notConnected"),
                 unreachable: t("unreachable"),
                 keyFailed: t("keyFailed"),
-                modelNotAccessible: t("modelNotAccessible"),
-                routeBlocked: t("routeBlocked"),
+                keyErrors: t.raw("keyErrors") as Record<string, string>,
                 modelFailed: t("modelFailed"),
                 start: t("start"),
                 starting: t("starting"),
                 startFailed: t("startFailed"),
                 replaceKey: t("replaceKey"),
-                hint: t("hint"),
               }}
             />
             <LanguageMenu locale={locale} pathname="/analyses/new/results" />

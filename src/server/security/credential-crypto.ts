@@ -3,6 +3,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 import type { AiCredentialPurpose, AiRouteProvider } from "@/domain/ai/provider";
+import { configuredValue } from "@/server/environment";
 
 const algorithm = "aes-256-gcm";
 const nonceBytes = 12;
@@ -51,8 +52,10 @@ function associatedData(binding: CredentialBinding) {
 }
 
 export function activeCredentialEncryptionConfiguration() {
-  const encodedKey = process.env.BYOK_ENCRYPTION_KEY?.trim();
-  const keyVersion = Number.parseInt(process.env.BYOK_ENCRYPTION_KEY_VERSION?.trim() ?? "", 10);
+  // Mitkopierte Anführungszeichen („"1"") ließen parseInt NaN liefern und
+  // sperrten jede Schlüsselverbindung mit einem stummen Serverfehler.
+  const encodedKey = configuredValue("BYOK_ENCRYPTION_KEY");
+  const keyVersion = Number.parseInt(configuredValue("BYOK_ENCRYPTION_KEY_VERSION"), 10);
   if (!encodedKey || !Number.isSafeInteger(keyVersion) || keyVersion < 1) {
     throw new Error("BYOK_ENCRYPTION_NOT_CONFIGURED");
   }

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { configuredSet } from "./environment";
+import { configuredSet, configuredValue } from "./environment";
 
 describe("configured environment lists", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -12,5 +12,11 @@ describe("configured environment lists", () => {
     expect(configuredSet("TEST_CONFIGURED_LIST")).toEqual(
       new Set(["openrouter", "requesty", "openai"]),
     );
+  });
+
+  it("reads single values without pasted quotes", () => {
+    vi.stubEnv("TEST_CONFIGURED_VALUE", ' "1" ');
+    expect(Number.parseInt(configuredValue("TEST_CONFIGURED_VALUE"), 10)).toBe(1);
+    expect(configuredValue("TEST_CONFIGURED_MISSING")).toBe("");
   });
 });

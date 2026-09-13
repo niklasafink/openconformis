@@ -8,6 +8,7 @@ import {
 } from "@/server/security/request-protection";
 
 import { CredentialValidationError } from "@/server/ai/credential-validation";
+import { ModelProviderError } from "@/server/ai/structured-model";
 import {
   createTemporaryCredential,
   listActiveTemporaryCredentials,
@@ -71,7 +72,38 @@ function errorResponse(error: unknown) {
     ]).get(error.code);
     return NextResponse.json({ code: error.code }, { status: status ?? 500 });
   }
-  return NextResponse.json({ code: "CREDENTIAL_CONNECTION_FAILED" }, { status: 500 });
+  if (error instanceof ModelProviderError) {
+    console.error("[ai-credentials] provider route failed", error.code);
+    return NextResponse.json({ code: error.code }, { status: 503 });
+  }
+  if (error instanceof Error && serverConfigurationCodes.has(error.message)) {
+    console.error("[ai-credentials] server configuration invalid", error.message);
+    return NextResponse.json({ code: error.message }, { status: 503 });
+  }
+  // Unbekannte Fehler behalten Fehlertyp und Datenbank-Code als Ursache.
+  // Die Fehlermeldung selbst bleibt draußen: sie kann Abfrageparameter enthalten.
+  const name = error instanceof Error ? error.name : typeof error;
+  const databaseCode = databaseErrorCode(error);
+  const code =
+    databaseCode || /drizzle|postgres|neon/iu.test(name)
+      ? "CREDENTIAL_STORAGE_FAILED"
+      : "CREDENTIAL_CONNECTION_FAILED";
+  const detail = [name, databaseCode].filter(Boolean).join(" ");
+  console.error("[ai-credentials] connection failed", code, detail);
+  return NextResponse.json({ code, detail }, { status: 500 });
+}
+
+const serverConfigurationCodes = new Set([
+  "BYOK_ENCRYPTION_NOT_CONFIGURED",
+  "BYOK_ENCRYPTION_KEY_INVALID",
+  "BYOK_KEY_VERSION_INVALID",
+  "BYOK_SECRET_INVALID",
+]);
+
+function databaseErrorCode(error: unknown) {
+  const candidate = error as { code?: unknown; cause?: { code?: unknown } } | null;
+  const code = candidate?.cause?.code ?? candidate?.code;
+  return typeof code === "string" && /^[0-9A-Z]{5}$/u.test(code) ? code : undefined;
 }
 
 export async function POST(request: Request) {
