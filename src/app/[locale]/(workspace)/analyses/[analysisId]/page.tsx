@@ -4,10 +4,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { AnalysisRunLive } from "@/components/results/analysis-run-live";
 import { AnalysisResultsWorkspace } from "@/components/results/analysis-results-workspace";
+import { ModelAccessStatus } from "@/components/results/model-access-panel";
 import { loadAnalysisResultLabels } from "@/components/results/result-labels";
 import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
+import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
 import {
   getOwnedAnalysisResultWorkspace,
   getOwnedAnalysisStatus,
@@ -42,12 +44,18 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
   const analysis = await getOwnedAnalysisStatus({ analysisId, ownerUserId: user.id });
   if (!analysis) notFound();
 
-  const [navigation, t, resultLabels, results] = await Promise.all([
+  const [navigation, t, access, resultLabels, results, credentials] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("AnalysisRun"),
+    getTranslations("ResultsPreview"),
     loadAnalysisResultLabels(),
     getOwnedAnalysisResultWorkspace({ analysisId, ownerUserId: user.id }),
+    listActiveTemporaryCredentials("analysis").catch(() => []),
   ]);
+  // Grün, solange der an diesen Lauf gebundene Schlüssel noch hinterlegt ist.
+  const boundCredential = analysis.sourceDraftId
+    ? credentials.find((credential) => credential.bindingId === analysis.sourceDraftId)
+    : undefined;
   const sameOrganization = principal?.organizationId === results?.organizationId;
   // Ohne Original — gelöscht nach Aufbewahrungsfrist — bleibt nur der
   // ausgelesene Text; der Umschalter entfällt dann.
@@ -89,11 +97,49 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     },
   };
 
+  const assessedLabel = results
+    ? resultLabels.pending.assessedCount
+        .replace("{assessed}", String(results.items.filter(({ pending }) => !pending).length))
+        .replace("{total}", String(results.items.length))
+    : undefined;
+
   return (
     <>
       <PageHeader
         title={navigation("results")}
-        actions={<LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />}
+        status={
+          running && results ? (
+            <AnalysisRunLive
+              analysisId={analysis.id}
+              compact
+              assessedLabel={assessedLabel}
+              frameworkSlug={analysis.frameworkSlug}
+              requirementCount={analysis.requirementCount}
+              failure={{ code: analysis.failureCode, detail: analysis.failureDetail }}
+              createdAtLabel={createdAtLabel}
+              initialState={{
+                status: analysis.status,
+                stage: analysis.stage,
+                progressPercent: analysis.progressPercent,
+              }}
+              labels={liveLabels}
+            />
+          ) : null
+        }
+        actions={
+          <>
+            <ModelAccessStatus
+              lastFour={boundCredential ? (boundCredential.lastFour ?? "") : null}
+              labels={{
+                panelTitle: access("panelTitle"),
+                apiKey: access("apiKey"),
+                connected: access("connected"),
+                notConnected: access("notConnected"),
+              }}
+            />
+            <LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />
+          </>
+        }
       />
       <div className="workspace-content min-w-0">
         {results ? (
@@ -102,7 +148,6 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
             canConfirm={Boolean(principal && sameOrganization && canConfirmAssessment(principal))}
             canOverride={Boolean(principal && sameOrganization && canOverrideAssessment(principal))}
             initialSelectedId={query.requirement}
-            frameworkSlug={results.frameworkSlug}
             policyName={results.policyName}
             organizationContext={results.organizationContext}
             items={results.items}
@@ -110,24 +155,6 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
             documentBlocks={results.documentBlocks}
             original={
               originalKind ? { policyVersionId: results.policyVersionId, kind: originalKind } : null
-            }
-            banner={
-              running ? (
-                <AnalysisRunLive
-                  analysisId={analysis.id}
-                  compact
-                  frameworkSlug={analysis.frameworkSlug}
-                  requirementCount={analysis.requirementCount}
-                  failure={{ code: analysis.failureCode, detail: analysis.failureDetail }}
-                  createdAtLabel={createdAtLabel}
-                  initialState={{
-                    status: analysis.status,
-                    stage: analysis.stage,
-                    progressPercent: analysis.progressPercent,
-                  }}
-                  labels={liveLabels}
-                />
-              ) : null
             }
           />
         ) : (

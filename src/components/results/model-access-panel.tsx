@@ -85,6 +85,40 @@ function ReachabilityLight({ state }: { state: Reachability }) {
 }
 
 /**
+ * Schlüsselstatus einer bereits gestarteten Analyse. Modell und Draft sind
+ * eingefroren, deshalb gibt es hier nichts zu wählen oder zu starten — nur die
+ * Auskunft, ob der an den Lauf gebundene Schlüssel noch hinterlegt ist.
+ */
+export function ModelAccessStatus({
+  lastFour,
+  labels,
+}: Readonly<{
+  /** Letzte vier Zeichen des aktiven Schlüssels; `null`, wenn keiner mehr hinterlegt ist. */
+  lastFour: string | null;
+  labels: Pick<ModelAccessLabels, "panelTitle" | "apiKey" | "connected" | "notConnected">;
+}>) {
+  const reachability: Reachability = lastFour === null ? "not_connected" : "connected";
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
+          <ReachabilityLight state={reachability} />
+          {labels.apiKey}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64">
+        <div className="flex items-center gap-2 text-sm">
+          <ReachabilityLight state={reachability} />
+          <span className="truncate text-muted-foreground">
+            {lastFour === null ? labels.notConnected : `${labels.connected} · ••••${lastFour}`}
+          </span>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
  * Zugangsfeld oben rechts: Statuslicht, Modellwahl und Schlüsseleingabe. Es
  * steht neben dem Ergebnis statt als Dialog davor — das Ergebnis bleibt beim
  * Eintragen des Schlüssels sichtbar, und der Lauf startet von hier aus.
@@ -246,9 +280,9 @@ export function ModelAccessPanel({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="max-w-56 gap-2" title={labels.panelTitle}>
+        <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
           <ReachabilityLight state={reachability} />
-          <span className="truncate">{model?.name ?? labels.panelTitle}</span>
+          {labels.apiKey}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">

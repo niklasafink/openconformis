@@ -96,7 +96,6 @@ describe("analysis result confirmation UI", () => {
         analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
         canConfirm
         canOverride={false}
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[item]}
@@ -121,7 +120,6 @@ describe("analysis result confirmation UI", () => {
         analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
         canConfirm={false}
         canOverride={false}
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[item]}
@@ -153,7 +151,6 @@ describe("analysis result confirmation UI", () => {
         analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
         canConfirm={false}
         canOverride
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[item]}
@@ -204,7 +201,6 @@ describe("analysis result confirmation UI", () => {
         analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
         canConfirm={false}
         canOverride={false}
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[
@@ -266,7 +262,6 @@ describe("requirements without an assessment", () => {
         analysisId="preview"
         canConfirm
         canOverride
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[pendingItem]}
@@ -276,7 +271,6 @@ describe("requirements without an assessment", () => {
     );
 
     expect(screen.getAllByText("Noch nicht bewertet").length).toBeGreaterThan(0);
-    expect(screen.getByText("0 von 1 bewertet")).toBeInTheDocument();
     expect(
       screen.getByText("Diese Anforderung wartet auf die Bewertung durch das Modell."),
     ).toBeInTheDocument();
@@ -298,7 +292,6 @@ describe("requirements without an assessment", () => {
         analysisId="preview"
         canConfirm={false}
         canOverride={false}
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[pendingItem]}
@@ -345,7 +338,6 @@ describe("live results during a run", () => {
         analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
         canConfirm={false}
         canOverride={false}
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[pending]}
@@ -354,7 +346,7 @@ describe("live results during a run", () => {
       />,
     );
 
-    expect(screen.getByText("0 von 1 bewertet")).toBeInTheDocument();
+    expect(screen.getAllByText("Noch nicht bewertet").length).toBeGreaterThan(0);
 
     // Der Server liefert dieselbe Anforderung bewertet nach — ohne Neuladen.
     view.rerender(
@@ -362,7 +354,6 @@ describe("live results during a run", () => {
         analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
         canConfirm={false}
         canOverride={false}
-        frameworkSlug="dora"
         policyName="IKT-Sicherheitsrichtlinie.docx"
         organizationContext=""
         items={[{ ...item, id: "result-1" }]}
@@ -371,7 +362,7 @@ describe("live results during a run", () => {
       />,
     );
 
-    expect(screen.queryByText("0 von 1 bewertet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Noch nicht bewertet")).not.toBeInTheDocument();
     expect(screen.getByText("Die laufende Überwachung ist nicht belegt.")).toBeInTheDocument();
     expect(screen.getAllByText("Teilweise erfüllt").length).toBeGreaterThan(0);
   });

@@ -114,7 +114,6 @@ type AnalysisResultsWorkspaceProps = {
   canConfirm: boolean;
   canOverride: boolean;
   initialSelectedId?: string;
-  frameworkSlug: string;
   policyName: string;
   organizationContext: string;
   items: ResultItem[];
@@ -126,8 +125,6 @@ type AnalysisResultsWorkspaceProps = {
   documentBlocks?: DocumentBlock[];
   /** Die hochgeladene Datei selbst, für die Originalansicht neben dem Text. */
   original?: PolicyOriginal | null;
-  /** Leiste über dem Ergebnis, solange der Lauf noch arbeitet. */
-  banner?: React.ReactNode;
 };
 
 export type Citation = {
@@ -171,14 +168,12 @@ export function AnalysisResultsWorkspace({
   canConfirm,
   canOverride,
   initialSelectedId,
-  frameworkSlug,
   policyName,
   organizationContext,
   items,
   labels,
   documentBlocks: providedDocumentBlocks,
   original = null,
-  banner,
 }: AnalysisResultsWorkspaceProps) {
   const initialId = items.some(({ id }) => id === initialSelectedId)
     ? initialSelectedId
@@ -268,9 +263,6 @@ export function AnalysisResultsWorkspace({
   const confirmedCount = Object.values(confirmedById).filter(Boolean).length;
   const confirmationCountLabel = labels.confirmedCount
     .replace("{confirmed}", String(confirmedCount))
-    .replace("{total}", String(reviewItems.length));
-  const assessedCountLabel = labels.pending.assessedCount
-    .replace("{assessed}", String(reviewItems.length - pendingCount))
     .replace("{total}", String(reviewItems.length));
   const selectedIsConfirmed = confirmedById[selected.id] ?? false;
 
@@ -366,14 +358,6 @@ export function AnalysisResultsWorkspace({
 
   return (
     <div className="result-workspace">
-      {banner}
-      <header className="result-heading">
-        <div>
-          <span>{frameworkSlug.toUpperCase()}</span>
-          <h1>{policyName}</h1>
-        </div>
-      </header>
-
       <div className="result-summary" aria-label={labels.checked}>
         <span>
           <strong>{reviewItems.length}</strong> {labels.checked}
@@ -396,19 +380,16 @@ export function AnalysisResultsWorkspace({
               ))}
           </div>
         </div>
-        <div className="result-summary-actions">
-          {pendingCount > 0 ? (
-            <span>{assessedCountLabel}</span>
-          ) : (
-            <>
-              <span>{confirmationCountLabel}</span>
-              <a className="result-export-button" href={`/api/analyses/${analysisId}/export/xlsx`}>
-                <Download size={16} aria-hidden="true" />
-                {labels.exportExcel}
-              </a>
-            </>
-          )}
-        </div>
+        {/* Während des Laufs steht der Bewertungsstand neben dem Seitentitel. */}
+        {pendingCount === 0 ? (
+          <div className="result-summary-actions">
+            <span>{confirmationCountLabel}</span>
+            <a className="result-export-button" href={`/api/analyses/${analysisId}/export/xlsx`}>
+              <Download size={16} aria-hidden="true" />
+              {labels.exportExcel}
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <div className="result-mobile-tabs" role="tablist">

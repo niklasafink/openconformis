@@ -25,8 +25,10 @@ type AnalysisRunLiveProps = {
   requirementCount: number;
   createdAtLabel: string;
   initialState: LiveState;
-  /** Schmale Leiste über dem Ergebnis statt eigenständiger Wartekarte. */
+  /** Schmale Zeile neben dem Seitentitel statt eigenständiger Wartekarte. */
   compact?: boolean;
+  /** Bereits bewertete Anforderungen, z. B. „1 von 10 bewertet". */
+  assessedLabel?: string;
   failure?: { code: string | null; detail: string | null };
   labels: {
     failureTitle: string;
@@ -48,6 +50,7 @@ const terminalStatuses = new Set<AnalysisStatus>(["completed", "failed", "cancel
 
 export function AnalysisRunLive({
   analysisId,
+  assessedLabel,
   compact = false,
   failure,
   frameworkSlug,
@@ -106,21 +109,23 @@ export function AnalysisRunLive({
   }, [analysisId, router, state.progressPercent, state.status]);
 
   if (compact) {
+    // Der Anbietertext nennt beim Fehlschlag die genaue Ursache; er steht
+    // vollständig im Tooltip, falls die Zeile ihn kürzen muss.
+    const detail =
+      state.status === "failed"
+        ? failure?.detail || failure?.code || labels.failureUnknown
+        : labels.stage[state.stage];
     return (
       <section className="analysis-run-strip" aria-live="polite">
         <span className="analysis-run-status" data-status={state.status}>
           {labels.status[state.status]}
         </span>
-        <span className="analysis-run-strip-stage">
-          {state.status === "failed"
-            ? failure?.detail || failure?.code || labels.failureUnknown
-            : labels.stage[state.stage]}
+        <span className="analysis-run-strip-stage" data-status={state.status} title={detail}>
+          {detail}
         </span>
-        <div className="analysis-run-progress" aria-label={labels.progressLabel}>
-          <span style={{ width: `${state.progressPercent}%` }} />
-        </div>
-        <span className="analysis-run-strip-note">
-          {pollingFailed ? labels.pollingFailed : `${state.progressPercent}%`}
+        <span className="analysis-run-strip-note" aria-label={labels.progressLabel}>
+          {pollingFailed ? labels.pollingFailed : `${state.progressPercent} %`}
+          {assessedLabel ? ` · ${assessedLabel}` : null}
         </span>
       </section>
     );

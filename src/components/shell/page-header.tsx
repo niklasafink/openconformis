@@ -8,6 +8,8 @@ type PageHeaderProps = Readonly<{
   actions?: ReactNode;
   /** Kleine Zeile neben dem Titel, z. B. der Schritt im Workflow. */
   eyebrow?: string;
+  /** Laufender Zustand direkt neben dem Titel, z. B. Fortschritt oder Fehler. */
+  status?: ReactNode;
   /** Seitentitel. Fehlt er, rendert die Seite ihre eigene Überschrift. */
   title?: string;
 }>;
@@ -17,14 +19,14 @@ type PageHeaderProps = Readonly<{
  * nicht zum Layout: Titel und Aktionen wechseln mit jedem Schritt, die Sidebar
  * daneben bleibt über die Navigation hinweg stehen.
  */
-export async function PageHeader({ actions, eyebrow, title }: PageHeaderProps) {
+export async function PageHeader({ actions, eyebrow, status, title }: PageHeaderProps) {
   const t = await getTranslations("Navigation");
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 px-4 md:px-6">
       <SidebarTrigger aria-label={t("toggleSidebar")} className="md:hidden" />
       {title ? (
-        <div className="flex min-w-0 items-baseline gap-3">
+        <div className="flex shrink-0 items-baseline gap-3">
           <h1 className="truncate font-serif text-[26px] leading-none font-normal tracking-tight">
             {title}
           </h1>
@@ -33,7 +35,8 @@ export async function PageHeader({ actions, eyebrow, title }: PageHeaderProps) {
           ) : null}
         </div>
       ) : null}
-      <div className="ml-auto flex items-center gap-2">{actions}</div>
+      {status ? <div className="flex min-w-0 flex-1 items-center">{status}</div> : null}
+      <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>
     </header>
   );
 }

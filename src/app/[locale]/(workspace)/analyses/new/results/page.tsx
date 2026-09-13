@@ -185,7 +185,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
           analysisId="preview"
           canConfirm={false}
           canOverride={false}
-          frameworkSlug={boundDraft.frameworkSlug ?? "dora"}
           policyName={policyPreview.selection.filename}
           organizationContext={scope.organizationContext}
           items={items}
