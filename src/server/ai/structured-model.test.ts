@@ -6,6 +6,7 @@ import {
   readProviderErrorDetail,
   readProviderJson,
   retryableProviderStatus,
+  withProviderErrorContext,
 } from "./structured-model";
 
 describe("readProviderErrorDetail", () => {
@@ -82,6 +83,41 @@ describe("readProviderJson", () => {
   it("passes a successful payload through", async () => {
     const response = new Response(JSON.stringify({ id: "gen-1" }), { status: 200 });
     await expect(readProviderJson(response)).resolves.toEqual({ id: "gen-1" });
+  });
+
+  it("describes a body that is not JSON without echoing it, and allows a retry", async () => {
+    const response = new Response('{"choices": [{"message": "Auszug aus der Policy', {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    try {
+      await readProviderJson(response);
+      expect.unreachable("readProviderJson should have thrown");
+    } catch (error) {
+      expect(error).toMatchObject({ code: "PROVIDER_RESPONSE_INVALID", retryable: true });
+      expect((error as ModelProviderError).detail).toContain("kein gültiges JSON (HTTP 200");
+      expect((error as ModelProviderError).detail).not.toContain("Policy");
+    }
+  });
+});
+
+describe("withProviderErrorContext", () => {
+  it("names where the error arose and its code while keeping retry semantics", () => {
+    const error = withProviderErrorContext(
+      new ModelProviderError("PROVIDER_RESPONSE_INVALID", true, "leere Antwort"),
+      "Art. 6, Verifikation (Versuch 1), anthropic/claude-sonnet-5",
+    );
+    expect(error).toMatchObject({
+      code: "PROVIDER_RESPONSE_INVALID",
+      retryable: true,
+      detail:
+        "Art. 6, Verifikation (Versuch 1), anthropic/claude-sonnet-5: leere Antwort [PROVIDER_RESPONSE_INVALID]",
+    });
+  });
+
+  it("leaves errors from outside the provider untouched", () => {
+    const error = new Error("ANALYSIS_NOT_FOUND");
+    expect(withProviderErrorContext(error, "Art. 6")).toBe(error);
   });
 });
 

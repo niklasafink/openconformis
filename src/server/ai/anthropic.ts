@@ -4,9 +4,12 @@ import { z } from "zod";
 
 import {
   assertStructuredRequest,
+  describeSchemaIssues,
   fetchProviderJson,
+  invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
 } from "./structured-model";
@@ -79,8 +82,11 @@ export async function requestAnthropicStructured<T>(
     },
     fetchImplementation,
   );
+  throwIfProviderErrorPayload(payload);
   const parsed = responseSchema.safeParse(payload);
-  if (!parsed.success) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!parsed.success) {
+    throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
+  }
   if (parsed.data.stop_reason === "refusal") {
     throw new ModelProviderError("PROVIDER_REFUSAL", false);
   }
@@ -91,7 +97,11 @@ export async function requestAnthropicStructured<T>(
     .filter((block) => block.type === "text" && block.text)
     .map((block) => block.text)
     .join("");
-  if (!rawOutput) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!rawOutput) {
+    throw invalidProviderResponse(
+      `leere Antwort (stop_reason: ${parsed.data.stop_reason ?? "keiner"}, Anfrage ${parsed.data.id})`,
+    );
+  }
 
   return {
     providerRequestId: parsed.data.id,

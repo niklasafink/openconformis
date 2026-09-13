@@ -23,7 +23,11 @@ import { appendAuditEvent } from "@/server/audit/event";
 import { getFrozenAnalysisInstruction } from "@/server/ai/analysis-instruction-service";
 import { buildAssessmentPrompt } from "@/server/ai/assessment-prompt";
 import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
-import { ModelProviderError, type StructuredModelResponse } from "@/server/ai/structured-model";
+import {
+  ModelProviderError,
+  withProviderErrorContext,
+  type StructuredModelResponse,
+} from "@/server/ai/structured-model";
 import {
   getAnalysisProviderConfiguration,
   isAnalysisProviderAvailable,
@@ -232,12 +236,32 @@ async function failInvocation(
   // Grenze eines Workflow-Schritts hinweg übersteht der Fehler nur seinen Typ,
   // nicht seine Meldung — der abschliessende Fehlschritt sähe sonst wieder nur
   // „alle Versuche verbraucht" und die eigentliche Ursache wäre verloren.
+  // Die jüngste Ursache gewinnt: ein überstandener Aussetzer darf den Grund des
+  // endgültigen Abbruchs nicht verdecken.
   const detail = error instanceof ModelProviderError ? error.detail : undefined;
   if (!analysisId || !detail) return;
-  await db
-    .update(analyses)
-    .set({ failureDetail: detail })
-    .where(and(eq(analyses.id, analysisId), isNull(analyses.failureDetail)));
+  await db.update(analyses).set({ failureDetail: detail }).where(eq(analyses.id, analysisId));
+}
+
+/** Wo ein Anbieteraufruf scheiterte — ohne Policy-Inhalte. */
+function invocationContext(
+  analysis: AnalysisRecord,
+  item: ScopeRecord,
+  stage: "assessment" | "verification",
+  attempt: number,
+) {
+  const german = analysis.locale === "de";
+  const stageLabel =
+    stage === "assessment"
+      ? german
+        ? "Bewertung"
+        : "Assessment"
+      : german
+        ? "Verifikation"
+        : "Verification";
+  const modelId =
+    stage === "assessment" ? analysis.providerModelId : analysis.verifierProviderModelId;
+  return `${item.scope.regulatoryId}, ${stageLabel} (${german ? "Versuch" : "attempt"} ${attempt}), ${modelId}`;
 }
 
 function requirementFromScope(scope: ScopeRecord["scope"]) {
@@ -436,9 +460,13 @@ async function assessItem(
         deterministicFallback: false,
       };
     } catch (error) {
-      await failInvocation(invocationId, startedAt, error, outputHash, analysis.id);
+      const failure = withProviderErrorContext(
+        error,
+        invocationContext(analysis, item, "assessment", attempt),
+      );
+      await failInvocation(invocationId, startedAt, failure, outputHash, analysis.id);
       if (error instanceof ModelProviderError) {
-        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw error;
+        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
         previousFailure = error.detail;
         continue;
       }
@@ -522,9 +550,13 @@ async function verifyItem(
       await finishInvocation(invocationId, startedAt, response, outputHash);
       return { result: response.output, inputHash, outputHash };
     } catch (error) {
-      await failInvocation(invocationId, startedAt, error, undefined, analysis.id);
+      const failure = withProviderErrorContext(
+        error,
+        invocationContext(analysis, item, "verification", attempt),
+      );
+      await failInvocation(invocationId, startedAt, failure, undefined, analysis.id);
       if (error instanceof ModelProviderError) {
-        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw error;
+        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
         continue;
       }
       throw error;

@@ -228,3 +228,81 @@ describe("OpenRouter structured adapter", () => {
     ).rejects.toMatchObject({ code: "PROVIDER_OUTPUT_INCOMPLETE", retryable: false });
   });
 });
+
+describe("OpenRouter response diagnostics", () => {
+  function requestWith(body: unknown) {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+    return requestOpenRouterStructured(
+      {
+        apiKey: "test-key",
+        baseUrl: "https://openrouter.ai/api/v1",
+        modelId: "anthropic/claude-sonnet-5",
+        system: "system",
+        user: "user",
+        schemaName: "answer",
+        jsonSchema: { type: "object" },
+        outputSchema,
+        maxOutputTokens: 12_000,
+      },
+      fetchMock,
+    );
+  }
+
+  it("reads an abort that arrives as HTTP 200 and leaves it retryable", async () => {
+    // Ein Verifikationsaufruf brach nach 40 Sekunden so ab; der Lauf meldete nur
+    // „nicht auswertbar" und endete, obwohl der Anbieter den Grund mitschickte.
+    await expect(
+      requestWith({ error: { code: 502, message: "Upstream provider overloaded" } }),
+    ).rejects.toMatchObject({
+      code: "PROVIDER_HTTP_ERROR",
+      retryable: true,
+      detail: expect.stringContaining("Upstream provider overloaded"),
+    });
+  });
+
+  it("names the provider reason when a choice ends in an error without content", async () => {
+    await expect(
+      requestWith({
+        id: "gen-5",
+        model: "anthropic/claude-sonnet-5",
+        provider: "Anthropic",
+        choices: [
+          {
+            message: { content: null },
+            finish_reason: "error",
+            error: { message: "Internal server error" },
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: "PROVIDER_HTTP_ERROR",
+      retryable: true,
+      detail: expect.stringMatching(/Anthropic: Internal server error \(Anfrage gen-5\)/u),
+    });
+  });
+
+  it("states finish reason and request id for an empty answer", async () => {
+    await expect(
+      requestWith({
+        id: "gen-6",
+        model: "anthropic/claude-sonnet-5",
+        choices: [{ message: { content: "" }, finish_reason: "stop" }],
+      }),
+    ).rejects.toMatchObject({
+      code: "PROVIDER_RESPONSE_INVALID",
+      retryable: true,
+      detail: expect.stringMatching(/finish_reason: stop.*gen-6/u),
+    });
+  });
+
+  it("names the fields that break the expected response format", async () => {
+    await expect(
+      requestWith({ id: "gen-7", model: "anthropic/claude-sonnet-5", choices: [] }),
+    ).rejects.toMatchObject({
+      code: "PROVIDER_RESPONSE_INVALID",
+      detail: expect.stringContaining("choices"),
+    });
+  });
+});

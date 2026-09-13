@@ -5,11 +5,15 @@ import { openRouterUrl } from "./openrouter-route";
 
 import {
   assertStructuredRequest,
+  describeSchemaIssues,
   dollarsToMicrounits,
   fetchProviderJson,
+  invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
   providerRequestTimeoutMilliseconds,
+  readProviderErrorDetail,
+  throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
 } from "./structured-model";
@@ -27,11 +31,13 @@ const openRouterResponseSchema = z.object({
   choices: z
     .array(
       z.object({
+        // Bei einem Abbruch sendet OpenRouter `content: null` und den Grund in `error`.
         message: z.object({
-          content: z.string(),
+          content: z.string().nullable().optional(),
         }),
         finish_reason: z.string().nullable().optional(),
         native_finish_reason: z.string().nullable().optional(),
+        error: z.unknown().optional(),
       }),
     )
     .min(1),
@@ -113,20 +119,33 @@ export async function requestOpenRouterStructured<T>(
     fetchImplementation,
     request.timeoutMilliseconds ?? providerRequestTimeoutMilliseconds,
   );
-  let providerResponse: z.infer<typeof openRouterResponseSchema>;
-  try {
-    providerResponse = openRouterResponseSchema.parse(payload);
-  } catch {
-    throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  throwIfProviderErrorPayload(payload);
+  const parsed = openRouterResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
   }
-
+  const providerResponse = parsed.data;
   const choice = providerResponse.choices[0];
+  const requestLabel = `Anfrage ${providerResponse.id}`;
+  const finishReason = choice?.finish_reason ?? choice?.native_finish_reason;
+
+  // Bricht der vorgelagerte Anbieter während der Generierung ab, steht der Grund
+  // an der Auswahl, und `content` ist leer. Ein zweiter Versuch gelingt meist.
+  if (choice?.error || finishReason === "error") {
+    const message = readProviderErrorDetail({ error: choice?.error });
+    throw new ModelProviderError(
+      "PROVIDER_HTTP_ERROR",
+      true,
+      `Abbruch während der Generierung durch ${providerResponse.provider ?? "den Anbieter"}${
+        message ? `: ${message}` : ""
+      } (${requestLabel})`,
+    );
+  }
 
   // Eine abgeschnittene Antwort ist kein Schemafehler, sondern ein zu niedriges
   // Ausgabelimit. Ohne diese Unterscheidung meldete der Lauf „kein gültiges
   // Ergebnis nach dem vereinbarten Schema" und schickte den Betreiber damit auf
   // die falsche Spur — der Anthropic-Adapter prüft das seit jeher.
-  const finishReason = choice?.finish_reason ?? choice?.native_finish_reason;
   if (finishReason === "length" || finishReason === "max_tokens") {
     throw new ModelProviderError(
       "PROVIDER_OUTPUT_INCOMPLETE",
@@ -136,7 +155,13 @@ export async function requestOpenRouterStructured<T>(
   }
 
   const rawOutput = choice?.message.content;
-  if (!rawOutput) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!rawOutput) {
+    throw invalidProviderResponse(
+      `leere Antwort (finish_reason: ${finishReason ?? "keiner"}, ${
+        providerResponse.provider ?? "Anbieter unbekannt"
+      }, ${requestLabel})`,
+    );
+  }
 
   const output = parseStructuredOutput(rawOutput, request.outputSchema);
 

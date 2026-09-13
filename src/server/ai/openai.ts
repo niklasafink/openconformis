@@ -4,9 +4,12 @@ import { z } from "zod";
 
 import {
   assertStructuredRequest,
+  describeSchemaIssues,
   fetchProviderJson,
+  invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
 } from "./structured-model";
@@ -91,8 +94,11 @@ export async function requestOpenAiStructured<T>(
     },
     fetchImplementation,
   );
+  throwIfProviderErrorPayload(payload);
   const parsed = responseSchema.safeParse(payload);
-  if (!parsed.success) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!parsed.success) {
+    throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
+  }
   if (parsed.data.status !== "completed") {
     throw new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", parsed.data.status !== "cancelled");
   }
@@ -104,7 +110,7 @@ export async function requestOpenAiStructured<T>(
     .filter((block) => block.type === "output_text" && block.text)
     .map((block) => block.text)
     .join("");
-  if (!rawOutput) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!rawOutput) throw invalidProviderResponse(`leere Antwort (Anfrage ${parsed.data.id})`);
 
   return {
     providerRequestId: parsed.data.id,

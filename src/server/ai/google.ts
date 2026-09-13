@@ -4,9 +4,12 @@ import { z } from "zod";
 
 import {
   assertStructuredRequest,
+  describeSchemaIssues,
   fetchProviderJson,
+  invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
 } from "./structured-model";
@@ -81,10 +84,13 @@ export async function requestGoogleStructured<T>(
     },
     fetchImplementation,
   );
+  throwIfProviderErrorPayload(payload);
   const parsed = responseSchema.safeParse(payload);
-  if (!parsed.success) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!parsed.success) {
+    throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
+  }
   const candidate = parsed.data.candidates[0];
-  if (!candidate) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!candidate) throw invalidProviderResponse("keine Antwortkandidaten");
   if (candidate.finishReason && candidate.finishReason !== "STOP") {
     const refusalReasons = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"]);
     throw new ModelProviderError(
@@ -98,7 +104,11 @@ export async function requestGoogleStructured<T>(
     .map((part) => part.text)
     .filter((text): text is string => Boolean(text))
     .join("");
-  if (!rawOutput) throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+  if (!rawOutput) {
+    throw invalidProviderResponse(
+      `leere Antwort (finishReason: ${candidate.finishReason ?? "keiner"})`,
+    );
+  }
 
   return {
     providerRequestId:

@@ -91,7 +91,7 @@ export async function analysisWorkflow(analysisId: string) {
     // Die Begründung des Anbieters mitschreiben, damit die Ergebnisseite den
     // Grund nennen kann statt nur „fehlgeschlagen".
     const detail =
-      error instanceof Error && error.message ? error.message.slice(0, 300) : undefined;
+      error instanceof Error && error.message ? error.message.slice(0, 700) : undefined;
     await failAnalysisStep(analysisId, detail);
     throw error;
   }

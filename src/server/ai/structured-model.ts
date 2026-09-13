@@ -104,6 +104,53 @@ export function readProviderErrorDetail(payload: unknown): string | undefined {
   return candidate?.trim().slice(0, maximumProviderDetailLength) || undefined;
 }
 
+/**
+ * OpenRouter meldet einen Abbruch, der erst während der Generierung eintritt,
+ * mit HTTP 200 und einem Fehlerobjekt statt einer Antwort. Ohne diese Prüfung
+ * scheiterte der Lauf als „nicht auswertbar", obwohl der Anbieter den Grund
+ * mitgeliefert hatte — und brach ab, obwohl ein zweiter Versuch gelungen wäre.
+ */
+export function throwIfProviderErrorPayload(payload: unknown) {
+  if (!payload || typeof payload !== "object") return;
+  const error = (payload as Record<string, unknown>).error;
+  if (!error) return;
+  const status =
+    typeof error === "object" ? Number((error as Record<string, unknown>).code) : Number.NaN;
+  const knownStatus = Number.isInteger(status) && status >= 100 && status <= 599;
+  const message = readProviderErrorDetail(payload);
+  throw new ModelProviderError(
+    "PROVIDER_HTTP_ERROR",
+    knownStatus ? retryableProviderStatus(status) : true,
+    `Abbruch während der Generierung${knownStatus ? ` (Fehler ${status})` : ""}${message ? `: ${message}` : ""}`,
+  );
+}
+
+/**
+ * Nennt, woran die Auswertung gescheitert ist. Standardmässig wiederholbar: eine
+ * leere oder unvollständige Antwort ist fast immer ein Aussetzer des Anbieters.
+ */
+export function invalidProviderResponse(reason: string, retryable = true) {
+  return new ModelProviderError(
+    "PROVIDER_RESPONSE_INVALID",
+    retryable,
+    `${defaultProviderDetail.PROVIDER_RESPONSE_INVALID.replace(/\.$/u, "")}: ${reason}`,
+  );
+}
+
+/**
+ * Stellt dem Fehler voran, wo er entstand — Anforderung, Stufe, Versuch, Modell —
+ * und hängt den Code an. Die Meldung „nicht auswertbar" allein liess offen, ob
+ * Bewertung oder Verifikation, welches Modell und welche Anforderung betroffen war.
+ */
+export function withProviderErrorContext(error: unknown, context: string) {
+  if (!(error instanceof ModelProviderError)) return error;
+  return new ModelProviderError(
+    error.code,
+    error.retryable,
+    `${context}: ${error.detail} [${error.code}]`,
+  );
+}
+
 export function assertStructuredRequest(request: { apiKey: string; maxOutputTokens: number }) {
   if (!request.apiKey.trim()) throw new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
   if (!Number.isInteger(request.maxOutputTokens) || request.maxOutputTokens < 1) {
@@ -139,7 +186,11 @@ export async function readProviderJson(response: Response) {
   try {
     responseText = await response.text();
   } catch {
-    throw new ModelProviderError("PROVIDER_HTTP_ERROR", true);
+    throw new ModelProviderError(
+      "PROVIDER_HTTP_ERROR",
+      true,
+      "Die Verbindung zum Modellanbieter brach beim Lesen der Antwort ab.",
+    );
   }
   if (responseText.length > 2_000_000) {
     throw new ModelProviderError("PROVIDER_RESPONSE_TOO_LARGE", false);
@@ -147,7 +198,14 @@ export async function readProviderJson(response: Response) {
   try {
     return JSON.parse(responseText) as unknown;
   } catch {
-    throw new ModelProviderError("PROVIDER_RESPONSE_INVALID", false);
+    // Nur Länge und Inhaltstyp nennen, nie den Körper: dort stünden Policy-Zitate.
+    throw invalidProviderResponse(
+      responseText.trim()
+        ? `kein gültiges JSON (HTTP ${response.status}, ${responseText.length} Zeichen, ${
+            response.headers.get("content-type") ?? "ohne Inhaltstyp"
+          })`
+        : `leerer Antwortkörper (HTTP ${response.status})`,
+    );
   }
 }
 
@@ -213,7 +271,7 @@ export function parseStructuredOutput<T>(rawOutput: string, outputSchema: z.ZodT
   }
 }
 
-function describeSchemaIssues(error: unknown): string | undefined {
+export function describeSchemaIssues(error: unknown): string | undefined {
   if (!(error instanceof z.ZodError)) return undefined;
   const issues = error.issues
     .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
