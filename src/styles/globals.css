@@ -1792,6 +1792,38 @@ i[data-result-status="no_assessment_possible"] {
   white-space: nowrap;
 }
 
+/* Mit Auswahl-Häkchen trägt die umgebende Zeile Rahmen und Markierung. */
+.result-list-header {
+  gap: 10px;
+}
+
+.result-list-item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding-left: 14px;
+}
+
+.result-list-item:hover {
+  background: var(--surface-subtle);
+}
+
+.result-list-item[data-active="true"] {
+  box-shadow: inset 3px 0 0 var(--selection);
+  background: var(--surface-selected);
+}
+
+.result-list-item > .result-list-row,
+.result-list-item > .result-list-row[data-active="true"] {
+  min-width: 0;
+  flex: 1;
+  border-bottom: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-left: 10px;
+}
+
 /* Eine Anforderung ohne Bewertung trägt bewusst keine Ampelfarbe. */
 [data-result-pending="true"] i,
 i[data-result-pending="true"] {

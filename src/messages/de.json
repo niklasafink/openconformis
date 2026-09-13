@@ -200,7 +200,6 @@
     "panelTitle": "Modellzugang",
     "model": "Modell",
     "selected": "Ausgewählt",
-    "unevaluatedWarning": "Dieses Modell ist nicht evaluiert. Ergebnisse können unzuverlässig sein.",
     "apiKey": "API-Key",
     "keyFailed": "Der Schlüssel oder Modellzugriff konnte nicht bestätigt werden.",
     "keyErrors": {
@@ -320,11 +319,16 @@
     "dismiss": "Meldung ausblenden",
     "showNotice": "Wieder anzeigen",
     "newAnalysis": "Neue Analyse",
-    "cancelledNotice": "Die Analyse wurde gestoppt.",
-    "stop": "Analyse stoppen",
-    "stopping": "Wird gestoppt …",
-    "stopFailed": "Die Analyse konnte nicht gestoppt werden. Bitte erneut versuchen.",
-    "restart": "Analyse neu starten"
+    "cancelledNotice": "Die Analyse wurde abgebrochen.",
+    "stop": "Analyse abbrechen",
+    "stopping": "Wird abgebrochen …",
+    "stopFailed": "Die Analyse konnte nicht abgebrochen werden. Bitte erneut versuchen.",
+    "restart": "Analyse neu starten",
+    "newAnalysisAll": "Alle Anforderungen",
+    "newAnalysisSelection": "Nur Auswahl ({count})",
+    "startSelection": "Auswahl analysieren ({count})",
+    "selectAll": "Alle Anforderungen auswählen",
+    "selectRequirement": "{requirement} auswählen"
   },
   "Auth": {
     "signInTitle": "Anmelden",

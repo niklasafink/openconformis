@@ -194,6 +194,7 @@ export async function getOwnedAnalysisResultWorkspace(input: {
       if (!result) {
         return {
           id: `pending-${scope.id}`,
+          requirementKey: scope.requirementExternalKey,
           regulatoryId: scope.regulatoryId,
           title: scope.title,
           legalText: scope.legalText,
@@ -215,6 +216,7 @@ export async function getOwnedAnalysisResultWorkspace(input: {
       return {
         pending: false,
         id: result.id,
+        requirementKey: scope.requirementExternalKey,
         regulatoryId: scope.regulatoryId,
         title: scope.title,
         legalText: scope.legalText,

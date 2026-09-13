@@ -200,7 +200,6 @@
     "panelTitle": "Model access",
     "model": "Model",
     "selected": "Selected",
-    "unevaluatedWarning": "This model is not evaluated. Results may be unreliable.",
     "apiKey": "API key",
     "keyFailed": "The key or model access could not be confirmed.",
     "keyErrors": {
@@ -320,11 +319,16 @@
     "dismiss": "Dismiss message",
     "showNotice": "Show again",
     "newAnalysis": "New analysis",
-    "cancelledNotice": "The analysis was stopped.",
-    "stop": "Stop analysis",
-    "stopping": "Stopping …",
-    "stopFailed": "The analysis could not be stopped. Please try again.",
-    "restart": "Restart analysis"
+    "cancelledNotice": "The analysis was cancelled.",
+    "stop": "Cancel analysis",
+    "stopping": "Cancelling …",
+    "stopFailed": "The analysis could not be cancelled. Please try again.",
+    "restart": "Restart analysis",
+    "newAnalysisAll": "All requirements",
+    "newAnalysisSelection": "Selection only ({count})",
+    "startSelection": "Analyse selection ({count})",
+    "selectAll": "Select all requirements",
+    "selectRequirement": "Select {requirement}"
   },
   "Auth": {
     "signInTitle": "Log in",

@@ -8,9 +8,9 @@ import {
   AnalysisRerunControls,
   AnalysisRunHeaderProvider,
   AnalysisRunHeaderStatus,
-  AnalysisStopButton,
 } from "./analysis-run-header";
 import type { AnalysisRunState } from "./analysis-run-live";
+import { RequirementSelectionProvider } from "./requirement-selection";
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -47,10 +47,13 @@ const labels = {
   dismiss: "Meldung ausblenden",
   showNotice: "Wieder anzeigen",
   newAnalysis: "Neue Analyse",
-  cancelledNotice: "Die Analyse wurde gestoppt.",
-  stop: "Analyse stoppen",
-  stopping: "Wird gestoppt …",
-  stopFailed: "Die Analyse konnte nicht gestoppt werden.",
+  newAnalysisAll: "Alle Anforderungen",
+  newAnalysisSelection: "Nur Auswahl ({count})",
+  startSelection: "Auswahl analysieren ({count})",
+  cancelledNotice: "Die Analyse wurde abgebrochen.",
+  stop: "Analyse abbrechen",
+  stopping: "Wird abgebrochen …",
+  stopFailed: "Die Analyse konnte nicht abgebrochen werden.",
   restart: "Analyse neu starten",
 };
 
@@ -58,7 +61,6 @@ const accessLabels = {
   panelTitle: "Modellzugang",
   model: "Modell",
   selected: "Ausgewählt",
-  unevaluatedWarning: "Dieses Modell ist nicht evaluiert.",
   apiKey: "API-Key",
   keyFailed: "Der Schlüssel konnte nicht bestätigt werden.",
   keyErrors: { CREDENTIAL_REJECTED: "Der Anbieter lehnt den Schlüssel ab." },
@@ -94,23 +96,27 @@ function renderHeader(
   },
 ) {
   return render(
-    <AnalysisRunHeaderProvider
-      analysisId={analysisId}
-      initialState={initialState}
-      failure={{ code: "PROVIDER_REQUEST_FAILED", detail: providerError }}
-      labels={labels}
+    <RequirementSelectionProvider
+      requirementKeys={["dora-art-5", "dora-art-6", "dora-art-9"]}
+      labels={{ selectAll: "Alle Anforderungen auswählen", select: "{requirement} auswählen" }}
     >
-      <AnalysisRunHeaderStatus assessed={1} total={10} />
-      <AnalysisStopButton />
-      <AnalysisRerunControls
-        catalogue={catalogue}
-        initialModelProfileId="openrouter:anthropic/claude-sonnet-5"
-        labels={accessLabels}
-        lastFour={null}
-        locale="de"
-      />
-      <AnalysisNotificationsButton />
-    </AnalysisRunHeaderProvider>,
+      <AnalysisRunHeaderProvider
+        analysisId={analysisId}
+        initialState={initialState}
+        failure={{ code: "PROVIDER_REQUEST_FAILED", detail: providerError }}
+        labels={labels}
+      >
+        <AnalysisRunHeaderStatus assessed={1} total={10} />
+        <AnalysisRerunControls
+          catalogue={catalogue}
+          initialModelProfileId="openrouter:anthropic/claude-sonnet-5"
+          labels={accessLabels}
+          lastFour={null}
+          locale="de"
+        />
+        <AnalysisNotificationsButton />
+      </AnalysisRunHeaderProvider>
+    </RequirementSelectionProvider>,
   );
 }
 
@@ -142,8 +148,8 @@ describe("analysis run header", () => {
     expect(alert).toHaveTextContent("Fehlgeschlagen");
     expect(alert).toHaveTextContent(providerError);
     expect(screen.getByRole("button", { name: "Benachrichtigungen (1)" })).toBeInTheDocument();
-    // Ein beendeter Lauf lässt sich nicht mehr stoppen.
-    expect(screen.queryByRole("button", { name: "Analyse stoppen" })).not.toBeInTheDocument();
+    // Ein beendeter Lauf lässt sich nicht mehr abbrechen.
+    expect(screen.queryByRole("button", { name: "Analyse abbrechen" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Neue Analyse" })[0]!);
     expect(await screen.findByLabelText("API-Key")).toBeInTheDocument();
@@ -163,6 +169,9 @@ describe("analysis run header", () => {
     expect(screen.getByRole("radio", { checked: true })).not.toHaveTextContent("Ausgewählt");
     fireEvent.change(keyInput, { target: { value: "sk-or-v1-secret-key" } });
     expect(screen.getByRole("radio", { checked: true })).toHaveTextContent("Ausgewählt");
+    // Die Eingabetaste im Schlüsselfeld startet nichts; erst der Klick zählt.
+    fireEvent.keyDown(keyInput, { key: "Enter", code: "Enter" });
+    expect(fetch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Analyse starten" }));
 
     await waitFor(() =>
@@ -173,8 +182,31 @@ describe("analysis run header", () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       modelProfileId: "openrouter:anthropic/claude-sonnet-5",
       modelCatalogueVersion: catalogue.version,
-      unevaluatedWarningAccepted: false,
+      unevaluatedWarningAccepted: true,
       apiKey: "sk-or-v1-secret-key",
+    });
+  });
+
+  it("starts a new run for the selected requirements only", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ analysisId: "8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f", status: "queued" }, 202),
+    );
+    renderHeader({ status: "completed", stage: "completed", progressPercent: 100 });
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Neue Analyse" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Nur Auswahl (3)" }));
+    fireEvent.change(await screen.findByLabelText("API-Key"), {
+      target: { value: "sk-or-v1-secret-key" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl analysieren (3)" }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      requirementKeys: ["dora-art-5", "dora-art-6", "dora-art-9"],
     });
   });
 
@@ -192,18 +224,19 @@ describe("analysis run header", () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it("stops a running analysis and reports it as stopped", async () => {
+  it("cancels a running analysis from the same place as a new analysis", async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: "cancelled", changed: true }));
     renderHeader({ status: "running", stage: "assessment", progressPercent: 50 });
 
-    fireEvent.click(screen.getByRole("button", { name: "Analyse stoppen" }));
+    expect(screen.queryByRole("button", { name: "Neue Analyse" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Analyse abbrechen" }));
 
-    expect(await screen.findByText("Die Analyse wurde gestoppt.")).toBeInTheDocument();
+    expect(await screen.findByText("Die Analyse wurde abgebrochen.")).toBeInTheDocument();
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
       `/api/analyses/${analysisId}/cancel`,
       expect.objectContaining({ method: "POST" }),
     );
-    expect(screen.queryByRole("button", { name: "Analyse stoppen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Analyse abbrechen" })).not.toBeInTheDocument();
   });
 
   it("moves a dismissed error into the notifications and keeps it dismissed after a reload", async () => {

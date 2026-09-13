@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalysisResultsWorkspace, explanationPoints } from "./analysis-results-workspace";
 import { splitEvidenceHighlight } from "./policy-document-viewer";
+import { RequirementSelectionProvider } from "./requirement-selection";
 
 const labels = {
   checked: "geprüft",
@@ -100,6 +101,49 @@ describe("assessment rationale points", () => {
       "Die Policy nennt am 14. Dezember keine Überwachung.",
       "Belege fehlen.",
     ]);
+  });
+});
+
+describe("requirement selection for a new analysis", () => {
+  it("lets single requirements be deselected and everything be selected again", () => {
+    const second = {
+      ...item,
+      id: "4b0c6d2a-8f1e-4a7b-9c3d-5e6f7a8b9c0d",
+      regulatoryId: "Art. 6 Abs. 1 DORA",
+    };
+    render(
+      <RequirementSelectionProvider
+        requirementKeys={["dora-art-5-2", "dora-art-6-1"]}
+        labels={{ selectAll: "Alle Anforderungen auswählen", select: "{requirement} auswählen" }}
+      >
+        <AnalysisResultsWorkspace
+          analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+          canConfirm={false}
+          canOverride={false}
+          policyName="IKT-Sicherheitsrichtlinie.docx"
+          organizationContext=""
+          items={[
+            { ...item, requirementKey: "dora-art-5-2" },
+            { ...second, requirementKey: "dora-art-6-1" },
+          ]}
+          labels={labels}
+          documentBlocks={[]}
+        />
+      </RequirementSelectionProvider>,
+    );
+
+    const all = screen.getByRole("checkbox", { name: "Alle Anforderungen auswählen" });
+    const first = screen.getByRole("checkbox", { name: "Art. 5 Abs. 2 DORA auswählen" });
+    expect(all).toBeChecked();
+    expect(first).toBeChecked();
+
+    fireEvent.click(first);
+    expect(first).not.toBeChecked();
+    expect(all).toHaveAttribute("data-state", "indeterminate");
+
+    fireEvent.click(all);
+    expect(first).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Art. 6 Abs. 1 DORA auswählen" })).toBeChecked();
   });
 });
 

@@ -56,7 +56,8 @@ async function reusePending(pending: { id: string; status: StartAnalysisResult["
 /**
  * Startet eine bestehende Analyse neu: dieselbe unveränderliche Policy-Fassung,
  * derselbe eingefrorene Prüfungsumfang samt Unternehmenskontext, aber das neu
- * gewählte Modell und ein frisch hinterlegter Schlüssel. Der alte Lauf bleibt als
+ * gewählte Modell und ein frisch hinterlegter Schlüssel. Auf Wunsch prüft er nur
+ * eine Auswahl der Anforderungen. Der alte Lauf bleibt als
  * eigener Nachweis stehen; läuft er noch, wird er vorher gestoppt.
  *
  * Jeder Lauf braucht einen eigenen Draft, weil Schlüsselbindung und Eindeutigkeit
@@ -127,6 +128,15 @@ export async function rerunAnalysis(
       if (scopeItems.length === 0 || scopeItems.length !== source.requirementCount) {
         throw new AnalysisStartError("SCOPE_INVALID");
       }
+      // „Nur Auswahl" prüft eine Teilmenge desselben Umfangs; jede gewünschte
+      // Anforderung muss im Ausgangslauf vorkommen.
+      const requested = input.requirementKeys ? new Set(input.requirementKeys) : null;
+      const selectedItems = requested
+        ? scopeItems.filter((item) => requested.has(item.requirementExternalKey))
+        : scopeItems;
+      if (selectedItems.length === 0 || (requested && selectedItems.length !== requested.size)) {
+        throw new AnalysisStartError("SCOPE_INVALID");
+      }
 
       const now = new Date();
       await transaction.insert(anonymousDrafts).values({
@@ -178,11 +188,11 @@ export async function rerunAnalysis(
             institutionSize: source.institutionSize,
             policySha256: source.policySha256,
             policyParserVersion: source.policyParserVersion,
-            requirementKeys: scopeItems.map((item) => item.requirementExternalKey),
+            requirementKeys: selectedItems.map((item) => item.requirementExternalKey),
           }),
           policySha256: source.policySha256,
           policyParserVersion: source.policyParserVersion,
-          requirementCount: scopeItems.length,
+          requirementCount: selectedItems.length,
         })
         .returning({ id: analyses.id, status: analyses.status });
       if (!analysis) throw new AnalysisStartError("ANALYSIS_NOT_CREATED");
@@ -190,7 +200,7 @@ export async function rerunAnalysis(
       // Die Anforderungen kommen aus dem Schnappschuss des Ausgangslaufs, nicht
       // aus dem aktuellen Katalog: der Neustart prüft denselben Umfang.
       await transaction.insert(analysisScopeItems).values(
-        scopeItems.map((item) => ({
+        selectedItems.map((item) => ({
           analysisId: analysis.id,
           requirementExternalKey: item.requirementExternalKey,
           regulatoryId: item.regulatoryId,
@@ -215,7 +225,7 @@ export async function rerunAnalysis(
           rerunOfAnalysisId: source.id,
           frameworkContentHash: source.frameworkContentHash,
           modelProfileId: route.modelProfileId,
-          requirementCount: scopeItems.length,
+          requirementCount: selectedItems.length,
         },
       });
       return { analysisId: analysis.id, status: analysis.status, reused: false };

@@ -15,7 +15,6 @@ export type ModelAccessLabels = Readonly<{
   panelTitle: string;
   model: string;
   selected: string;
-  unevaluatedWarning: string;
   apiKey: string;
   keyFailed: string;
   /** Ursache je Fehlercode der Schlüsselverbindung. */
@@ -101,7 +100,6 @@ export function ModelAccessPanel({
   );
   const [credential, setCredential] = useState(initialCredential);
   const [apiKey, setApiKey] = useState("");
-  const [warningAccepted, setWarningAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,17 +126,11 @@ export function ModelAccessPanel({
   async function changeModel(nextModelProfileId: string) {
     const nextModel = catalogue.models.find(({ id }) => id === nextModelProfileId);
     setModelProfileId(nextModelProfileId);
-    setWarningAccepted(false);
     setError(null);
-    // Ein ungeprüftes Modell übernimmt der Server erst mit bestätigtem Hinweis.
+    // Ein ungeprüftes Modell übernimmt der Server erst mit dem Klick auf Start.
     if (nextModel?.evaluated && !(await saveModel(nextModelProfileId, false))) {
       setError(labels.modelFailed);
     }
-  }
-
-  async function acceptWarning(accepted: boolean) {
-    setWarningAccepted(accepted);
-    if (accepted && !(await saveModel(modelProfileId, true))) setError(labels.modelFailed);
   }
 
   async function connectAndStart() {
@@ -146,6 +138,12 @@ export function ModelAccessPanel({
     setPending(true);
     setError(null);
     try {
+      // Der bewusste Klick auf „Analyse starten" gilt als Kenntnisnahme, dass das
+      // Modell nicht evaluiert ist.
+      if (!model.evaluated && !(await saveModel(model.id, true))) {
+        setError(labels.modelFailed);
+        return;
+      }
       let credentialId = connected ? credential?.credentialId : undefined;
       if (apiKey.trim()) {
         const response = await postJson("/api/ai-credentials", {
@@ -216,11 +214,9 @@ export function ModelAccessPanel({
           onApiKeyChange={setApiKey}
           onModelChange={(id) => void changeModel(id)}
           onSubmit={() => void connectAndStart()}
-          onWarningAcceptedChange={(accepted) => void acceptWarning(accepted)}
           pending={pending}
           submitLabel={labels.start}
           submittingLabel={labels.starting}
-          warningAccepted={warningAccepted}
         />
       </PopoverContent>
     </Popover>

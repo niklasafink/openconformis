@@ -7,10 +7,10 @@ import {
   AnalysisRerunControls,
   AnalysisRunHeaderProvider,
   AnalysisRunHeaderStatus,
-  AnalysisStopButton,
 } from "@/components/results/analysis-run-header";
 import { AnalysisRunLive } from "@/components/results/analysis-run-live";
 import { AnalysisResultsWorkspace } from "@/components/results/analysis-results-workspace";
+import { RequirementSelectionProvider } from "@/components/results/requirement-selection";
 import { loadAnalysisResultLabels } from "@/components/results/result-labels";
 import { PageHeader } from "@/components/shell/page-header";
 import { LanguageMenu } from "@/components/shell/language-menu";
@@ -113,6 +113,9 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     dismiss: t("dismiss"),
     showNotice: t("showNotice"),
     newAnalysis: t("newAnalysis"),
+    newAnalysisAll: t("newAnalysisAll"),
+    newAnalysisSelection: t("newAnalysisSelection", { count: "{count}" }),
+    startSelection: t("startSelection", { count: "{count}" }),
     cancelledNotice: t("cancelledNotice"),
     stop: t("stop"),
     stopping: t("stopping"),
@@ -121,7 +124,13 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
   };
 
   return (
-    <>
+    <RequirementSelectionProvider
+      requirementKeys={results?.items.map(({ requirementKey }) => requirementKey) ?? []}
+      labels={{
+        selectAll: t("selectAll"),
+        select: t("selectRequirement", { requirement: "{requirement}" }),
+      }}
+    >
       <AnalysisRunHeaderProvider
         analysisId={analysis.id}
         failure={{ code: analysis.failureCode, detail: analysis.failureDetail }}
@@ -144,7 +153,6 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
           }
           actions={
             <>
-              <AnalysisStopButton />
               <AnalysisRerunControls
                 catalogue={catalogue}
                 initialModelProfileId={analysis.modelProfileId}
@@ -154,7 +162,6 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
                   panelTitle: access("panelTitle"),
                   model: access("model"),
                   selected: access("selected"),
-                  unevaluatedWarning: access("unevaluatedWarning"),
                   apiKey: access("apiKey"),
                   keyFailed: access("keyFailed"),
                   keyErrors: access.raw("keyErrors") as Record<string, string>,
@@ -204,6 +211,6 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
           </main>
         )}
       </div>
-    </>
+    </RequirementSelectionProvider>
   );
 }

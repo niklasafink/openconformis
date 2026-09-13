@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { PolicyDocumentViewer, type PolicyOriginal } from "./policy-document-viewer";
+import { useRequirementSelection } from "./requirement-selection";
 
 export type ResultStatus =
   | "fulfilled"
@@ -16,6 +17,8 @@ export type ResultStatus =
 
 export type ResultItem = {
   id: string;
+  /** Fachlicher Schlüssel der Anforderung, für die Auswahl einer neuen Analyse. */
+  requirementKey?: string;
   regulatoryId: string;
   title: string;
   legalText: string;
@@ -212,6 +215,7 @@ export function AnalysisResultsWorkspace({
     ? initialSelectedId
     : items[0]?.id;
   const [reviewItems, setReviewItems] = useState(items);
+  const selection = useRequirementSelection();
   const [selectedId, setSelectedId] = useState(initialId);
   const [confirmedById, setConfirmedById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(items.map((item) => [item.id, item.confirmedAt !== null])),
@@ -480,27 +484,58 @@ export function AnalysisResultsWorkspace({
 
       <div className="result-columns">
         <section className="result-list" aria-label={labels.requirement}>
-          <div className="result-column-header">{labels.requirement}</div>
+          <div className="result-column-header result-list-header">
+            {selection ? (
+              <Checkbox
+                aria-label={selection.labels.selectAll}
+                checked={
+                  selection.selectedKeys.size === 0
+                    ? false
+                    : selection.requirementKeys.every((key) => selection.selectedKeys.has(key))
+                      ? true
+                      : "indeterminate"
+                }
+                onCheckedChange={(checked) => selection.setAllSelected(checked === true)}
+              />
+            ) : null}
+            <span>{labels.requirement}</span>
+          </div>
           <div className="result-column-scroll">
-            {reviewItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="result-list-row"
-                data-active={item.id === selected.id || undefined}
-                onClick={() => selectRequirement(item.id)}
-              >
-                <span>
-                  <strong>{item.regulatoryId}</strong>
-                  <small>{item.title}</small>
-                </span>
-                <i
-                  data-result-status={item.pending ? undefined : item.status}
-                  data-result-pending={item.pending || undefined}
-                  aria-label={item.pending ? labels.pending.title : labels.status[item.status]}
-                />
-              </button>
-            ))}
+            {reviewItems.map((item) => {
+              const active = item.id === selected.id || undefined;
+              const row = (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="result-list-row"
+                  data-active={active}
+                  onClick={() => selectRequirement(item.id)}
+                >
+                  <span>
+                    <strong>{item.regulatoryId}</strong>
+                    <small>{item.title}</small>
+                  </span>
+                  <i
+                    data-result-status={item.pending ? undefined : item.status}
+                    data-result-pending={item.pending || undefined}
+                    aria-label={item.pending ? labels.pending.title : labels.status[item.status]}
+                  />
+                </button>
+              );
+              const key = item.requirementKey;
+              if (!selection || !key) return row;
+              // Häkchen links bestimmen, was „Neue Analyse · Nur Auswahl" prüft.
+              return (
+                <div key={item.id} className="result-list-item" data-active={active}>
+                  <Checkbox
+                    aria-label={selection.labels.select.replace("{requirement}", item.regulatoryId)}
+                    checked={selection.selectedKeys.has(key)}
+                    onCheckedChange={(checked) => selection.setSelected(key, checked === true)}
+                  />
+                  {row}
+                </div>
+              );
+            })}
           </div>
         </section>
 

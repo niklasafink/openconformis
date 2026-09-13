@@ -159,7 +159,6 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
                 panelTitle: t("panelTitle"),
                 model: t("model"),
                 selected: t("selected"),
-                unevaluatedWarning: t("unevaluatedWarning"),
                 apiKey: t("apiKey"),
                 keyFailed: t("keyFailed"),
                 keyErrors: t.raw("keyErrors") as Record<string, string>,

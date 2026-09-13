@@ -435,4 +435,14 @@ Consequences: the source run stays unchanged as its own record. Model, route and
 instruction versions are frozen per run as before; a restart is a new run, not a
 change to the old one. No migration is required.
 
+Amendment (2026-09-13): the header shows one run action instead of two — "Analyse
+abbrechen" while the run is queued or running, afterwards "Neue Analyse" with a menu
+for "Alle Anforderungen" or "Nur Auswahl". The requirement list carries checkboxes;
+"Nur Auswahl" sends their `requirementKeys`, and the rerun copies only those scope
+items (every key must exist in the source run). Model and key field starts nothing on
+Enter or autofill, only on the start button. At the owner's request the popover no
+longer shows the unevaluated-model sentence; clicking start counts as acknowledging it
+(`unevaluatedWarningAccepted: true`). The notification bell lists each message in its
+own bordered entry and no longer offers a new analysis.
+
 Decision: accepted.
