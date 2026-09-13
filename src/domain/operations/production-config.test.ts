@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkProductionConfig } from "./production-config";
+import { checkByokEncryptionConfig, checkProductionConfig } from "./production-config";
 
 function completeEnvironment(): NodeJS.ProcessEnv {
   return {
@@ -18,8 +18,35 @@ function completeEnvironment(): NodeJS.ProcessEnv {
     BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_example",
     CRON_SECRET: "c".repeat(32),
     BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+    BYOK_ENCRYPTION_KEY_VERSION: "1",
   };
 }
+
+describe("BYOK encryption configuration", () => {
+  const key = Buffer.alloc(32, 7).toString("base64");
+  const variables = (environment: Record<string, string>) =>
+    checkByokEncryptionConfig(environment as NodeJS.ProcessEnv).map(({ variable }) => variable);
+
+  it("accepts values pasted with surrounding quotes, like the runtime does", () => {
+    expect(
+      variables({
+        BYOK_ENCRYPTION_KEY: `"${key}"`,
+        BYOK_ENCRYPTION_KEY_VERSION: '"1"',
+        BYOK_CREDENTIAL_TTL_HOURS: '"24"',
+      }),
+    ).toEqual([]);
+  });
+
+  it("names every variable that blocks storing user keys", () => {
+    expect(
+      variables({
+        BYOK_ENCRYPTION_KEY: "not-a-key",
+        BYOK_ENCRYPTION_KEY_VERSION: "",
+        BYOK_CREDENTIAL_TTL_HOURS: "48",
+      }),
+    ).toEqual(["BYOK_ENCRYPTION_KEY", "BYOK_ENCRYPTION_KEY_VERSION", "BYOK_CREDENTIAL_TTL_HOURS"]);
+  });
+});
 
 describe("production configuration", () => {
   it("accepts the serverless Vercel configuration", () => {

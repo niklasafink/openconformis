@@ -20,7 +20,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:https": "NEXT_PUBLIC_APP_URL=https://localhost:3000 next dev --experimental-https --experimental-https-key certificates/localhost-key.pem --experimental-https-cert certificates/localhost.pem",
-    "build": "next build --webpack",
+    "build": "node --import tsx scripts/check-byok-config.ts && next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

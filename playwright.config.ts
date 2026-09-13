@@ -19,6 +19,9 @@ const sharedServerEnv = {
   DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED ?? databaseUrl,
   TURNSTILE_ENFORCED: "false",
   ABUSE_HASH_SECRET: "e2e-only-abuse-hash-secret-at-least-thirty-two-characters",
+  // Nur für E2E: `/api/health` meldet ohne gültigen BYOK-Schlüssel `degraded`.
+  BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
+  BYOK_ENCRYPTION_KEY_VERSION: "1",
 };
 
 export default defineConfig({

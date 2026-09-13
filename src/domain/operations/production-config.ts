@@ -6,8 +6,12 @@ export type ProductionConfigIssue = Readonly<{
   severity: "error" | "warning";
 }>;
 
+/** Wie zur Laufzeit zählen beim Einfügen mitkopierte Anführungszeichen nicht. */
 function value(environment: NodeJS.ProcessEnv, name: string) {
-  return environment[name]?.trim() ?? "";
+  return (environment[name] ?? "")
+    .trim()
+    .replace(/^(["'])(.*)\1$/su, "$2")
+    .trim();
 }
 
 function requireValue(
@@ -79,6 +83,32 @@ function validateByokKey(issues: ProductionConfigIssue[], environment: NodeJS.Pr
   }
 }
 
+/**
+ * Ohne gültigen Schlüssel und Version kann der Server keinen Nutzer-Schlüssel
+ * speichern, und jede BYOK-Verbindung scheitert. Health-Check und
+ * Produktions-Build prüfen deshalb genau diese Werte.
+ */
+export function checkByokEncryptionConfig(environment: NodeJS.ProcessEnv): ProductionConfigIssue[] {
+  const issues: ProductionConfigIssue[] = [];
+  validateByokKey(issues, environment);
+  if (!/^[1-9][0-9]*$/u.test(value(environment, "BYOK_ENCRYPTION_KEY_VERSION"))) {
+    issues.push({
+      variable: "BYOK_ENCRYPTION_KEY_VERSION",
+      message: "must be a positive integer",
+      severity: "error",
+    });
+  }
+  const ttl = value(environment, "BYOK_CREDENTIAL_TTL_HOURS");
+  if (ttl && !(/^[0-9]+$/u.test(ttl) && Number(ttl) >= 1 && Number(ttl) <= 24)) {
+    issues.push({
+      variable: "BYOK_CREDENTIAL_TTL_HOURS",
+      message: "must be an integer between 1 and 24",
+      severity: "error",
+    });
+  }
+  return issues;
+}
+
 export function checkProductionConfig(
   environment: NodeJS.ProcessEnv,
   target: ProductionRuntimeTarget = "all",
@@ -100,7 +130,7 @@ export function checkProductionConfig(
     requireExact(issues, environment, "STORAGE_DRIVER", "vercel-blob");
     requireValue(issues, environment, "BLOB_READ_WRITE_TOKEN");
     requireMinimumLength(issues, environment, "CRON_SECRET", 32);
-    validateByokKey(issues, environment);
+    issues.push(...checkByokEncryptionConfig(environment));
     if (
       value(environment, "NEON_AUTH_COOKIE_SECRET") &&
       value(environment, "NEON_AUTH_COOKIE_SECRET") === value(environment, "BYOK_ENCRYPTION_KEY")
