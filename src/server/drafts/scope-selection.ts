@@ -113,12 +113,12 @@ export async function persistDraftScope(input: {
     }),
     getAnalysisModelCatalogue(),
   ]);
-  // Vorbelegung bevorzugt ein evaluiertes Modell. Ein ungeprüftes gilt erst mit
-  // dem Klick auf „Analyse starten" als bestätigt.
+  // Vorbelegt wird nur ein evaluiertes Modell. Ein ungeprüftes darf ohne
+  // Kenntnisnahme nicht gespeichert werden (draft_model_selections_content_check);
+  // der Modellzugang im Ergebnis speichert es mit dem Klick auf „Analyse starten".
   const defaultModel = existingModelSelection
     ? null
-    : (catalogue.models.find((model) => model.evaluated) ?? catalogue.models[0]);
-  if (!existingModelSelection && !defaultModel) throw new Error("MODEL_CATALOGUE_INVALID");
+    : catalogue.models.find((model) => model.evaluated);
 
   const now = new Date();
   await db.transaction(async (transaction) => {

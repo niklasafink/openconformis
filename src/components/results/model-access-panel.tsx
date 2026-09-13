@@ -176,9 +176,10 @@ export function ModelAccessPanel({
     setPending(true);
     setError(null);
     try {
-      // Der bewusste Klick auf „Analyse starten" gilt als Kenntnisnahme, dass das
-      // Modell nicht evaluiert ist.
-      if (!model.evaluated && !(await saveModel(model.id, true))) {
+      // Der Start friert die gespeicherte Route ein; sie muss dem gewählten Modell
+      // entsprechen, auch wenn der Umfang keine Vorbelegung speichern konnte. Der
+      // bewusste Klick gilt als Kenntnisnahme, dass das Modell nicht evaluiert ist.
+      if (!(await saveModel(model.id, !model.evaluated))) {
         setError(labels.modelFailed);
         return;
       }

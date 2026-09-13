@@ -61,7 +61,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     getCurrentPolicyPreview(draft),
   ]);
 
-  if (!boundDraft || !scope?.modelSelection || !policyPreview) {
+  if (!boundDraft || !scope || !policyPreview) {
     // Ohne Draft-Bindung lässt sich der Schritt nicht rekonstruieren — der
     // Bindungs-Cookie ist der Eigentumsnachweis am Draft. Angemeldete Nutzer
     // beginnen neu, nicht angemeldete gehen auf die Anmeldefläche, die ohne
@@ -164,7 +164,8 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
               catalogue={catalogue}
               draftId={boundDraft.id}
               initialCredential={initialCredential}
-              initialModelProfileId={scope.modelSelection.modelProfileId}
+              // Ohne gespeicherte Route wählt das Feld das erste Katalogmodell.
+              initialModelProfileId={scope.modelSelection?.modelProfileId ?? ""}
               initialSavedCredentials={savedCredentials}
               locale={locale}
               selectModelAction={selectAnalysisModel}
