@@ -1937,32 +1937,6 @@ i[data-result-pending="true"] {
   line-height: 1.55;
 }
 
-/* Laufzustand in der Kopfzeile, direkt neben dem Seitentitel. */
-.analysis-run-strip {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.analysis-run-strip .analysis-run-status {
-  padding: 2px 8px;
-  font-size: 12px;
-}
-
-.analysis-run-strip-stage {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.analysis-run-strip-stage[data-status="failed"] {
-  color: var(--status-not-met);
-}
-
 .analysis-run-status[data-status="failed"] {
   border-color: #f0caca;
   background: var(--status-not-met-bg);

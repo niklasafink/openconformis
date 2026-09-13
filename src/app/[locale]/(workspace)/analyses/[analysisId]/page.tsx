@@ -2,6 +2,11 @@ import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 
+import {
+  AnalysisNotificationsButton,
+  AnalysisRunHeaderProvider,
+  AnalysisRunHeaderStatus,
+} from "@/components/results/analysis-run-header";
 import { AnalysisRunLive } from "@/components/results/analysis-run-live";
 import { AnalysisResultsWorkspace } from "@/components/results/analysis-results-workspace";
 import { ModelAccessStatus } from "@/components/results/model-access-panel";
@@ -97,50 +102,56 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     },
   };
 
-  const assessedLabel = results
-    ? resultLabels.pending.assessedCount
-        .replace("{assessed}", String(results.items.filter(({ pending }) => !pending).length))
-        .replace("{total}", String(results.items.length))
-    : undefined;
+  const runHeaderLabels = {
+    ...liveLabels,
+    assessedCount: resultLabels.pending.assessedCount,
+    notifications: t("notifications"),
+    noNotifications: t("noNotifications"),
+    dismiss: t("dismiss"),
+    showNotice: t("showNotice"),
+    newAnalysis: t("newAnalysis"),
+  };
 
   return (
     <>
-      <PageHeader
-        title={navigation("results")}
-        status={
-          running && results ? (
-            <AnalysisRunLive
-              analysisId={analysis.id}
-              compact
-              assessedLabel={assessedLabel}
-              frameworkSlug={analysis.frameworkSlug}
-              requirementCount={analysis.requirementCount}
-              failure={{ code: analysis.failureCode, detail: analysis.failureDetail }}
-              createdAtLabel={createdAtLabel}
-              initialState={{
-                status: analysis.status,
-                stage: analysis.stage,
-                progressPercent: analysis.progressPercent,
-              }}
-              labels={liveLabels}
-            />
-          ) : null
-        }
-        actions={
-          <>
-            <ModelAccessStatus
-              lastFour={boundCredential ? (boundCredential.lastFour ?? "") : null}
-              labels={{
-                panelTitle: access("panelTitle"),
-                apiKey: access("apiKey"),
-                connected: access("connected"),
-                notConnected: access("notConnected"),
-              }}
-            />
-            <LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />
-          </>
-        }
-      />
+      <AnalysisRunHeaderProvider
+        analysisId={analysis.id}
+        failure={{ code: analysis.failureCode, detail: analysis.failureDetail }}
+        initialState={{
+          status: analysis.status,
+          stage: analysis.stage,
+          progressPercent: analysis.progressPercent,
+        }}
+        labels={runHeaderLabels}
+        newAnalysisHref={`/${locale}/analyses/new/framework`}
+      >
+        <PageHeader
+          title={navigation("results")}
+          status={
+            running && results ? (
+              <AnalysisRunHeaderStatus
+                assessed={results.items.filter(({ pending }) => !pending).length}
+                total={results.items.length}
+              />
+            ) : null
+          }
+          actions={
+            <>
+              <AnalysisNotificationsButton />
+              <ModelAccessStatus
+                lastFour={boundCredential ? (boundCredential.lastFour ?? "") : null}
+                labels={{
+                  panelTitle: access("panelTitle"),
+                  apiKey: access("apiKey"),
+                  connected: access("connected"),
+                  notConnected: access("notConnected"),
+                }}
+              />
+              <LanguageMenu locale={locale} pathname={`/analyses/${analysis.id}`} />
+            </>
+          }
+        />
+      </AnalysisRunHeaderProvider>
       <div className="workspace-content min-w-0">
         {results ? (
           <AnalysisResultsWorkspace

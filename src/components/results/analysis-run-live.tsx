@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type AnalysisStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
-type AnalysisStage =
+export type AnalysisStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type AnalysisStage =
   | "queued"
   | "preprocessing"
   | "retrieval"
@@ -13,7 +13,7 @@ type AnalysisStage =
   | "finalizing"
   | "completed";
 
-type LiveState = {
+export type AnalysisRunState = {
   status: AnalysisStatus;
   stage: AnalysisStage;
   progressPercent: number;
@@ -24,11 +24,7 @@ type AnalysisRunLiveProps = {
   frameworkSlug: string;
   requirementCount: number;
   createdAtLabel: string;
-  initialState: LiveState;
-  /** Schmale Zeile neben dem Seitentitel statt eigenständiger Wartekarte. */
-  compact?: boolean;
-  /** Bereits bewertete Anforderungen, z. B. „1 von 10 bewertet". */
-  assessedLabel?: string;
+  initialState: AnalysisRunState;
   failure?: { code: string | null; detail: string | null };
   labels: {
     failureTitle: string;
@@ -48,17 +44,12 @@ type AnalysisRunLiveProps = {
 
 const terminalStatuses = new Set<AnalysisStatus>(["completed", "failed", "cancelled"]);
 
-export function AnalysisRunLive({
-  analysisId,
-  assessedLabel,
-  compact = false,
-  failure,
-  frameworkSlug,
-  requirementCount,
-  createdAtLabel,
-  initialState,
-  labels,
-}: AnalysisRunLiveProps) {
+/**
+ * Fragt den Zustand eines Laufs ab, bis er endet. Bei Fortschritt und beim
+ * Ende lädt die Seite ihre Serverdaten nach, damit Bewertungen und die
+ * Begründung eines Fehlschlags erscheinen.
+ */
+export function useAnalysisRunState(analysisId: string, initialState: AnalysisRunState) {
   const router = useRouter();
   const [state, setState] = useState(initialState);
   const [pollingFailed, setPollingFailed] = useState(false);
@@ -83,7 +74,7 @@ export function AnalysisRunLive({
           headers: { accept: "application/json" },
         });
         if (!response.ok) throw new Error("ANALYSIS_STATUS_FAILED");
-        const next = (await response.json()) as LiveState;
+        const next = (await response.json()) as AnalysisRunState;
         if (disposed) return;
         setPollingFailed(false);
         const advanced = next.progressPercent !== state.progressPercent;
@@ -108,28 +99,19 @@ export function AnalysisRunLive({
     };
   }, [analysisId, router, state.progressPercent, state.status]);
 
-  if (compact) {
-    // Der Anbietertext nennt beim Fehlschlag die genaue Ursache; er steht
-    // vollständig im Tooltip, falls die Zeile ihn kürzen muss.
-    const detail =
-      state.status === "failed"
-        ? failure?.detail || failure?.code || labels.failureUnknown
-        : labels.stage[state.stage];
-    return (
-      <section className="analysis-run-strip" aria-live="polite">
-        <span className="analysis-run-status" data-status={state.status}>
-          {labels.status[state.status]}
-        </span>
-        <span className="analysis-run-strip-stage" data-status={state.status} title={detail}>
-          {detail}
-        </span>
-        <span className="analysis-run-strip-note" aria-label={labels.progressLabel}>
-          {pollingFailed ? labels.pollingFailed : `${state.progressPercent} %`}
-          {assessedLabel ? ` · ${assessedLabel}` : null}
-        </span>
-      </section>
-    );
-  }
+  return { state, pollingFailed };
+}
+
+export function AnalysisRunLive({
+  analysisId,
+  failure,
+  frameworkSlug,
+  requirementCount,
+  createdAtLabel,
+  initialState,
+  labels,
+}: AnalysisRunLiveProps) {
+  const { state, pollingFailed } = useAnalysisRunState(analysisId, initialState);
 
   return (
     <section className="analysis-run-card" aria-live="polite">

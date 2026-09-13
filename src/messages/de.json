@@ -320,7 +320,12 @@
     },
     "failureTitle": "Der Lauf ist fehlgeschlagen",
     "failureUnknown": "Die Ursache wurde nicht festgehalten.",
-    "failureHint": "Konfigurations- und Zugangsfehler werden in der Umgebung oder der Administration behoben. Ihr Schlüssel wurde nicht verbraucht — starten Sie die Analyse danach erneut."
+    "failureHint": "Konfigurations- und Zugangsfehler werden in der Umgebung oder der Administration behoben. Ihr Schlüssel wurde nicht verbraucht — starten Sie die Analyse danach erneut.",
+    "notifications": "Benachrichtigungen",
+    "noNotifications": "Keine Benachrichtigungen",
+    "dismiss": "Meldung ausblenden",
+    "showNotice": "Wieder anzeigen",
+    "newAnalysis": "Neue Analyse"
   },
   "Auth": {
     "signInTitle": "Anmelden",

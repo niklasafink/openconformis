@@ -320,7 +320,12 @@
     },
     "failureTitle": "The run failed",
     "failureUnknown": "The cause was not recorded.",
-    "failureHint": "Configuration and access errors are resolved in the environment or in administration. Your key was not consumed — start the analysis again afterwards."
+    "failureHint": "Configuration and access errors are resolved in the environment or in administration. Your key was not consumed — start the analysis again afterwards.",
+    "notifications": "Notifications",
+    "noNotifications": "No notifications",
+    "dismiss": "Dismiss message",
+    "showNotice": "Show again",
+    "newAnalysis": "New analysis"
   },
   "Auth": {
     "signInTitle": "Log in",
