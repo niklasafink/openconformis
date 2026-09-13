@@ -130,7 +130,7 @@ export function AppSidebar({
 
   return (
     <Sidebar variant="floating" collapsible="icon">
-      <SidebarHeader className="flex-row items-center justify-between px-3 pt-3 pb-4 group-data-[collapsible=icon]:px-1.5">
+      <SidebarHeader className="flex-row items-center justify-between px-3 pt-3 pb-4 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-1.5">
         <Link
           href="/analyses/new/framework"
           locale={locale}
@@ -142,10 +142,7 @@ export function AppSidebar({
             {labels.brand}
           </span>
         </Link>
-        <SidebarTrigger
-          aria-label={labels.toggleSidebar}
-          className="text-muted-foreground group-data-[collapsible=icon]:hidden"
-        />
+        <SidebarTrigger aria-label={labels.toggleSidebar} className="text-muted-foreground" />
       </SidebarHeader>
 
       <SidebarContent>
