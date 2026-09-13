@@ -168,6 +168,8 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
                 notConnected: t("notConnected"),
                 unreachable: t("unreachable"),
                 keyFailed: t("keyFailed"),
+                modelNotAccessible: t("modelNotAccessible"),
+                routeBlocked: t("routeBlocked"),
                 modelFailed: t("modelFailed"),
                 start: t("start"),
                 starting: t("starting"),

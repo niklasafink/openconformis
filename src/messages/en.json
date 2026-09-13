@@ -211,6 +211,8 @@
     "notConnected": "No key connected",
     "unreachable": "Provider unreachable",
     "keyFailed": "The key or model access could not be confirmed.",
+    "modelNotAccessible": "The key is valid, but this model is not enabled for the account. Check the privacy and provider settings on OpenRouter or choose another model.",
+    "routeBlocked": "This model route is not enabled on the server. Please choose another model.",
     "modelFailed": "The model could not be applied.",
     "start": "Start analysis",
     "starting": "Starting analysis …",

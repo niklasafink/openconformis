@@ -16,7 +16,6 @@ import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import { aiCredentials } from "@/server/db/schema/ai";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
-import { configuredSet } from "@/server/environment";
 import {
   activeCredentialEncryptionConfiguration,
   decryptCredentialSecret,
@@ -25,7 +24,11 @@ import {
 } from "@/server/security/credential-crypto";
 
 import { validateProviderCredential } from "./credential-validation";
-import { getAnalysisProviderConfiguration, isAnalysisProviderAvailable } from "./provider-routing";
+import {
+  allowedByokProviders,
+  getAnalysisProviderConfiguration,
+  isAnalysisProviderAvailable,
+} from "./provider-routing";
 
 export class TemporaryCredentialError extends Error {
   constructor(public readonly code: string) {
@@ -80,7 +83,7 @@ export async function createTemporaryCredential(input: {
   ) {
     throw new TemporaryCredentialError("BYOK_INPUT_INVALID");
   }
-  if (!configuredSet("BYOK_PROVIDER_ALLOWLIST").has(provider)) {
+  if (!allowedByokProviders().has(provider)) {
     throw new TemporaryCredentialError("BYOK_PROVIDER_DISABLED");
   }
   if (purpose === "analysis" && !isAnalysisProviderAvailable(provider)) {

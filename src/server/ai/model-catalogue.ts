@@ -15,27 +15,43 @@ import {
   openRouterZeroDataRetention,
 } from "./openrouter-route";
 
-import { isAnalysisProviderAvailable } from "./provider-routing";
+import { allowedByokProviders } from "./provider-routing";
+
+const openRouterModelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  context_length: z.number().int().nonnegative().optional(),
+  pricing: z
+    .object({
+      prompt: z.string().optional(),
+      completion: z.string().optional(),
+    })
+    .optional(),
+  supported_parameters: z.array(z.string()).optional(),
+  architecture: z.object({ output_modalities: z.array(z.string()).optional() }).optional(),
+});
 
 const openRouterModelsSchema = z.object({
-  data: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().min(1),
-        context_length: z.number().int().nonnegative().optional(),
-        pricing: z
-          .object({
-            prompt: z.string().optional(),
-            completion: z.string().optional(),
-          })
-          .optional(),
-        supported_parameters: z.array(z.string()).optional(),
-        architecture: z.object({ output_modalities: z.array(z.string()).optional() }).optional(),
-      }),
-    )
-    .max(2_000),
+  data: z.array(openRouterModelSchema).max(2_000),
 });
+
+type OpenRouterModel = z.infer<typeof openRouterModelSchema>;
+
+/**
+ * Feste Modellauswahl der Analyse: je ein Modell von Anthropic, OpenAI und
+ * Google sowie zwei chinesische Modelle, alle über OpenRouter. Der offene
+ * Katalog mit Hunderten Einträgen machte die Wahl beliebig und ließ Routen
+ * vorauswählen, für die es keinen Analysepfad gibt.
+ */
+export const analysisModelShortlist = [
+  { modelId: "anthropic/claude-sonnet-5", publisher: "Anthropic", name: "Claude Sonnet 5" },
+  { modelId: "openai/gpt-5.5", publisher: "OpenAI", name: "GPT-5.5" },
+  { modelId: "google/gemini-3.8-flash", publisher: "Google", name: "Gemini 3.8 Flash" },
+  { modelId: "moonshotai/kimi-k3", publisher: "Moonshot AI", name: "Kimi K3" },
+  { modelId: "z-ai/glm-5.3", publisher: "Z.ai", name: "GLM 5.3" },
+] as const;
+
+type ShortlistEntry = (typeof analysisModelShortlist)[number];
 
 export class ModelCatalogueError extends Error {
   constructor(public readonly code: "MODEL_CATALOGUE_UNAVAILABLE" | "MODEL_CATALOGUE_INVALID") {
@@ -93,18 +109,6 @@ function profilesFromEnvironment(
   );
 }
 
-function configuredDirectProfiles() {
-  const evaluated = evaluatedModelIds();
-  const definitions: ProviderModelList[] = [
-    { provider: "requesty", environmentName: "BYOK_REQUESTY_ANALYSIS_MODELS" },
-    { provider: "openai", environmentName: "BYOK_OPENAI_ANALYSIS_MODELS", publisher: "OpenAI" },
-  ];
-  return profilesFromEnvironment(
-    definitions.filter(({ provider }) => isAnalysisProviderAvailable(provider)),
-    (provider, modelId) => ({ evaluated: isEvaluated(evaluated, provider, modelId) }),
-  );
-}
-
 function configuredChatProfiles() {
   return profilesFromEnvironment(
     [
@@ -129,18 +133,21 @@ function defaultAnalysisModelId() {
   return process.env.DEFAULT_ANALYSIS_MODEL_PROFILE?.trim() || "anthropic/claude-sonnet-5";
 }
 
-function fallbackProfiles(): AnalysisModelProfile[] {
-  const modelId = defaultAnalysisModelId();
-  return [
-    {
-      id: `openrouter:${modelId}`,
-      publisher: publisherFromModelId(modelId),
-      name: displayName(modelId),
-      routeProvider: "openrouter",
-      providerModelId: modelId,
-      evaluated: isEvaluated(evaluatedModelIds(), "openrouter", modelId),
-    },
-  ];
+function shortlistProfile(
+  entry: ShortlistEntry,
+  discovered?: OpenRouterModel,
+): AnalysisModelProfile {
+  return {
+    id: `openrouter:${entry.modelId}`,
+    publisher: entry.publisher,
+    name: entry.name,
+    routeProvider: "openrouter",
+    providerModelId: entry.modelId,
+    contextLength: discovered?.context_length || undefined,
+    promptPricePerMillion: pricePerMillion(discovered?.pricing?.prompt),
+    completionPricePerMillion: pricePerMillion(discovered?.pricing?.completion),
+    evaluated: isEvaluated(evaluatedModelIds(), "openrouter", entry.modelId),
+  };
 }
 
 async function curatedProfiles() {
@@ -170,38 +177,37 @@ function isSelectable(model: AnalysisModelProfile) {
   );
 }
 
-function mergeCuratedProfiles(discovered: AnalysisModelProfile[], curated: AnalysisModelProfile[]) {
+/** Kuratierte Profile bewerten die Auswahl, fügen aber keine weiteren Modelle hinzu. */
+function withCuratedDecisions(models: AnalysisModelProfile[], curated: AnalysisModelProfile[]) {
   const curatedByRoute = new Map(
     curated.map((model) => [`${model.routeProvider}:${model.providerModelId}`, model]),
   );
-  const merged = discovered
+  return models
     .map((model) => {
       const decision = curatedByRoute.get(`${model.routeProvider}:${model.providerModelId}`);
       return decision ? { ...model, ...decision } : { ...model, lifecycle: "unevaluated" as const };
     })
     .filter(isSelectable);
-  for (const model of curated) {
-    if (isSelectable(model) && !merged.some(({ id }) => id === model.id)) merged.push(model);
-  }
-  return merged;
 }
 
 /**
- * Die Oberfläche wählt den ersten Eintrag vor. Ohne diesen Rang gewann der
- * alphabetisch erste Anbieter, sodass ein beliebiges Modell die Standardanalyse
- * führte, obwohl DEFAULT_ANALYSIS_MODEL_PROFILE ein anderes benennt.
+ * Die Oberfläche wählt den ersten Eintrag vor. Ohne diesen Rang gewann ein
+ * beliebiges Modell die Standardanalyse, obwohl DEFAULT_ANALYSIS_MODEL_PROFILE
+ * ein anderes benennt.
  */
 function isDefaultAnalysisModel(model: AnalysisModelProfile) {
   return model.providerModelId === defaultAnalysisModelId();
 }
 
-function byEvaluationThenName(left: AnalysisModelProfile, right: AnalysisModelProfile) {
+function shortlistRank(model: AnalysisModelProfile) {
+  return analysisModelShortlist.findIndex(({ modelId }) => modelId === model.providerModelId);
+}
+
+function byEvaluationThenShortlist(left: AnalysisModelProfile, right: AnalysisModelProfile) {
   return (
     Number(right.evaluated) - Number(left.evaluated) ||
     Number(isDefaultAnalysisModel(right)) - Number(isDefaultAnalysisModel(left)) ||
-    left.publisher.localeCompare(right.publisher, "en") ||
-    left.name.localeCompare(right.name, "en") ||
-    left.routeProvider.localeCompare(right.routeProvider, "en")
+    shortlistRank(left) - shortlistRank(right)
   );
 }
 
@@ -209,13 +215,21 @@ function catalogueOf(models: AnalysisModelProfile[]): AnalysisModelCatalogue {
   return { version: createContentHash(models), fetchedAt: new Date().toISOString(), models };
 }
 
-/** Katalog ohne Anbieterabfrage: konfigurierte Standardmodelle plus kuratierte Profile. */
+/** Auswahlkatalog; bleibt nach Kuratierung nichts übrig, gilt die volle Auswahl. */
+function shortlistCatalogue(models: AnalysisModelProfile[], curated: AnalysisModelProfile[]) {
+  const selectable = withCuratedDecisions(models, curated);
+  const offered =
+    selectable.length > 0
+      ? selectable
+      : analysisModelShortlist.map((entry) => shortlistProfile(entry));
+  return catalogueOf(offered.sort(byEvaluationThenShortlist));
+}
+
+/** Katalog ohne Anbieterabfrage: die feste Auswahl ohne Preise und Kontextlängen. */
 function offlineCatalogue(curated: AnalysisModelProfile[]) {
-  return catalogueOf(
-    mergeCuratedProfiles([...fallbackProfiles(), ...configuredDirectProfiles()], curated).slice(
-      0,
-      500,
-    ),
+  return shortlistCatalogue(
+    analysisModelShortlist.map((entry) => shortlistProfile(entry)),
+    curated,
   );
 }
 
@@ -260,30 +274,22 @@ export async function getAnalysisModelCatalogue(
 
   const parsed = openRouterModelsSchema.safeParse(payload);
   if (!parsed.success) throw new ModelCatalogueError("MODEL_CATALOGUE_INVALID");
-  const evaluated = evaluatedModelIds();
-  const openRouterModels = parsed.data.data
-    .filter(
-      (model) =>
-        model.supported_parameters?.includes("structured_outputs") &&
-        (model.architecture?.output_modalities ?? ["text"]).includes("text"),
-    )
-    .slice(0, 500)
-    .map((model): AnalysisModelProfile => ({
-      id: `openrouter:${model.id}`,
-      publisher: publisherFromModelId(model.id),
-      name: model.name,
-      routeProvider: "openrouter",
-      providerModelId: model.id,
-      contextLength: model.context_length || undefined,
-      promptPricePerMillion: pricePerMillion(model.pricing?.prompt),
-      completionPricePerMillion: pricePerMillion(model.pricing?.completion),
-      evaluated: isEvaluated(evaluated, "openrouter", model.id),
-    }));
+  const structuredTextModels = new Map(
+    parsed.data.data
+      .filter(
+        (model) =>
+          model.supported_parameters?.includes("structured_outputs") &&
+          (model.architecture?.output_modalities ?? ["text"]).includes("text"),
+      )
+      .map((model) => [model.id, model]),
+  );
 
-  const models = mergeCuratedProfiles([...openRouterModels, ...configuredDirectProfiles()], curated)
-    .slice(0, 500)
-    .sort(byEvaluationThenName);
-  return catalogueOf(models.length > 0 ? models : fallbackProfiles());
+  // Ein Modell der Auswahl, das die Route nicht strukturiert bedienen kann,
+  // entfällt: die Schlüsselprüfung würde es ohnehin ablehnen.
+  const models = analysisModelShortlist
+    .filter(({ modelId }) => structuredTextModels.has(modelId))
+    .map((entry) => shortlistProfile(entry, structuredTextModels.get(entry.modelId)));
+  return shortlistCatalogue(models, curated);
 }
 
 export async function resolveAnalysisModelSelection(input: {
@@ -301,7 +307,7 @@ export async function getChatModelCatalogue(): Promise<AnalysisModelCatalogue> {
     getAnalysisModelCatalogue(),
     curatedProfiles(),
   ]);
-  const allowedProviders = configuredSet("BYOK_PROVIDER_ALLOWLIST");
+  const allowedProviders = allowedByokProviders();
   const candidates = [...analysisCatalogue.models, ...configuredChatProfiles(), ...curated]
     .filter((model) => allowedProviders.has(model.routeProvider))
     .filter((model) => model.supportsStreaming !== false)

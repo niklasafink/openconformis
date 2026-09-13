@@ -37,6 +37,8 @@ export type ModelAccessLabels = Readonly<{
   notConnected: string;
   unreachable: string;
   keyFailed: string;
+  modelNotAccessible: string;
+  routeBlocked: string;
   modelFailed: string;
   start: string;
   starting: string;
@@ -181,7 +183,16 @@ export function ModelAccessPanel({
       const payload = (await response.json()) as { credentialId?: string; code?: string };
       if (!response.ok || !payload.credentialId) {
         const unreachable = response.status === 503 || payload.code === "PROVIDER_UNAVAILABLE";
-        setFailure({ message: unreachable ? labels.unreachable : labels.keyFailed, unreachable });
+        // Ein gesperrter Anbieter oder ein nicht freigegebenes Modell ist kein
+        // falscher Schlüssel; die Meldung benennt den tatsächlichen Grund.
+        const message = unreachable
+          ? labels.unreachable
+          : response.status === 409
+            ? labels.routeBlocked
+            : payload.code === "MODEL_NOT_ACCESSIBLE"
+              ? labels.modelNotAccessible
+              : labels.keyFailed;
+        setFailure({ message, unreachable });
         return;
       }
       setCredential({

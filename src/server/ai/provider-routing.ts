@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AiRouteProvider } from "@/domain/ai/provider";
+import { configuredSet } from "@/server/environment";
 
 import { openRouterBaseUrl, openRouterZeroDataRetention } from "./openrouter-route";
 export { openRouterZeroDataRetention } from "./openrouter-route";
@@ -49,6 +50,16 @@ function analysisBaseUrl(provider: AiRouteProvider) {
     case "google":
       return undefined;
   }
+}
+
+/**
+ * Freigegebene BYOK-Anbieter. Ohne gesetzte Liste bleibt OpenRouter erlaubt,
+ * die Route aller Modelle der Auswahl — eine leere oder beim Speichern
+ * verlorene Variable sperrte sonst jede Schlüsseleingabe.
+ */
+export function allowedByokProviders(): ReadonlySet<string> {
+  const configured = configuredSet("BYOK_PROVIDER_ALLOWLIST");
+  return configured.size > 0 ? configured : new Set(["openrouter"]);
 }
 
 export function isAnalysisProviderAvailable(provider: AiRouteProvider) {
