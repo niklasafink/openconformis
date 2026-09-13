@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Asterisk,
-  ChevronDown,
-  ChevronRight,
-  ListChecks,
-  MessageSquarePlus,
-  Settings,
-} from "lucide-react";
+import { Asterisk, ChevronDown, ChevronRight, ListChecks, Settings } from "lucide-react";
 
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -19,7 +12,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -51,7 +43,6 @@ export type SidebarLabels = Readonly<{
   noProjects: string;
   recentChats: string;
   noChats: string;
-  newChat: string;
   toggleSidebar: string;
 }>;
 
@@ -158,7 +149,7 @@ export function AppSidebar({
                   >
                     <span
                       aria-hidden="true"
-                      className="flex size-4 shrink-0 items-center justify-center text-[15px] leading-none"
+                      className="flex size-3.5 shrink-0 items-center justify-center text-[12px] leading-none"
                     >
                       💬
                     </span>
@@ -179,13 +170,13 @@ export function AppSidebar({
                     tooltip={labels.gapAnalysis}
                   >
                     <Link href={stepPath.framework} locale={locale}>
-                      <ListChecks className="text-sky-600" />
+                      <ListChecks className="size-3.5! text-sky-600" />
                       <span>{labels.gapAnalysis}</span>
                     </Link>
                   </SidebarMenuButton>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuAction aria-label={labels.gapAnalysis}>
-                      <ChevronRight className="transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                      <ChevronRight className="size-3.5! transition-transform group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuAction>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -223,7 +214,7 @@ export function AppSidebar({
                       locale={locale}
                       aria-current={activeArea === "administration" ? "page" : undefined}
                     >
-                      <Settings className="text-muted-foreground" />
+                      <Settings className="size-3.5! text-muted-foreground" />
                       <span>{labels.administration}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -238,7 +229,7 @@ export function AppSidebar({
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="text-[13px] font-semibold text-muted-foreground hover:text-foreground">
                 {labels.recentProjects}
-                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                <ChevronDown className="ml-auto size-3.5! transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
             </SidebarGroupLabel>
             <CollapsibleContent>
@@ -278,14 +269,9 @@ export function AppSidebar({
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="text-[13px] font-semibold text-muted-foreground hover:text-foreground">
                 {labels.recentChats}
-                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                <ChevronDown className="ml-auto size-3.5! transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
             </SidebarGroupLabel>
-            <SidebarGroupAction asChild title={labels.newChat}>
-              <Link href="/chat" locale={locale} aria-label={labels.newChat}>
-                <MessageSquarePlus />
-              </Link>
-            </SidebarGroupAction>
             <CollapsibleContent>
               <SidebarGroupContent>
                 {threads.length === 0 ? (

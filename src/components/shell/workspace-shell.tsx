@@ -89,7 +89,6 @@ export async function WorkspaceShell({ children, locale }: WorkspaceShellProps) 
           noProjects: t("noProjects"),
           recentChats: t("recentChats"),
           noChats: t("noChats"),
-          newChat: t("newChat"),
           toggleSidebar: t("toggleSidebar"),
         }}
         userLabels={{
