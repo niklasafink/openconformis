@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AnalysisResultsWorkspace } from "./analysis-results-workspace";
+import { AnalysisResultsWorkspace, explanationPoints } from "./analysis-results-workspace";
 import { splitEvidenceHighlight } from "./policy-document-viewer";
 
 const labels = {
@@ -11,7 +11,9 @@ const labels = {
   organizationContext: "Unternehmenskontext",
   assessment: "Begründung der Bewertung",
   confidence: "Konfidenz",
-  missingInformation: "Fehlende Informationen",
+  todos: "To-dos",
+  todosProgress: "{done} von {total} erledigt",
+  todoFailed: "To-do nicht gespeichert",
   evidence: "Belegstellen",
   noEvidence: "Keine Belegstellen",
   page: "Seite",
@@ -69,6 +71,7 @@ const item = {
   override: null,
   explanation: "Die laufende Überwachung ist nicht belegt.",
   missingInformation: [],
+  resolvedTodoIndexes: [],
   confidencePercent: 88,
   verificationStatus: "passed" as const,
   confirmedAt: null,
@@ -78,6 +81,81 @@ const item = {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+describe("assessment rationale points", () => {
+  it("keeps one point per line and drops the bullet markers", () => {
+    expect(
+      explanationPoints("- Das Leitungsorgan genehmigt den Rahmen.\n\n• Die Überwachung fehlt."),
+    ).toEqual(["Das Leitungsorgan genehmigt den Rahmen.", "Die Überwachung fehlt."]);
+  });
+
+  it("splits older prose at sentence ends but not after abbreviations or numbers", () => {
+    expect(
+      explanationPoints(
+        "Art. 5 Abs. 2 DORA verlangt z. B. eine Genehmigung. Die Policy nennt am 14. Dezember keine Überwachung. Belege fehlen.",
+      ),
+    ).toEqual([
+      "Art. 5 Abs. 2 DORA verlangt z. B. eine Genehmigung.",
+      "Die Policy nennt am 14. Dezember keine Überwachung.",
+      "Belege fehlen.",
+    ]);
+  });
+});
+
+describe("analysis result to-dos", () => {
+  const withTodos = {
+    ...item,
+    missingInformation: ["Genehmigung durch das Leitungsorgan", "Überwachung der Umsetzung"],
+    resolvedTodoIndexes: [1],
+  };
+
+  it("persists a checked to-do and updates the done count", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ resolvedTodoIndexes: [0, 1] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        canConfirm={false}
+        canOverride
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[withTodos]}
+        labels={labels}
+        documentBlocks={[]}
+      />,
+    );
+
+    expect(screen.getByText("1 von 2 erledigt")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Überwachung der Umsetzung" })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Genehmigung durch das Leitungsorgan" }));
+
+    await waitFor(() => expect(screen.getByText("2 von 2 erledigt")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/analyses/3d594650-3436-4d0d-969e-a3b712c02ed0/results/98752346-fd91-46f0-96c3-568c729486cf/todos",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ index: 0, done: true }) }),
+    );
+  });
+
+  it("shows the to-do state read-only without review permission", () => {
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        canConfirm={false}
+        canOverride={false}
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[withTodos]}
+        labels={labels}
+        documentBlocks={[]}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "Überwachung der Umsetzung" })).toBeDisabled();
+  });
 });
 
 describe("analysis result confirmation UI", () => {

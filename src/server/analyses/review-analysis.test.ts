@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SessionPrincipal } from "@/server/auth/session-principal";
 
-import { canConfirmAssessment, canOverrideAssessment } from "./review-analysis";
+import { canConfirmAssessment, canOverrideAssessment, nextResolvedTodos } from "./review-analysis";
 
 function principal(
   roles: SessionPrincipal["roles"],
@@ -41,5 +41,17 @@ describe("analysis result override permission", () => {
 
   it("requires a verified email", () => {
     expect(canOverrideAssessment(principal(["reviewer"], false))).toBe(false);
+  });
+});
+
+describe("resolved to-do positions", () => {
+  it("adds a position once and keeps the list sorted", () => {
+    expect(nextResolvedTodos([2], 0, true)).toEqual([0, 2]);
+    expect(nextResolvedTodos([0, 2], 2, true)).toEqual([0, 2]);
+  });
+
+  it("reopens a position without touching the others", () => {
+    expect(nextResolvedTodos([0, 2], 0, false)).toEqual([2]);
+    expect(nextResolvedTodos([2], 1, false)).toEqual([2]);
   });
 });

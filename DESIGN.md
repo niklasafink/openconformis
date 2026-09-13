@@ -344,9 +344,15 @@ the URL and analysis state. Reloading must preserve progress and selection.
   than forcing unusable columns.
 - The requirement list header stays sticky.
 - Selected row is obvious but quiet.
-- Detail sections are outlined, rounded groups and can collapse independently.
-- Source group contains requirement, linked sub-requirements and company context.
-- Rationale has a subtle light-grey background to distinguish AI-generated text.
+- The detail column header carries only the pane label and the confirmation control.
+- The detail starts with one norm box: regulatory reference left and assessment status
+  right as a shared heading, legal text and linked sub-requirements below.
+- Further detail sections are outlined, rounded groups and can collapse independently;
+  company context starts collapsed.
+- Rationale is a short bullet list with a subtle light-grey background to distinguish
+  AI-generated text.
+- Missing aspects follow as checkable to-dos with a done count; checked items are
+  struck through and persisted per result.
 - Evidence is a separate outlined section.
 - Evidence references use consistent numbers in rationale, evidence list and source.
 - The document toolbar shows only the policy name.

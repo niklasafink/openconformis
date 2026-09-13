@@ -52,7 +52,10 @@ export async function PUT(
     ) {
       return NextResponse.json({ code: "TODO_FORBIDDEN" }, { status: 403 });
     }
-    if (error instanceof AnalysisResultNotFoundError || error instanceof AnalysisTodoNotFoundError) {
+    if (
+      error instanceof AnalysisResultNotFoundError ||
+      error instanceof AnalysisTodoNotFoundError
+    ) {
       return NextResponse.json({ code: "ANALYSIS_TODO_NOT_FOUND" }, { status: 404 });
     }
     if (error instanceof AnalysisNotCompletedError) {

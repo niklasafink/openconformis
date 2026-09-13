@@ -3,6 +3,8 @@
 import { ChevronDown, Download, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Checkbox } from "@/components/ui/checkbox";
+
 import { PolicyDocumentViewer, type PolicyOriginal } from "./policy-document-viewer";
 
 export type ResultStatus =
@@ -34,6 +36,8 @@ export type ResultItem = {
   override: { id: string; status: ResultStatus; reason: string; createdAt: string } | null;
   explanation: string;
   missingInformation: string[];
+  /** Positionen in missingInformation, die ein Mensch als erledigt abgehakt hat. */
+  resolvedTodoIndexes: number[];
   confidencePercent: number;
   verificationStatus: "pending" | "not_selected" | "passed" | "needs_review" | "rejected";
   confirmedAt: string | null;
@@ -67,7 +71,9 @@ export type AnalysisResultLabels = {
   organizationContext: string;
   assessment: string;
   confidence: string;
-  missingInformation: string;
+  todos: string;
+  todosProgress: string;
+  todoFailed: string;
   evidence: string;
   noEvidence: string;
   page: string;
@@ -155,6 +161,33 @@ export function citationsOf(item: ResultItem | undefined): Citation[] {
   );
 }
 
+/**
+ * Die Begründung als Stichpunkte. Neuere Läufe liefern eine Zeile je Punkt;
+ * ältere Fließtexte werden an Satzgrenzen geteilt. Abkürzungen wie „Art.“,
+ * „Abs.“ oder „z. B.“ und Zahlen vor dem Punkt beenden keinen Satz.
+ */
+export function explanationPoints(explanation: string): string[] {
+  const lines = explanation
+    .split(/\r?\n/u)
+    .map((line) => line.replace(/^\s*(?:[-–•*]|\d+[.)])\s+/u, "").trim())
+    .filter(Boolean);
+  if (lines.length !== 1) return lines;
+
+  const text = lines[0] ?? "";
+  const points: string[] = [];
+  let start = 0;
+  for (const match of text.matchAll(/[.!?](?=\s+["„“(]?[A-ZÄÖÜ])/gu)) {
+    const end = match.index + 1;
+    const word = /\S*$/u.exec(text.slice(start, match.index))?.[0] ?? "";
+    if (word.replace(/[^\p{L}]/gu, "").length < 4 || /\d$/u.test(word)) continue;
+    points.push(text.slice(start, end).trim());
+    start = end;
+  }
+  const rest = text.slice(start).trim();
+  if (rest) points.push(rest);
+  return points;
+}
+
 const statuses: ResultStatus[] = [
   "fulfilled",
   "partially_fulfilled",
@@ -183,6 +216,9 @@ export function AnalysisResultsWorkspace({
   const [confirmedById, setConfirmedById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(items.map((item) => [item.id, item.confirmedAt !== null])),
   );
+  const [resolvedTodosById, setResolvedTodosById] = useState<Record<string, number[]>>(() =>
+    Object.fromEntries(items.map((item) => [item.id, item.resolvedTodoIndexes])),
+  );
   // Während der Lauf arbeitet, lädt die Seite ihre Ergebnisse nach. Ohne diesen
   // Abgleich bliebe der Arbeitsplatz auf dem Stand des ersten Renderns stehen
   // und zeigte fertige Bewertungen weiter als „noch nicht bewertet".
@@ -191,9 +227,14 @@ export function AnalysisResultsWorkspace({
     setRenderedItems(items);
     setReviewItems(items);
     setConfirmedById(Object.fromEntries(items.map((item) => [item.id, item.confirmedAt !== null])));
+    setResolvedTodosById(
+      Object.fromEntries(items.map((item) => [item.id, item.resolvedTodoIndexes])),
+    );
   }
   const [savingConfirmationId, setSavingConfirmationId] = useState<string>();
   const [confirmationError, setConfirmationError] = useState(false);
+  const [savingTodoKey, setSavingTodoKey] = useState<string>();
+  const [todoError, setTodoError] = useState(false);
   const [documentBlocks, setDocumentBlocks] = useState<DocumentBlock[] | undefined>(
     providedDocumentBlocks,
   );
@@ -265,12 +306,18 @@ export function AnalysisResultsWorkspace({
     .replace("{confirmed}", String(confirmedCount))
     .replace("{total}", String(reviewItems.length));
   const selectedIsConfirmed = confirmedById[selected.id] ?? false;
+  const selectedTodos = selected.pending ? [] : selected.missingInformation;
+  const selectedResolvedTodos = resolvedTodosById[selected.id] ?? [];
+  const todosProgressLabel = labels.todosProgress
+    .replace("{done}", String(selectedResolvedTodos.length))
+    .replace("{total}", String(selectedTodos.length));
 
   function selectRequirement(id: string) {
     setSelectedId(id);
     setActiveEvidenceId(citationsOf(reviewItems.find((item) => item.id === id))[0]?.id);
     setHoveredEvidenceId(undefined);
     setConfirmationError(false);
+    setTodoError(false);
     const url = new URL(window.location.href);
     url.searchParams.set("requirement", id);
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
@@ -305,6 +352,26 @@ export function AnalysisResultsWorkspace({
       setConfirmationError(true);
     } finally {
       setSavingConfirmationId(undefined);
+    }
+  }
+
+  async function updateTodo(resultId: string, index: number, done: boolean) {
+    setSavingTodoKey(`${resultId}:${index}`);
+    setTodoError(false);
+    try {
+      const response = await fetch(`/api/analyses/${analysisId}/results/${resultId}/todos`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ index, done }),
+      });
+      if (!response.ok) throw new Error("TODO_FAILED");
+      const result = (await response.json()) as { resolvedTodoIndexes: number[] };
+      setResolvedTodosById((current) => ({ ...current, [resultId]: result.resolvedTodoIndexes }));
+    } catch {
+      setTodoError(true);
+    } finally {
+      setSavingTodoKey(undefined);
     }
   }
 
@@ -442,11 +509,8 @@ export function AnalysisResultsWorkspace({
           data-mobile-hidden={mobilePane !== "assessment" || undefined}
           aria-label={selected.title}
         >
-          <div className="result-detail-header">
-            <div>
-              <span>{selected.regulatoryId}</span>
-              <h2>{selected.title}</h2>
-            </div>
+          <div className="result-column-header result-detail-header">
+            <span>{labels.assessmentPane}</span>
             <div className="result-detail-actions">
               {confirmationError ? (
                 <span className="result-confirmation-error" role="alert">
@@ -472,47 +536,46 @@ export function AnalysisResultsWorkspace({
                   </span>
                 </label>
               ) : null}
-              {selected.pending ? (
-                <span className="result-status-pill" data-result-pending="true">
-                  {labels.pending.title}
-                </span>
-              ) : canOverride ? (
-                <button
-                  type="button"
-                  className="result-status-pill result-status-button"
-                  data-result-status={selected.status}
-                  onClick={showOverrideDialog}
-                  aria-label={labels.changeStatus}
-                >
-                  {labels.status[selected.status]}
-                  <Pencil size={12} aria-hidden="true" />
-                </button>
-              ) : (
-                <span className="result-status-pill" data-result-status={selected.status}>
-                  {labels.status[selected.status]}
-                </span>
-              )}
             </div>
           </div>
           <div className="result-column-scroll result-detail-scroll">
-            <details className="result-section" open>
-              <summary>
-                <span>{selected.regulatoryId}</span>
-                <ChevronDown size={16} aria-hidden="true" />
-              </summary>
+            <article className="result-norm">
+              <header>
+                <h2>
+                  <strong>{selected.regulatoryId}</strong>
+                  <span className="result-norm-title">{selected.title}</span>
+                </h2>
+                {selected.pending ? (
+                  <span className="result-status-pill" data-result-pending="true">
+                    {labels.pending.title}
+                  </span>
+                ) : canOverride ? (
+                  <button
+                    type="button"
+                    className="result-status-pill result-status-button"
+                    data-result-status={selected.status}
+                    onClick={showOverrideDialog}
+                    aria-label={labels.changeStatus}
+                  >
+                    {labels.status[selected.status]}
+                    <Pencil size={12} aria-hidden="true" />
+                  </button>
+                ) : (
+                  <span className="result-status-pill" data-result-status={selected.status}>
+                    {labels.status[selected.status]}
+                  </span>
+                )}
+              </header>
               <p>{selected.legalText}</p>
-            </details>
-            {selected.subrequirements.map((subrequirement) => (
-              <details className="result-section" open key={subrequirement.externalKey}>
-                <summary>
-                  <span>{subrequirement.regulatoryId}</span>
-                  <ChevronDown size={16} aria-hidden="true" />
-                </summary>
-                <p>{subrequirement.legalText}</p>
-              </details>
-            ))}
+              {selected.subrequirements.map((subrequirement) => (
+                <div className="result-norm-sub" key={subrequirement.externalKey}>
+                  <strong>{subrequirement.regulatoryId}</strong>
+                  <p>{subrequirement.legalText}</p>
+                </div>
+              ))}
+            </article>
             {organizationContext ? (
-              <details className="result-section" open>
+              <details className="result-section">
                 <summary>
                   <span>{labels.organizationContext}</span>
                   <ChevronDown size={16} aria-hidden="true" />
@@ -529,7 +592,11 @@ export function AnalysisResultsWorkspace({
                 <p className="result-pending-note">{labels.pending.note}</p>
               ) : (
                 <div>
-                  <p>{selected.explanation}</p>
+                  <ul className="result-rationale">
+                    {explanationPoints(selected.explanation).map((point, index) => (
+                      <li key={index}>{point}</li>
+                    ))}
+                  </ul>
                   {citations.length > 0 ? (
                     <div className="result-citation-links" aria-label={labels.evidence}>
                       {citations.map((evidence) => (
@@ -575,19 +642,44 @@ export function AnalysisResultsWorkspace({
                       </time>
                     </div>
                   ) : null}
-                  {selected.missingInformation.length > 0 ? (
-                    <div className="result-missing-information">
-                      <strong>{labels.missingInformation}</strong>
-                      <ul>
-                        {selected.missingInformation.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
                 </div>
               )}
             </details>
+            {selectedTodos.length > 0 ? (
+              <details className="result-section result-todo-section" open>
+                <summary>
+                  <span>
+                    {labels.todos}
+                    <small>{todosProgressLabel}</small>
+                  </span>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </summary>
+                <ul className="result-todo-list">
+                  {selectedTodos.map((todo, index) => {
+                    const done = selectedResolvedTodos.includes(index);
+                    const checkboxId = `result-todo-${selected.id}-${index}`;
+                    return (
+                      <li key={index} data-done={done || undefined}>
+                        <Checkbox
+                          id={checkboxId}
+                          checked={done}
+                          disabled={!canOverride || savingTodoKey === `${selected.id}:${index}`}
+                          onCheckedChange={(checked) =>
+                            void updateTodo(selected.id, index, checked === true)
+                          }
+                        />
+                        <label htmlFor={checkboxId}>{todo}</label>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {todoError ? (
+                  <p className="result-todo-error" role="alert">
+                    {labels.todoFailed}
+                  </p>
+                ) : null}
+              </details>
+            ) : null}
             <details className="result-section result-evidence-section" open>
               <summary>
                 <span>
