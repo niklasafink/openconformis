@@ -99,6 +99,46 @@ export async function createRerunAnalysisCredential(
   return connectTemporaryCredential({ ...input, purpose: "analysis" }, async () => input.bindingId);
 }
 
+/**
+ * Prüft einen eingegebenen Schlüssel beim Anbieter und speichert ihn dauerhaft,
+ * ohne eine Analyse zu verbinden oder zu starten. Der Start leitet später
+ * seinen kurzlebigen Schlüssel aus dem gespeicherten ab.
+ */
+export async function verifyAndSaveUserCredential(input: {
+  provider: string;
+  requiredModelId: string;
+  secret: string;
+}) {
+  const user = await requireAuthenticatedSessionUser();
+  const provider = aiRouteProviderSchema.parse(input.provider);
+  const secret = input.secret.trim();
+  if (
+    secret.length < 8 ||
+    secret.length > 20_000 ||
+    !input.requiredModelId.trim() ||
+    input.requiredModelId.length > 300
+  ) {
+    throw new TemporaryCredentialError("BYOK_INPUT_INVALID");
+  }
+  if (!allowedByokProviders().has(provider)) {
+    throw new TemporaryCredentialError("BYOK_PROVIDER_DISABLED");
+  }
+  if (!isAnalysisProviderAvailable(provider)) {
+    throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");
+  }
+
+  await validateProviderCredential({
+    provider,
+    secret,
+    requiredModelId: input.requiredModelId,
+    route: getAnalysisProviderConfiguration(provider),
+  });
+  await db.transaction((transaction) =>
+    saveUserCredential(transaction, { ownerUserId: user.id, provider, secret }),
+  );
+  return { provider, lastFour: secret.slice(-4) };
+}
+
 async function connectTemporaryCredential(
   input: CredentialConnectInput,
   resolveBindingId: (user: SessionUser, purpose: AiCredentialPurpose) => Promise<string>,

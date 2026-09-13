@@ -1,13 +1,54 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { aiRouteProviderSchema } from "@/domain/ai/provider";
+import { credentialErrorResponse } from "@/server/ai/credential-error-response";
 import { deleteSavedCredential } from "@/server/ai/saved-credential-service";
+import { verifyAndSaveUserCredential } from "@/server/ai/temporary-credential-service";
 import { AuthenticationRequiredError } from "@/server/auth/session-principal";
 import { VerifiedEmailRequiredError } from "@/server/auth/session-user";
+import { assertRequestSize, enforceRequestRateLimit } from "@/server/security/request-protection";
 import { hasTrustedApplicationOrigin } from "@/server/security/trusted-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const saveInputSchema = z.object({
+  provider: aiRouteProviderSchema,
+  requiredModelId: z.string().trim().min(1).max(300),
+  apiKey: z.string().trim().min(8).max(20_000),
+});
+
+/**
+ * Fügt einen Schlüssel hinzu: Der Anbieter bestätigt ihn für das gewählte Modell,
+ * danach wird er verschlüsselt gespeichert. Es startet dabei keine Analyse.
+ */
+export async function POST(request: Request) {
+  if (!hasTrustedApplicationOrigin(request)) {
+    return NextResponse.json({ code: "UNTRUSTED_ORIGIN" }, { status: 403 });
+  }
+
+  try {
+    assertRequestSize(request, 131_072);
+    await enforceRequestRateLimit(request, {
+      bucket: "credential-connect",
+      limit: 30,
+      windowSeconds: 3600,
+    });
+    const input = saveInputSchema.parse(await request.json());
+    const saved = await verifyAndSaveUserCredential({
+      provider: input.provider,
+      requiredModelId: input.requiredModelId,
+      secret: input.apiKey,
+    });
+    return NextResponse.json(saved, {
+      status: 201,
+      headers: { "cache-control": "private, no-store" },
+    });
+  } catch (error) {
+    return credentialErrorResponse(error, "ai-credentials/saved");
+  }
+}
 
 /** Entfernt den gespeicherten Schlüssel des Nutzers für einen Anbieter. */
 export async function DELETE(request: Request) {

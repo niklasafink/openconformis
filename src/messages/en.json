@@ -187,6 +187,8 @@
     "apiKey": "API key",
     "savedKey": "••••{lastFour} saved",
     "removeSavedKey": "Remove saved key",
+    "addKey": "Add",
+    "addingKey": "Adding …",
     "keyFailed": "The key or model access could not be confirmed.",
     "keyErrors": {
       "UNTRUSTED_ORIGIN": "Request from an untrusted address: NEXT_PUBLIC_APP_URL does not match the domain in use.",
@@ -310,10 +312,8 @@
     "stop": "Cancel analysis",
     "stopping": "Cancelling …",
     "stopFailed": "The analysis could not be cancelled. Please try again.",
-    "restart": "Restart analysis",
     "newAnalysisAll": "All requirements",
     "newAnalysisSelection": "Selection only ({count})",
-    "startSelection": "Analyse selection ({count})",
     "selectAll": "Select all requirements",
     "selectRequirement": "Select {requirement}"
   },

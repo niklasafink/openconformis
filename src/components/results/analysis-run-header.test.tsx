@@ -49,12 +49,10 @@ const labels = {
   newAnalysis: "Neue Analyse",
   newAnalysisAll: "Alle Anforderungen",
   newAnalysisSelection: "Nur Auswahl ({count})",
-  startSelection: "Auswahl analysieren ({count})",
   cancelledNotice: "Die Analyse wurde abgebrochen.",
   stop: "Analyse abbrechen",
   stopping: "Wird abgebrochen …",
   stopFailed: "Die Analyse konnte nicht abgebrochen werden.",
-  restart: "Analyse neu starten",
 };
 
 const accessLabels = {
@@ -64,6 +62,8 @@ const accessLabels = {
   apiKey: "API-Key",
   savedKey: "••••{lastFour} gespeichert",
   removeSavedKey: "Gespeicherten Key entfernen",
+  addKey: "Hinzufügen",
+  addingKey: "Wird hinzugefügt …",
   keyFailed: "Der Schlüssel konnte nicht bestätigt werden.",
   keyErrors: { CREDENTIAL_REJECTED: "Der Anbieter lehnt den Schlüssel ab." },
   modelFailed: "Das Modell konnte nicht übernommen werden.",
@@ -96,6 +96,7 @@ function renderHeader(
     stage: "assessment",
     progressPercent: 41,
   },
+  savedCredentials: { provider: string; lastFour: string }[] = [],
 ) {
   return render(
     <RequirementSelectionProvider
@@ -115,6 +116,7 @@ function renderHeader(
           labels={accessLabels}
           lastFour={null}
           locale="de"
+          savedCredentials={savedCredentials}
         />
         <AnalysisNotificationsButton />
       </AnalysisRunHeaderProvider>
@@ -153,15 +155,15 @@ describe("analysis run header", () => {
     // Ein beendeter Lauf lässt sich nicht mehr abbrechen.
     expect(screen.queryByRole("button", { name: "Analyse abbrechen" })).not.toBeInTheDocument();
 
+    // Der Link in der Meldung öffnet das Menü „Neue Analyse", nicht das Schlüsselfeld.
     fireEvent.click(screen.getAllByRole("button", { name: "Neue Analyse" })[0]!);
-    expect(await screen.findByLabelText("API-Key")).toBeInTheDocument();
-    expect(screen.getByLabelText("Modell")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Analyse starten" })).toBeDisabled();
+    expect(await screen.findByRole("menuitem", { name: "Alle Anforderungen" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("API-Key")).not.toBeInTheDocument();
   });
 
-  it("starts a new run with the chosen model and key and opens it", async () => {
+  it("adds a key without starting a new run", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      jsonResponse({ analysisId: "8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f", status: "queued" }, 202),
+      jsonResponse({ provider: "openrouter", lastFour: "-key" }, 201),
     );
     renderHeader({ status: "completed", stage: "completed", progressPercent: 100 });
 
@@ -171,12 +173,56 @@ describe("analysis run header", () => {
     const modelTrigger = screen.getByLabelText("Modell");
     expect(modelTrigger).toHaveTextContent("Claude Sonnet 5");
     expect(modelTrigger).toHaveAttribute("data-key-provided", "false");
+    expect(screen.getByRole("button", { name: "Hinzufügen" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Analyse starten" })).not.toBeInTheDocument();
     fireEvent.change(keyInput, { target: { value: "sk-or-v1-secret-key" } });
     expect(modelTrigger).toHaveAttribute("data-key-provided", "true");
-    // Die Eingabetaste im Schlüsselfeld startet nichts; erst der Klick zählt.
+    // Die Eingabetaste im Schlüsselfeld löst nichts aus; erst der Klick zählt.
     fireEvent.keyDown(keyInput, { key: "Enter", code: "Enter" });
     expect(fetch).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Analyse starten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
+
+    await waitFor(() => expect(screen.queryByLabelText("API-Key")).not.toBeInTheDocument());
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe("/api/ai-credentials/saved");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      provider: "openrouter",
+      requiredModelId: "anthropic/claude-sonnet-5",
+      apiKey: "sk-or-v1-secret-key",
+    });
+    expect(router.push).not.toHaveBeenCalled();
+    expect(screen.getByTitle("Modellzugang").querySelector("[data-reachability]")).toHaveAttribute(
+      "data-reachability",
+      "connected",
+    );
+  });
+
+  it("offers no new run until a key is saved", async () => {
+    renderHeader({ status: "completed", stage: "completed", progressPercent: 100 });
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Neue Analyse" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(await screen.findByRole("menuitem", { name: "Alle Anforderungen" })).toHaveAttribute(
+      "data-disabled",
+    );
+  });
+
+  it("starts a new run with the saved key straight from the menu", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ analysisId: "8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f", status: "queued" }, 202),
+    );
+    renderHeader({ status: "completed", stage: "completed", progressPercent: 100 }, [
+      { provider: "openrouter", lastFour: "9f2a" },
+    ]);
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Neue Analyse" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Alle Anforderungen" }));
 
     await waitFor(() =>
       expect(router.push).toHaveBeenCalledWith("/de/analyses/8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f"),
@@ -187,7 +233,6 @@ describe("analysis run header", () => {
       modelProfileId: "openrouter:anthropic/claude-sonnet-5",
       modelCatalogueVersion: catalogue.version,
       unevaluatedWarningAccepted: true,
-      apiKey: "sk-or-v1-secret-key",
     });
   });
 
@@ -195,17 +240,15 @@ describe("analysis run header", () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse({ analysisId: "8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f", status: "queued" }, 202),
     );
-    renderHeader({ status: "completed", stage: "completed", progressPercent: 100 });
+    renderHeader({ status: "completed", stage: "completed", progressPercent: 100 }, [
+      { provider: "openrouter", lastFour: "9f2a" },
+    ]);
 
     fireEvent.pointerDown(screen.getByRole("button", { name: "Neue Analyse" }), {
       button: 0,
       ctrlKey: false,
     });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Nur Auswahl (3)" }));
-    fireEvent.change(await screen.findByLabelText("API-Key"), {
-      target: { value: "sk-or-v1-secret-key" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Auswahl analysieren (3)" }));
 
     await waitFor(() => expect(router.push).toHaveBeenCalled());
     const [, init] = vi.mocked(fetch).mock.calls[0]!;
@@ -214,36 +257,23 @@ describe("analysis run header", () => {
     });
   });
 
-  it("starts with the saved key without asking for it again", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      jsonResponse({ analysisId: "8a0e2f0c-54a6-4c1e-9d0e-2b5f6c7d8e9f", status: "queued" }, 202),
-    );
-    render(
-      <AnalysisRunHeaderProvider
-        analysisId={analysisId}
-        initialState={{ status: "completed", stage: "completed", progressPercent: 100 }}
-        failure={{ code: null, detail: null }}
-        labels={labels}
-      >
-        <AnalysisRerunControls
-          catalogue={catalogue}
-          initialModelProfileId="openrouter:anthropic/claude-sonnet-5"
-          labels={accessLabels}
-          lastFour={null}
-          locale="de"
-          savedCredentials={[{ provider: "openrouter", lastFour: "9f2a" }]}
-        />
-      </AnalysisRunHeaderProvider>,
-    );
+  it("shows the saved key and lets the user remove it", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ deleted: true }));
+    renderHeader({ status: "completed", stage: "completed", progressPercent: 100 }, [
+      { provider: "openrouter", lastFour: "9f2a" },
+    ]);
 
     fireEvent.click(screen.getByTitle("Modellzugang"));
     expect(await screen.findByPlaceholderText("••••9f2a gespeichert")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Gespeicherten Key entfernen" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Analyse starten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Gespeicherten Key entfernen" }));
 
-    await waitFor(() => expect(router.push).toHaveBeenCalled());
-    const [, init] = vi.mocked(fetch).mock.calls[0]!;
-    expect(JSON.parse(String(init?.body))).not.toHaveProperty("apiKey");
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("••••9f2a gespeichert")).not.toBeInTheDocument(),
+    );
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe(
+      "/api/ai-credentials/saved?provider=openrouter",
+    );
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("names the provider's reason when the key is rejected", async () => {
@@ -254,7 +284,7 @@ describe("analysis run header", () => {
     fireEvent.change(await screen.findByLabelText("API-Key"), {
       target: { value: "sk-or-v1-wrong-key" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Analyse starten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
 
     expect(await screen.findByText(/Der Anbieter lehnt den Schlüssel ab/u)).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();

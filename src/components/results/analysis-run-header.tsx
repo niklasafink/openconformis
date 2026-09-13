@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 
 import {
@@ -21,10 +21,11 @@ import {
   type AnalysisStatus,
 } from "./analysis-run-live";
 import {
-  deleteSavedCredentialRequest,
   describeKeyFailure,
   postJson,
   ReachabilityLight,
+  StartError,
+  useSavedCredentials,
   type ModelAccessLabels,
   type SavedCredential,
 } from "./model-access-panel";
@@ -47,13 +48,10 @@ export type AnalysisRunHeaderLabels = Readonly<{
   newAnalysisAll: string;
   /** „Nur Auswahl ({count})" */
   newAnalysisSelection: string;
-  /** „Auswahl analysieren ({count})" */
-  startSelection: string;
   cancelledNotice: string;
   stop: string;
   stopping: string;
   stopFailed: string;
-  restart: string;
 }>;
 
 type RunNotice = { id: string; title: string; message: string; dismissed: boolean };
@@ -68,8 +66,9 @@ type AnalysisRunHeaderValue = {
   restore: () => void;
   labels: AnalysisRunHeaderLabels;
   markCancelled: () => void;
-  rerunOpen: boolean;
-  setRerunOpen: (open: boolean) => void;
+  /** Das Menü „Neue Analyse" ist geöffnet; auch die Fehlermeldung öffnet es. */
+  newAnalysisOpen: boolean;
+  setNewAnalysisOpen: (open: boolean) => void;
 };
 
 const AnalysisRunHeaderContext = createContext<AnalysisRunHeaderValue | null>(null);
@@ -125,7 +124,7 @@ export function AnalysisRunHeaderProvider({
     cancelledLocally && (polledState.status === "queued" || polledState.status === "running")
       ? { ...polledState, status: "cancelled" }
       : polledState;
-  const [rerunOpen, setRerunOpen] = useState(false);
+  const [newAnalysisOpen, setNewAnalysisOpen] = useState(false);
   // Das Wegklicken gilt je Analyse und übersteht ein Neuladen. Die Meldung
   // enthält keine Geheimnisse, nur den Text des Anbieters.
   const storageKey = `openconformis:dismissed-run-notice:${analysisId}`;
@@ -181,8 +180,8 @@ export function AnalysisRunHeaderProvider({
         restore: () => setDismissed(false),
         labels,
         markCancelled: () => setCancelledLocally(true),
-        rerunOpen,
-        setRerunOpen,
+        newAnalysisOpen,
+        setNewAnalysisOpen,
       }}
     >
       {children}
@@ -195,7 +194,8 @@ export function AnalysisRunHeaderStatus({
   assessed,
   total,
 }: Readonly<{ assessed: number; total: number }>) {
-  const { dismiss, labels, notices, pollingFailed, setRerunOpen, state } = useAnalysisRunHeader();
+  const { dismiss, labels, notices, pollingFailed, setNewAnalysisOpen, state } =
+    useAnalysisRunHeader();
   const notice = notices.find(({ dismissed }) => !dismissed);
   const assessedTitle = labels.assessedCount
     .replace("{assessed}", String(assessed))
@@ -228,7 +228,7 @@ export function AnalysisRunHeaderStatus({
           <button
             type="button"
             className="shrink-0 font-medium text-foreground underline underline-offset-2"
-            onClick={() => setRerunOpen(true)}
+            onClick={() => setNewAnalysisOpen(true)}
           >
             {labels.newAnalysis}
           </button>
@@ -292,10 +292,11 @@ function CancelRunButton() {
 }
 
 /**
- * Ein Knopf je Laufzustand: solange der Lauf arbeitet „Analyse abbrechen",
- * danach „Neue Analyse" mit der Wahl zwischen allen Anforderungen und der
- * Auswahl links. Beides öffnet dasselbe Feld aus Modell und Schlüssel; der
- * neue Lauf startet erst mit dem Klick auf den Startknopf.
+ * Zwei getrennte Vorgänge in der Kopfzeile. Links ein Knopf je Laufzustand:
+ * solange der Lauf arbeitet „Analyse abbrechen", danach „Neue Analyse" mit der
+ * Wahl zwischen allen Anforderungen und der Auswahl links — die Wahl startet den
+ * Lauf mit dem gespeicherten Schlüssel. Rechts „API-Key": Modell wählen und
+ * einen Schlüssel hinzufügen, ohne dass etwas startet.
  */
 export function AnalysisRerunControls({
   catalogue,
@@ -311,7 +312,7 @@ export function AnalysisRerunControls({
   /** Letzte vier Zeichen des Schlüssels dieses Laufs; `null`, wenn keiner mehr hinterlegt ist. */
   lastFour: string | null;
   locale: string;
-  /** Dauerhaft gespeicherte Schlüssel des Nutzers; damit startet der Lauf ohne Eingabe. */
+  /** Dauerhaft gespeicherte Schlüssel des Nutzers; damit startet der neue Lauf. */
   savedCredentials?: readonly SavedCredential[];
 }>) {
   const router = useRouter();
@@ -322,49 +323,36 @@ export function AnalysisRerunControls({
       ? initialModelProfileId
       : (catalogue.models[0]?.id ?? ""),
   );
-  const [apiKey, setApiKey] = useState("");
-  const [savedCredentials, setSavedCredentials] = useState(initialSavedCredentials);
-  const [scope, setScope] = useState<"all" | "selection">("all");
+  const keys = useSavedCredentials(initialSavedCredentials, labels);
+  const [keyOpen, setKeyOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const running = header.state.status === "queued" || header.state.status === "running";
   const selectedKeys = selection
     ? selection.requirementKeys.filter((key) => selection.selectedKeys.has(key))
     : [];
-  const onlySelection = scope === "selection" && selection !== null;
   const count = String(selectedKeys.length);
   const model = catalogue.models.find(({ id }) => id === modelProfileId);
-  const saved = model
-    ? savedCredentials.find(({ provider }) => provider === model.routeProvider)
-    : undefined;
+  const saved = keys.savedFor(model);
 
-  async function removeSavedKey() {
-    if (!model) return;
-    const provider = model.routeProvider;
-    const response = await deleteSavedCredentialRequest(provider).catch(() => null);
-    if (!response?.ok) return setError(labels.keyFailed);
-    setSavedCredentials((current) => current.filter((entry) => entry.provider !== provider));
+  async function addKey() {
+    if (!model || !(await keys.addKey(model))) return;
+    setStartError(null);
+    setKeyOpen(false);
   }
 
-  function openFor(nextScope: "all" | "selection") {
-    setScope(nextScope);
-    setError(null);
-    header.setRerunOpen(true);
-  }
-
-  async function restart() {
+  async function restart(scope: "all" | "selection") {
+    if (!model || pending) return;
     setPending(true);
-    setError(null);
+    setStartError(null);
     try {
       const response = await postJson(`/api/analyses/${header.analysisId}/rerun`, {
         modelProfileId,
         modelCatalogueVersion: catalogue.version,
-        // Der bewusste Klick auf den Startknopf gilt als Kenntnisnahme, falls das
-        // Modell nicht evaluiert ist.
+        // Die bewusste Wahl im Menü gilt als Kenntnisnahme, falls das Modell
+        // nicht evaluiert ist. Den Schlüssel nimmt der Server aus dem gespeicherten.
         unevaluatedWarningAccepted: true,
-        // Ohne eingegebenen Schlüssel nimmt der Server den gespeicherten.
-        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
-        ...(onlySelection ? { requirementKeys: selectedKeys } : {}),
+        ...(scope === "selection" && selection ? { requirementKeys: selectedKeys } : {}),
       });
       const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
         analysisId?: string;
@@ -372,100 +360,98 @@ export function AnalysisRerunControls({
         message?: string;
       };
       if (!response.ok || !payload.analysisId) {
-        setError(describeKeyFailure(labels, payload, response.status));
+        if (payload.code === "BYOK_SAVED_CREDENTIAL_NOT_FOUND") keys.forget(model.routeProvider);
+        setStartError(describeKeyFailure(labels, payload, response.status));
         return;
       }
-      setApiKey("");
-      header.setRerunOpen(false);
       router.push(`/${locale}/analyses/${payload.analysisId}`);
     } catch {
-      setError(`${labels.keyErrors.NETWORK_ERROR ?? labels.startFailed} (NETWORK_ERROR)`);
+      setStartError(`${labels.keyErrors.NETWORK_ERROR ?? labels.startFailed} (NETWORK_ERROR)`);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Popover open={header.rerunOpen} onOpenChange={header.setRerunOpen}>
-      <PopoverAnchor asChild>
-        <div className="flex items-center gap-2">
-          {running ? (
-            <CancelRunButton />
-          ) : (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="gap-1.5">
-                  {header.labels.newAnalysis}
-                  <ChevronDown aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                // Der Fokus soll ins geöffnete Zugangsfeld, nicht zurück auf den Knopf.
-                onCloseAutoFocus={(event) => event.preventDefault()}
-              >
-                <DropdownMenuItem onSelect={() => openFor("all")}>
-                  {header.labels.newAnalysisAll}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={selectedKeys.length === 0}
-                  onSelect={() => openFor("selection")}
-                >
-                  {header.labels.newAnalysisSelection.replace("{count}", count)}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+    <div className="flex items-center gap-2">
+      <StartError message={startError} />
+      {running ? (
+        <CancelRunButton />
+      ) : (
+        <DropdownMenu
+          modal={false}
+          open={header.newAnalysisOpen}
+          onOpenChange={header.setNewAnalysisOpen}
+        >
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={pending}
+            >
+              {pending ? labels.starting : header.labels.newAnalysis}
+              <ChevronDown aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {/* Ohne gespeicherten Schlüssel startet nichts; er kommt über „API-Key". */}
+            <DropdownMenuItem disabled={!saved} onSelect={() => void restart("all")}>
+              {header.labels.newAnalysisAll}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!saved || selectedKeys.length === 0}
+              onSelect={() => void restart("selection")}
+            >
+              {header.labels.newAnalysisSelection.replace("{count}", count)}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      <Popover open={keyOpen} onOpenChange={setKeyOpen}>
+        <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="gap-2"
             title={labels.panelTitle}
-            aria-expanded={header.rerunOpen}
-            onClick={() => header.setRerunOpen(!header.rerunOpen)}
           >
-            <ReachabilityLight connected={lastFour !== null || Boolean(saved)} />
+            <ReachabilityLight connected={Boolean(saved)} />
             {labels.apiKey}
           </Button>
-        </div>
-      </PopoverAnchor>
-      <PopoverContent align="end" className="w-80 p-4">
-        <ModelKeyForm
-          apiKey={apiKey}
-          catalogue={catalogue}
-          disabled={onlySelection && selectedKeys.length === 0}
-          error={error}
-          keyOptional={Boolean(saved)}
-          keyPlaceholder={
-            saved
-              ? labels.savedKey.replace("{lastFour}", saved.lastFour)
-              : lastFour !== null
-                ? `••••${lastFour}`
-                : undefined
-          }
-          onRemoveSavedKey={saved ? () => void removeSavedKey() : undefined}
-          removeSavedKeyLabel={labels.removeSavedKey}
-          labels={labels}
-          modelProfileId={modelProfileId}
-          onApiKeyChange={setApiKey}
-          onModelChange={(id) => {
-            setModelProfileId(id);
-            setError(null);
-          }}
-          onSubmit={() => void restart()}
-          pending={pending}
-          submitLabel={
-            onlySelection
-              ? header.labels.startSelection.replace("{count}", count)
-              : running
-                ? header.labels.restart
-                : labels.start
-          }
-          submittingLabel={labels.starting}
-        />
-      </PopoverContent>
-    </Popover>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 p-4">
+          <ModelKeyForm
+            apiKey={keys.apiKey}
+            catalogue={catalogue}
+            error={keys.keyError}
+            keyOptional={Boolean(saved)}
+            keyPlaceholder={
+              saved
+                ? labels.savedKey.replace("{lastFour}", saved.lastFour)
+                : lastFour !== null
+                  ? `••••${lastFour}`
+                  : undefined
+            }
+            onRemoveSavedKey={saved && model ? () => void keys.removeKey(model) : undefined}
+            removeSavedKeyLabel={labels.removeSavedKey}
+            labels={labels}
+            modelProfileId={modelProfileId}
+            onApiKeyChange={keys.setApiKey}
+            onModelChange={(id) => {
+              setModelProfileId(id);
+              keys.setKeyError(null);
+            }}
+            onSubmit={() => void addKey()}
+            pending={keys.adding}
+            submitLabel={labels.addKey}
+            submittingLabel={labels.addingKey}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 

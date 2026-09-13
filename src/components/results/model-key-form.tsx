@@ -24,11 +24,10 @@ export type ModelKeyFormLabels = Readonly<{
 type ModelKeyFormProps = Readonly<{
   apiKey: string;
   catalogue: AnalysisModelCatalogue;
-  disabled?: boolean;
   error?: string | null;
   /** Platzhalter im Schlüsselfeld, etwa die Endung eines bereits hinterlegten Schlüssels. */
   keyPlaceholder?: string;
-  /** Der Schlüssel darf leer bleiben, weil für das Modell schon einer hinterlegt ist. */
+  /** Für das Modell ist schon ein Schlüssel hinterlegt; das Modell leuchtet grün. */
   keyOptional?: boolean;
   labels: ModelKeyFormLabels;
   modelProfileId: string;
@@ -44,13 +43,13 @@ type ModelKeyFormProps = Readonly<{
 }>;
 
 /**
- * Modell und API-Key, sonst nichts. Bewusst kein Formular: Eingabetaste oder
- * ein Passwortmanager starten nichts, erst der Klick auf den Startknopf.
+ * Modell und API-Key, sonst nichts. Der Knopf fügt nur einen eingegebenen
+ * Schlüssel hinzu; eine Analyse startet hier nie. Bewusst kein Formular:
+ * Eingabetaste oder ein Passwortmanager lösen nichts aus, erst der Klick.
  */
 export function ModelKeyForm({
   apiKey,
   catalogue,
-  disabled = false,
   error,
   keyOptional = false,
   keyPlaceholder,
@@ -67,8 +66,9 @@ export function ModelKeyForm({
 }: ModelKeyFormProps) {
   const id = useId();
   const model = catalogue.models.find((candidate) => candidate.id === modelProfileId);
-  const keyProvided = keyOptional || apiKey.trim().length >= 8;
-  const canSubmit = Boolean(model) && !pending && !disabled && keyProvided;
+  const keyTyped = apiKey.trim().length >= 8;
+  const keyProvided = keyOptional || keyTyped;
+  const canSubmit = Boolean(model) && !pending && keyTyped;
 
   return (
     <div className="grid gap-4">

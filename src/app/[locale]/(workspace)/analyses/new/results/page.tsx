@@ -177,6 +177,8 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
                 apiKey: t("apiKey"),
                 savedKey: t("savedKey", { lastFour: "{lastFour}" }),
                 removeSavedKey: t("removeSavedKey"),
+                addKey: t("addKey"),
+                addingKey: t("addingKey"),
                 keyFailed: t("keyFailed"),
                 keyErrors: t.raw("keyErrors") as Record<string, string>,
                 modelFailed: t("modelFailed"),

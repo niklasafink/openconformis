@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -20,6 +21,8 @@ export type ModelAccessLabels = Readonly<{
   /** „••••{lastFour} gespeichert" */
   savedKey: string;
   removeSavedKey: string;
+  addKey: string;
+  addingKey: string;
   keyFailed: string;
   /** Ursache je Fehlercode der Schlüsselverbindung. */
   keyErrors: Readonly<Record<string, string>>;
@@ -35,6 +38,8 @@ export type ActiveCredential = Readonly<{
   lastFour: string;
   accessibleModelIds: readonly string[];
 }>;
+
+type AnalysisModel = AnalysisModelCatalogue["models"][number];
 
 type ModelAccessPanelProps = Readonly<{
   catalogue: AnalysisModelCatalogue;
@@ -99,8 +104,124 @@ export function ReachabilityLight({ connected }: { connected: boolean }) {
 }
 
 /**
- * Zugangsfeld oben rechts im Ergebnis vor dem Start: Modell und API-Key. Es
- * steht neben dem Ergebnis statt als Dialog davor, und der Lauf startet von hier.
+ * Gespeicherte Schlüssel des Nutzers. Hinzufügen prüft den eingegebenen
+ * Schlüssel beim Anbieter und speichert ihn; Entfernen löscht ihn. Beides
+ * startet keine Analyse — das bleibt dem eigenen Startknopf vorbehalten.
+ */
+export function useSavedCredentials(
+  initialSavedCredentials: readonly SavedCredential[],
+  labels: Pick<ModelAccessLabels, "keyErrors" | "keyFailed">,
+) {
+  const [savedCredentials, setSavedCredentials] = useState(initialSavedCredentials);
+  const [apiKey, setApiKey] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  function forget(provider: string) {
+    setSavedCredentials((current) => current.filter((entry) => entry.provider !== provider));
+  }
+
+  function savedFor(model: AnalysisModel | undefined) {
+    return model
+      ? savedCredentials.find(({ provider }) => provider === model.routeProvider)
+      : undefined;
+  }
+
+  async function addKey(model: AnalysisModel) {
+    const typed = apiKey.trim();
+    if (adding || typed.length < 8) return false;
+    setAdding(true);
+    setKeyError(null);
+    try {
+      const response = await postJson("/api/ai-credentials/saved", {
+        provider: model.routeProvider,
+        requiredModelId: model.providerModelId,
+        apiKey: typed,
+      });
+      // Eine Antwort ohne JSON (etwa eine Plattform-Fehlerseite) ist ein eigener
+      // Fehlerfall und darf nicht als falscher Schlüssel erscheinen.
+      const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
+        lastFour?: string;
+        code?: string;
+        detail?: string;
+      };
+      if (!response.ok) {
+        setKeyError(describeKeyFailure(labels, payload, response.status));
+        return false;
+      }
+      setSavedCredentials((current) => [
+        ...current.filter((entry) => entry.provider !== model.routeProvider),
+        { provider: model.routeProvider, lastFour: payload.lastFour ?? typed.slice(-4) },
+      ]);
+      setApiKey("");
+      return true;
+    } catch {
+      setKeyError(`${labels.keyErrors.NETWORK_ERROR ?? labels.keyFailed} (NETWORK_ERROR)`);
+      return false;
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function removeKey(model: AnalysisModel) {
+    const provider = model.routeProvider;
+    const response = await deleteSavedCredentialRequest(provider).catch(() => null);
+    if (!response?.ok) return setKeyError(labels.keyFailed);
+    forget(provider);
+  }
+
+  return {
+    apiKey,
+    setApiKey,
+    adding,
+    keyError,
+    setKeyError,
+    savedFor,
+    forget,
+    addKey,
+    removeKey,
+  };
+}
+
+/** Knopf mit Ladezustand, der eine Analyse startet. */
+export function StartAnalysisButton({
+  disabled,
+  labels,
+  onClick,
+  pending,
+}: Readonly<{
+  disabled: boolean;
+  labels: Pick<ModelAccessLabels, "start" | "starting">;
+  onClick: () => void;
+  pending: boolean;
+}>) {
+  return (
+    <Button type="button" size="sm" disabled={disabled || pending} onClick={onClick}>
+      {pending ? (
+        <>
+          <LoaderCircle aria-hidden="true" className="animate-spin" />
+          {labels.starting}
+        </>
+      ) : (
+        labels.start
+      )}
+    </Button>
+  );
+}
+
+/** Fehler des Starts in der Kopfzeile; der volle Text steht im Tooltip. */
+export function StartError({ message }: Readonly<{ message: string | null }>) {
+  return message ? (
+    <p role="alert" className="max-w-72 truncate text-xs text-destructive" title={message}>
+      {message}
+    </p>
+  ) : null;
+}
+
+/**
+ * Modellzugang oben rechts im Ergebnis vor dem Start. Zwei getrennte Vorgänge:
+ * „Analyse starten" startet den Lauf mit dem gespeicherten Schlüssel, der Knopf
+ * „API-Key" öffnet Modell und Schlüssel und fügt einen Schlüssel nur hinzu.
  */
 export function ModelAccessPanel({
   catalogue,
@@ -124,28 +245,18 @@ export function ModelAccessPanel({
       : (catalogue.models[0]?.id ?? ""),
   );
   const [credential, setCredential] = useState(initialCredential);
-  const [savedCredentials, setSavedCredentials] = useState(initialSavedCredentials);
-  const [apiKey, setApiKey] = useState("");
+  const keys = useSavedCredentials(initialSavedCredentials, labels);
+  const [keyOpen, setKeyOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const model = catalogue.models.find(({ id }) => id === modelProfileId);
-  // Grün heißt: für genau dieses Modell liegt ein bestätigter Schlüssel vor.
+  // Für genau dieses Modell liegt bereits ein an den Draft gebundener Schlüssel vor.
   const connected = Boolean(
     model && credential?.accessibleModelIds.includes(model.providerModelId),
   );
-  // Ein gespeicherter Schlüssel des Anbieters erspart die erneute Eingabe.
-  const saved = model
-    ? savedCredentials.find(({ provider }) => provider === model.routeProvider)
-    : undefined;
-
-  async function removeSavedKey() {
-    if (!model) return;
-    const provider = model.routeProvider;
-    const response = await deleteSavedCredentialRequest(provider).catch(() => null);
-    if (!response?.ok) return setError(labels.keyFailed);
-    setSavedCredentials((current) => current.filter((entry) => entry.provider !== provider));
-  }
+  const saved = keys.savedFor(model);
+  const canStart = Boolean(model) && (connected || Boolean(saved)) && selectedKeys?.length !== 0;
 
   async function saveModel(nextModelProfileId: string, unevaluatedWarningAccepted: boolean) {
     try {
@@ -164,37 +275,42 @@ export function ModelAccessPanel({
   async function changeModel(nextModelProfileId: string) {
     const nextModel = catalogue.models.find(({ id }) => id === nextModelProfileId);
     setModelProfileId(nextModelProfileId);
-    setError(null);
+    keys.setKeyError(null);
     // Ein ungeprüftes Modell übernimmt der Server erst mit dem Klick auf Start.
     if (nextModel?.evaluated && !(await saveModel(nextModelProfileId, false))) {
-      setError(labels.modelFailed);
+      keys.setKeyError(labels.modelFailed);
     }
   }
 
-  async function connectAndStart() {
+  async function addKey() {
+    if (!model || !(await keys.addKey(model))) return;
+    // Ein neuer Schlüssel ersetzt den bisher an den Draft gebundenen.
+    setCredential(null);
+    setStartError(null);
+    setKeyOpen(false);
+  }
+
+  async function start() {
     if (!model || pending) return;
     setPending(true);
-    setError(null);
+    setStartError(null);
     try {
       // Der Start friert die gespeicherte Route ein; sie muss dem gewählten Modell
       // entsprechen, auch wenn der Umfang keine Vorbelegung speichern konnte. Der
       // bewusste Klick gilt als Kenntnisnahme, dass das Modell nicht evaluiert ist.
       if (!(await saveModel(model.id, !model.evaluated))) {
-        setError(labels.modelFailed);
+        setStartError(labels.modelFailed);
         return;
       }
       let credentialId = connected ? credential?.credentialId : undefined;
-      // Ohne eingegebenen Schlüssel verbindet der Server den gespeicherten.
-      if (apiKey.trim() || !connected) {
+      if (!credentialId) {
+        // Der Server leitet den kurzlebigen Schlüssel aus dem gespeicherten ab.
         const response = await postJson("/api/ai-credentials", {
           provider: model.routeProvider,
           purpose: "analysis",
           bindingId: draftId,
           requiredModelId: model.providerModelId,
-          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         });
-        // Eine Antwort ohne JSON (etwa eine Plattform-Fehlerseite) ist ein eigener
-        // Fehlerfall und darf nicht als falscher Schlüssel erscheinen.
         const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
           credentialId?: string;
           lastFour?: string;
@@ -202,34 +318,23 @@ export function ModelAccessPanel({
           detail?: string;
         };
         if (!response.ok || !payload.credentialId) {
-          if (payload.code === "BYOK_SAVED_CREDENTIAL_NOT_FOUND") {
-            setSavedCredentials((current) =>
-              current.filter((entry) => entry.provider !== model.routeProvider),
-            );
-          }
-          setError(describeKeyFailure(labels, payload, response.status));
+          if (payload.code === "BYOK_SAVED_CREDENTIAL_NOT_FOUND") keys.forget(model.routeProvider);
+          setStartError(describeKeyFailure(labels, payload, response.status));
           return;
         }
         credentialId = payload.credentialId;
         setCredential({
           credentialId,
-          lastFour: payload.lastFour ?? apiKey.trim().slice(-4),
+          lastFour: payload.lastFour ?? saved?.lastFour ?? "",
           accessibleModelIds: [model.providerModelId],
         });
-        const lastFour = payload.lastFour ?? apiKey.trim().slice(-4);
-        setSavedCredentials((current) => [
-          ...current.filter((entry) => entry.provider !== model.routeProvider),
-          { provider: model.routeProvider, lastFour },
-        ]);
-        setApiKey("");
       }
-      if (!credentialId) return;
 
       // Die Häkchen der Liste sind der Umfang, den der Start einfriert.
       if (selectedKeys) {
-        const saved = await selectRequirementsAction({ draftId, requirementKeys: selectedKeys });
-        if (!saved.ok) {
-          setError(`${labels.startFailed} (${saved.code})`);
+        const result = await selectRequirementsAction({ draftId, requirementKeys: selectedKeys });
+        if (!result.ok) {
+          setStartError(`${labels.startFailed} (${result.code})`);
           return;
         }
       }
@@ -243,51 +348,59 @@ export function ModelAccessPanel({
       if (!response.ok || !analysis.analysisId) {
         // Die Begründung des Servers hat Vorrang: sie benennt den konkreten Zustand.
         if (analysis.code === "BYOK_CREDENTIAL_INVALID") setCredential(null);
-        setError(analysis.message ?? labels.startFailed);
+        setStartError(analysis.message ?? labels.startFailed);
         return;
       }
       router.replace(`/${locale}/analyses/${analysis.analysisId}`);
     } catch {
-      setError(`${labels.keyErrors.NETWORK_ERROR ?? labels.startFailed} (NETWORK_ERROR)`);
+      setStartError(`${labels.keyErrors.NETWORK_ERROR ?? labels.startFailed} (NETWORK_ERROR)`);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
-          <ReachabilityLight connected={connected || Boolean(saved)} />
-          {labels.apiKey}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-4">
-        <ModelKeyForm
-          apiKey={apiKey}
-          catalogue={catalogue}
-          disabled={selectedKeys?.length === 0}
-          error={error}
-          keyOptional={connected || Boolean(saved)}
-          keyPlaceholder={
-            connected
-              ? `••••${credential?.lastFour ?? ""}`
-              : saved
+    <>
+      <StartError message={startError} />
+      <StartAnalysisButton
+        disabled={!canStart}
+        labels={labels}
+        onClick={() => void start()}
+        pending={pending}
+      />
+      <Popover open={keyOpen} onOpenChange={setKeyOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2" title={labels.panelTitle}>
+            <ReachabilityLight connected={connected || Boolean(saved)} />
+            {labels.apiKey}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 p-4">
+          <ModelKeyForm
+            apiKey={keys.apiKey}
+            catalogue={catalogue}
+            error={keys.keyError}
+            keyOptional={connected || Boolean(saved)}
+            keyPlaceholder={
+              saved
                 ? labels.savedKey.replace("{lastFour}", saved.lastFour)
-                : undefined
-          }
-          onRemoveSavedKey={saved ? () => void removeSavedKey() : undefined}
-          removeSavedKeyLabel={labels.removeSavedKey}
-          labels={labels}
-          modelProfileId={modelProfileId}
-          onApiKeyChange={setApiKey}
-          onModelChange={(id) => void changeModel(id)}
-          onSubmit={() => void connectAndStart()}
-          pending={pending}
-          submitLabel={labels.start}
-          submittingLabel={labels.starting}
-        />
-      </PopoverContent>
-    </Popover>
+                : connected
+                  ? `••••${credential?.lastFour ?? ""}`
+                  : undefined
+            }
+            onRemoveSavedKey={saved && model ? () => void keys.removeKey(model) : undefined}
+            removeSavedKeyLabel={labels.removeSavedKey}
+            labels={labels}
+            modelProfileId={modelProfileId}
+            onApiKeyChange={keys.setApiKey}
+            onModelChange={(id) => void changeModel(id)}
+            onSubmit={() => void addKey()}
+            pending={keys.adding || pending}
+            submitLabel={labels.addKey}
+            submittingLabel={labels.addingKey}
+          />
+        </PopoverContent>
+      </Popover>
+    </>
   );
 }

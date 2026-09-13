@@ -187,6 +187,8 @@
     "apiKey": "API-Key",
     "savedKey": "••••{lastFour} gespeichert",
     "removeSavedKey": "Gespeicherten Key entfernen",
+    "addKey": "Hinzufügen",
+    "addingKey": "Wird hinzugefügt …",
     "keyFailed": "Der Schlüssel oder Modellzugriff konnte nicht bestätigt werden.",
     "keyErrors": {
       "UNTRUSTED_ORIGIN": "Anfrage von einer nicht freigegebenen Adresse: NEXT_PUBLIC_APP_URL passt nicht zur aufgerufenen Domain.",
@@ -310,10 +312,8 @@
     "stop": "Analyse abbrechen",
     "stopping": "Wird abgebrochen …",
     "stopFailed": "Die Analyse konnte nicht abgebrochen werden. Bitte erneut versuchen.",
-    "restart": "Analyse neu starten",
     "newAnalysisAll": "Alle Anforderungen",
     "newAnalysisSelection": "Nur Auswahl ({count})",
-    "startSelection": "Auswahl analysieren ({count})",
     "selectAll": "Alle Anforderungen auswählen",
     "selectRequirement": "{requirement} auswählen"
   },

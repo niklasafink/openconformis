@@ -118,12 +118,10 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
     newAnalysis: t("newAnalysis"),
     newAnalysisAll: t("newAnalysisAll"),
     newAnalysisSelection: t("newAnalysisSelection", { count: "{count}" }),
-    startSelection: t("startSelection", { count: "{count}" }),
     cancelledNotice: t("cancelledNotice"),
     stop: t("stop"),
     stopping: t("stopping"),
     stopFailed: t("stopFailed"),
-    restart: t("restart"),
   };
 
   return (
@@ -169,6 +167,8 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
                   apiKey: access("apiKey"),
                   savedKey: access("savedKey", { lastFour: "{lastFour}" }),
                   removeSavedKey: access("removeSavedKey"),
+                  addKey: access("addKey"),
+                  addingKey: access("addingKey"),
                   keyFailed: access("keyFailed"),
                   keyErrors: access.raw("keyErrors") as Record<string, string>,
                   modelFailed: access("modelFailed"),

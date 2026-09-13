@@ -101,13 +101,15 @@ test.describe("authenticated analysis setup", () => {
     await expect(page.getByRole("button", { name: /Art\. 5 Abs\. 4 DORA/u })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    // Das Zugangsfeld zeigt nur Modell und API-Key; ohne Schlüssel lässt sich
-    // die Analyse nicht starten.
+    // Starten und Schlüssel hinzufügen sind getrennte Knöpfe: Ohne gespeicherten
+    // Schlüssel lässt sich die Analyse nicht starten, und das Zugangsfeld fügt
+    // nur einen eingegebenen Schlüssel hinzu.
+    await expect(page.getByRole("button", { name: "Analyse starten" })).toBeDisabled();
     const accessPanel = page.getByTitle("Modellzugang");
     await expect(accessPanel).toBeVisible();
     await accessPanel.click();
     await expect(page.getByLabel(/API-Key$/u)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Analyse starten" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Hinzufügen" })).toBeDisabled();
     // Die Modelle stehen untereinander in einem Dropdown, das gewählte mit Häkchen.
     await page.getByRole("button", { name: "Modell", exact: true }).click();
     await expect(page.getByRole("menuitemradio", { checked: true })).toBeVisible();
