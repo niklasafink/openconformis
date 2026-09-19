@@ -142,7 +142,7 @@ export function AppSidebar({
           aria-label={labels.brand}
         >
           <Asterisk aria-hidden="true" className="size-6 shrink-0" strokeWidth={2.2} />
-          <span className="truncate font-serif text-[22px] leading-none group-data-[collapsible=icon]:hidden">
+          <span className="truncate font-serif text-page-title leading-none group-data-[collapsible=icon]:hidden">
             {labels.brand}
           </span>
         </Link>
@@ -167,7 +167,7 @@ export function AppSidebar({
                   >
                     <span
                       aria-hidden="true"
-                      className="flex size-3.5 shrink-0 items-center justify-center text-[12px] leading-none"
+                      className="flex size-3.5 shrink-0 items-center justify-center text-meta leading-none"
                     >
                       💬
                     </span>
@@ -258,7 +258,7 @@ export function AppSidebar({
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="text-[13px] font-semibold text-muted-foreground hover:text-foreground">
+              <CollapsibleTrigger className="text-body font-semibold text-muted-foreground hover:text-foreground">
                 {labels.recentProjects}
                 <ChevronDown className="ml-auto size-3.5! transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
@@ -306,7 +306,7 @@ export function AppSidebar({
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup className="mt-auto pb-4">
             <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="text-[13px] font-semibold text-muted-foreground hover:text-foreground">
+              <CollapsibleTrigger className="text-body font-semibold text-muted-foreground hover:text-foreground">
                 {labels.recentChats}
                 <ChevronDown className="ml-auto size-3.5! transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>

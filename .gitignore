@@ -41,3 +41,6 @@ certificates/
 .scratch-e2e/
 .vercel
 .env*
+
+# Lokaler Store des shadcn-Umwegs; gehört nicht ins Repository.
+.pnpm-store/

@@ -53,7 +53,7 @@ export async function AuthPageShell({
       >
         <h1
           id="auth-page-title"
-          className="mb-6 font-serif text-[26px] leading-none font-normal tracking-tight text-foreground"
+          className="mb-6 font-serif text-page-title leading-none font-normal tracking-tight text-foreground"
         >
           {title}
         </h1>

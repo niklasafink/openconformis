@@ -23,17 +23,17 @@ export async function PageHeader({ actions, eyebrow, status, title }: PageHeader
   const t = await getTranslations("Navigation");
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 px-4 md:px-6">
+    <header className="flex h-(--header-height) shrink-0 items-center gap-3 px-4 md:px-6">
       <SidebarTrigger aria-label={t("toggleSidebar")} className="md:hidden" />
       {title ? (
         <div className="flex shrink-0 items-baseline gap-3">
           {/* `truncate` schneidet am Zeilenkasten ab; mit `leading-none` fielen
-              Unterlängen wie das „g“ weg, deshalb bleibt Luft unter der Grundlinie. */}
-          <h1 className="truncate font-serif text-[26px] leading-[1.25] font-normal tracking-tight">
+              Unterlängen wie das „g“ weg, deshalb behält die Skala ihre Zeilenhöhe. */}
+          <h1 className="truncate font-serif text-page-title font-normal tracking-tight">
             {title}
           </h1>
           {eyebrow ? (
-            <span className="hidden text-xs text-muted-foreground sm:inline">{eyebrow}</span>
+            <span className="hidden text-meta text-muted-foreground sm:inline">{eyebrow}</span>
           ) : null}
         </div>
       ) : null}

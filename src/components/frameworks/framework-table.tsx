@@ -46,16 +46,16 @@ export async function FrameworkTable({
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           <TableHead className="w-11 px-4" aria-label={t("selected")} />
-          <TableHead className="h-11 text-[13px] font-medium text-foreground">
+          <TableHead className="h-9 text-meta font-medium text-foreground">
             {t("columnName")}
           </TableHead>
-          <TableHead className="w-40 text-[13px] font-medium text-foreground">
+          <TableHead className="w-40 text-meta font-medium text-foreground">
             {t("columnRegion")}
           </TableHead>
-          <TableHead className="w-44 text-[13px] font-medium text-foreground">
+          <TableHead className="w-44 text-meta font-medium text-foreground">
             {t("columnRequirements")}
           </TableHead>
-          <TableHead className="w-44 text-[13px] font-medium text-foreground">
+          <TableHead className="w-44 text-meta font-medium text-foreground">
             {t("columnStatus")}
           </TableHead>
         </TableRow>
@@ -71,7 +71,7 @@ export async function FrameworkTable({
               data-selected={isSelected || undefined}
               data-locked={isLocked || undefined}
               aria-disabled={isLocked || undefined}
-              className="relative h-14 data-selected:bg-accent/70 data-locked:text-muted-foreground data-locked:hover:bg-transparent"
+              className="relative h-11 data-selected:bg-accent/70 data-locked:text-muted-foreground data-locked:hover:bg-transparent"
             >
               <TableCell className="px-4">
                 <span

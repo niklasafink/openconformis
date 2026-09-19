@@ -1,7 +1,7 @@
 # Design system and interaction specification
 
 Status: binding baseline for the Next.js implementation  
-Last updated: 2026-09-08
+Last updated: 2026-09-19
 
 This document replaces the sibling-project design reference mentioned by the old
 wireframe. When the implementation and this file disagree, first decide whether the
@@ -71,13 +71,13 @@ Type scale:
 
 | Token                | Size / line-height | Weight | Use                             |
 | -------------------- | -----------------: | -----: | ------------------------------- |
-| `text-page-title`    |         28 / 34 px |    600 | One page title only.            |
-| `text-panel-title`   |         20 / 26 px |    600 | Finding or dialog title.        |
-| `text-section-title` |         16 / 22 px |    600 | Section heading.                |
-| `text-body`          |         14 / 21 px |    400 | Default body and table content. |
-| `text-body-strong`   |         14 / 21 px |    600 | IDs, selected values, emphasis. |
-| `text-control`       |         14 / 20 px |    500 | Buttons, inputs and navigation. |
-| `text-meta`          |         12 / 18 px |    400 | Secondary metadata.             |
+| `text-page-title`    |         22 / 28 px |    600 | One page title only.            |
+| `text-panel-title`   |         17 / 23 px |    600 | Finding or dialog title.        |
+| `text-section-title` |         14 / 20 px |    600 | Section heading.                |
+| `text-body`          |         13 / 19 px |    400 | Default body and table content. |
+| `text-body-strong`   |         13 / 19 px |    600 | IDs, selected values, emphasis. |
+| `text-control`       |         13 / 18 px |    500 | Buttons, inputs and navigation. |
+| `text-meta`          |         12 / 17 px |    400 | Secondary metadata.             |
 
 Rules:
 
@@ -183,7 +183,7 @@ and controls use these components instead of hand-built look-alikes.
 - Sidebar: shadcn `Sidebar` with `variant="floating"` and `collapsible="icon"`
   (16 rem wide, 0.5 rem inset, rounded, hairline ring). State persists in the
   `sidebar_state` cookie; ⌘/Ctrl+B toggles.
-- Header height: 56 px. Canvas fills the remaining viewport height.
+- Header height: 48 px (`--header-height`). Canvas fills the remaining viewport height.
 - Page content uses 16–24 px horizontal padding outside dense result mode.
 - Main shell itself does not horizontally scroll at 1280 px and above.
 
@@ -202,9 +202,9 @@ and controls use these components instead of hand-built look-alikes.
 
 ### Header
 
-- Left: the page title in serif (26 px) with the workflow step as small muted text.
+- Left: the page title in serif (22 px) with the workflow step as small muted text.
   Pages that carry their own heading (sign-in, administration) leave the title out.
-- Right: page-specific search (rounded, 32 px high, 240 px wide, shadcn `Input`),
+- Right: page-specific search (rounded, 28 px high, 208 px wide, shadcn `Input`),
   then the language control (shadcn `DropdownMenu` with flag plus accessible name).
 - Destructive or primary workflow actions do not live in the header unless
   their scope is unambiguous.
@@ -218,7 +218,7 @@ the URL and analysis state. Reloading must preserve progress and selection.
 
 ### Buttons
 
-- Standard height: 36 px; compact table action: 32 px.
+- Standard height: 32 px; compact table action: 24 px.
 - Horizontal padding: 12 px compact, 16 px standard.
 - Primary action: dark navy fill, white text.
 - Secondary: white surface, border, primary text.
@@ -230,7 +230,7 @@ the URL and analysis state. Reloading must preserve progress and selection.
 
 ### Inputs and selects
 
-- Standard height: 36 px.
+- Standard height: 32 px.
 - Search and status select at the same hierarchy have equal height.
 - Labels stay visible; placeholders are examples, not labels.
 - Error text appears directly below the field.
@@ -240,7 +240,7 @@ the URL and analysis state. Reloading must preserve progress and selection.
 
 ### Tables
 
-- Header height: 40 px; body row target: 64–88 px depending on content.
+- Header height: 36 px; body row target: 44 px.
 - Header labels use normal capitalization, 12–13 px and medium weight.
 - Sticky headers are required for independently scrolling tables.
 - Long requirement text is clamped after four lines with a visible ellipsis.

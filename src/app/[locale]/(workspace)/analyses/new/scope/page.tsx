@@ -74,7 +74,7 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
                 defaultValue={q}
                 placeholder={t("search")}
                 aria-label={t("search")}
-                className="h-8 w-60 rounded-full bg-card pl-8"
+                className="h-7 w-52 rounded-full bg-card pl-8"
               />
               <input type="hidden" name="draft" value={boundDraft.id} />
             </form>

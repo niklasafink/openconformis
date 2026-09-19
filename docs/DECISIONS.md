@@ -477,3 +477,113 @@ Consequences: amends D-025's "short-lived only" storage rule and the unevaluated
 warning. Account deletion cascades to saved keys.
 
 Decision: accepted.
+
+## D-029 Jev as a typed decision service next to the assessment models
+
+Product direction (2026-09-19): a grid of _n_ contracts × _m_ decision columns is a
+thousand decisions per run. A reasoning model per cell is neither affordable nor fast.
+Jev (TypeSafe System One) answers typed questions in about 100 ms at 0.042 $ per
+million input tokens and cannot return an invalid value for a request. That makes the
+grid possible at all.
+
+Jev returns only `noul` (probability of yes), `choice` (option plus distribution) or
+`score` (level) — never text. This project requires a rationale for every assessment,
+so the rationale is **assembled by code** from the selected criterion, the grounded
+quotes and the probability. It is therefore not generated and cannot invent anything.
+Only cells below the confidence threshold or with a failed citation check escalate to
+the large BYOK model, which then writes both assessment and rationale.
+
+TypeSafe documents German as weaker than English, so `instructions` and `criteria` are
+written in English while the `state` stays the German source text, and the confidence
+threshold is set conservatively. The column labels in the interface stay bilingual.
+
+Jev is registered as a BYOK provider (`typesafe`) but deliberately has no analysis base
+URL, so `isAnalysisProviderAvailable` keeps returning `false` and Jev never appears as
+an analysis or chat route in the model picker. It is a decision service, not an
+assessment model. Jev never decides alone: human confirmation and reasoned override
+stay in place exactly as in the gap analysis.
+
+Patterns adopted from public documentation and MIT repositories, with no vendored code
+(the project is PolyForm Noncommercial and uses its own fetch adapters rather than AI
+SDKs):
+
+| Source                                                   | Licence       | What is adopted                                                                                              |
+| -------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------ |
+| `docs.typesafe.ai/cookbooks/classifying_rag_passages`    | documentation | evidence routing: relevant / usable / injection nouls plus threshold logic                                   |
+| `docs.typesafe.ai/cookbooks/citation_check`              | documentation | two-stage citation check: substring, then choice supports / contradicts / says nothing, auto-accept from 0.8 |
+| `docs.typesafe.ai/patterns/confidence-routing`           | documentation | escalation to the large model below the threshold                                                            |
+| `docs.typesafe.ai/cookbooks/parallel_questions`          | documentation | several questions share one `state` in one request                                                           |
+| `docs.typesafe.ai/cookbooks/hierarchical_classification` | documentation | choice columns with more options than one question carries                                                   |
+| `devx-opensource/awesome-jev-by-typesafe`                | MIT           | use cases 7/11/13/26 as prompt templates                                                                     |
+| `jamietso/Tabular_Review`                                | MIT           | UX reference for column definition and cell-to-evidence jump (uses Gemini, not Jev)                          |
+| `logicrw/awesome-jev-projects`                           | MIT           | catalogue used for research                                                                                  |
+
+Deliberately not adopted: MCP servers (`typesafe-mcp`, `jev-mcp`), browser and desktop
+agents, context-GC plugins (`Winnow`, `fast-jev-compaction`) and model routers for
+coding agents. They do not solve a problem of this application.
+
+Consequences: the application stays usable without Jev. `scripts/check-byok-config.ts`
+must not require `typesafe`, the contract review has a `REVIEW_DECISION_ENGINE=model`
+fallback that runs the same grid through the large BYOK model, and the gap-analysis
+assist stays behind `ANALYSIS_JEV_ASSIST=off`. Enum values are added in their own
+migration ahead of any use, because PostgreSQL refuses a value added with
+`ALTER TYPE … ADD VALUE` inside the transaction that created it.
+
+Decision: accepted.
+
+## D-030 Contract review as the second axis next to the gap analysis
+
+Product direction (2026-09-19): the gap analysis checks _one_ policy against _one_
+framework. Due diligence and contract portfolios need the other axis: _n_ contracts ×
+_m_ decision columns as a grid, each cell a typed answer with exact evidence. The
+reference is `docs/jev-dd-tabular-review-empty.png` (Jev DD · Tabular Review). The
+upper-case labels of that screenshot (`SOURCE`, `CHOICE`, `YES / NO`) are **not**
+adopted — `DESIGN.md` §2 forbids upper-case labels; the interface says "Auswahl",
+"Ja/Nein", "Score" and "Quelle".
+
+Contract review is a fourth main sidebar entry without sub-entries; the stepper stays
+reserved for the gap analysis. A contract is technically a `policy_version`, so upload,
+OCR, parsing and `document_blocks` are reused unchanged, as are the document viewer,
+the substring grounding check and the XLSX export pattern.
+
+Runs freeze their configuration the way `analyses` does — document set, column set,
+route, model, prompt version, thresholds and the state token budget. The unique key
+`(runDocumentId, runColumnId)` on `review_cells` is the idempotency key of the whole
+run. Execution fans out one child workflow per contract; the parent starts them and
+sleeps, the children wake it up. `finalize` waits only on open cells, so one
+permanently failing cell cannot discard 999 good answers — a run ends as `completed`,
+`completed_with_gaps` or `failed`.
+
+Consequences: new tables only, no change to `analyses`, `policies` or `document_blocks`.
+Two short-lived credentials per run (`review_routing` and `review_escalation`) share one
+`bindingId`, and both are deleted in the parent's finalize step, never by a child.
+
+Decision: accepted.
+
+## D-031 One central type and size scale
+
+Product direction (2026-09-19): `DESIGN.md` §3 described a type scale that never
+existed as a token in `src/styles/globals.css`. Sizes stood inline (`text-[26px]`,
+`h-14`, `h-8`) and legacy classes carried their own `font-size`, so the interface read
+larger than intended and there was no single lever. The scale is now created once in
+the `@theme inline` block and shrunk by roughly 10–15 %:
+
+| Token                  | Size / line height |
+| ---------------------- | ------------------ |
+| `--text-page-title`    | 22 / 28 px         |
+| `--text-panel-title`   | 17 / 23 px         |
+| `--text-section-title` | 14 / 20 px         |
+| `--text-body`          | 13 / 19 px         |
+| `--text-control`       | 13 / 18 px         |
+| `--text-meta`          | 12 / 17 px         |
+
+12 px stays the lower bound. The header shrinks from 56 px to 48 px through a shared
+`--header-height` variable, because the old value was hard-wired into five
+`calc(100dvh - 56px)` expressions and changing only `h-14` would have produced the page
+scrollbar that `DESIGN.md` §2 forbids. Controls follow: buttons 32 px, inputs 32 px,
+table head 36 px, table row 44 px.
+
+Consequences: `DESIGN.md` §3, §4 and §5 are updated to the new values, since the
+binding documentation may not contradict the code.
+
+Decision: accepted.

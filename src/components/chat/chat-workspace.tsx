@@ -303,7 +303,7 @@ export function ChatWorkspace({
             event.currentTarget.form?.requestSubmit();
           }
         }}
-        className="min-h-12 resize-none border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0 md:text-[16px]"
+        className="min-h-12 resize-none border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0 md:text-sm"
       />
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <DropdownMenu>
@@ -312,7 +312,7 @@ export function ChatWorkspace({
               type="button"
               variant="ghost"
               size="sm"
-              className="gap-1.5 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
+              className="gap-1.5 px-2 font-normal text-muted-foreground hover:text-foreground"
               disabled={Boolean(threadId)}
             >
               <Plus className="size-4" />
@@ -343,7 +343,7 @@ export function ChatWorkspace({
               type="button"
               variant="ghost"
               size="sm"
-              className="gap-1.5 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
+              className="gap-1.5 px-2 font-normal text-muted-foreground hover:text-foreground"
               disabled={pending || catalogue.models.length === 0}
             >
               <Cpu className="size-4" />
@@ -381,7 +381,7 @@ export function ChatWorkspace({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="gap-1 px-2 text-[15px] font-normal text-muted-foreground hover:text-foreground"
+                className="gap-1 px-2 font-normal text-muted-foreground hover:text-foreground"
                 disabled={!selectedModel}
               >
                 <span>
@@ -446,22 +446,22 @@ export function ChatWorkspace({
   );
 
   return (
-    <div className="flex min-h-[calc(100dvh-56px)] flex-col">
+    <div className="flex min-h-[calc(100dvh-var(--header-height))] flex-col">
       {isEmpty ? (
         <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[10vh]">
-          <h1 className="mb-8 flex items-center gap-3 font-serif text-[40px] leading-none font-normal tracking-tight">
-            <Asterisk aria-hidden="true" className="size-9" strokeWidth={2.2} />
+          <h1 className="mb-8 flex items-center gap-3 font-serif text-4xl leading-none font-normal tracking-tight">
+            <Asterisk aria-hidden="true" className="size-8" strokeWidth={2.2} />
             <span>{userName ? labels.greeting.replace("{name}", userName) : labels.title}</span>
           </h1>
           <div className="w-full max-w-[880px]">{composer}</div>
           <p className="mt-1.5 text-[11px] text-muted-foreground">{labels.disclaimer}</p>
           {catalogue.models.length === 0 ? (
-            <p className="mt-2 text-sm text-destructive" role="alert">
+            <p className="mt-2 text-body text-destructive" role="alert">
               {labels.emptyModels}
             </p>
           ) : null}
           {error ? (
-            <p className="mt-2 text-sm text-destructive" role="alert">
+            <p className="mt-2 text-body text-destructive" role="alert">
               {error}
             </p>
           ) : null}
@@ -489,8 +489,8 @@ export function ChatWorkspace({
                   <div className="min-w-0 flex-1">
                     <div>{message.content}</div>
                     {message.citations.length > 0 ? (
-                      <section className="mt-4 border-t pt-3 text-[13px] whitespace-normal">
-                        <h2 className="mb-1 text-[13px] font-medium">{labels.sources}</h2>
+                      <section className="mt-4 border-t pt-3 text-body whitespace-normal">
+                        <h2 className="mb-1 text-body font-medium">{labels.sources}</h2>
                         {message.citations.map((citation) => (
                           <details
                             key={`${message.id}-${citation.citationOrder}`}
@@ -526,7 +526,7 @@ export function ChatWorkspace({
                 {labels.disclaimer}
               </p>
               {error ? (
-                <p className="mt-1 text-center text-sm text-destructive" role="alert">
+                <p className="mt-1 text-center text-body text-destructive" role="alert">
                   {error}
                 </p>
               ) : null}

@@ -79,7 +79,7 @@ export default async function FrameworkPage({ params, searchParams }: FrameworkP
                 defaultValue={q}
                 placeholder={topbar("searchFrameworks")}
                 aria-label={topbar("searchFrameworks")}
-                className="h-8 w-60 rounded-full bg-card pl-8"
+                className="h-7 w-52 rounded-full bg-card pl-8"
               />
               {selectedFramework ? (
                 <input type="hidden" name="framework" value={selectedFramework.id} />
@@ -91,7 +91,7 @@ export default async function FrameworkPage({ params, searchParams }: FrameworkP
         }
       />
       <div className="workspace-content min-w-0">
-        <div className="flex min-h-[calc(100dvh-56px)] flex-col gap-4 px-4 pb-4 md:px-6 md:pb-6">
+        <div className="flex min-h-[calc(100dvh-var(--header-height))] flex-col gap-4 px-4 pb-4 md:px-6 md:pb-6">
           <div
             className="flex flex-wrap items-center gap-2"
             role="group"
@@ -102,8 +102,8 @@ export default async function FrameworkPage({ params, searchParams }: FrameworkP
                 key={entry.id}
                 asChild
                 variant={entry.id === filter ? "secondary" : "ghost"}
-                size="sm"
-                className="rounded-full px-3.5 data-active:bg-card data-active:shadow-xs data-active:ring-1 data-active:ring-border"
+                size="xs"
+                className="rounded-full px-3 data-active:bg-card data-active:shadow-xs data-active:ring-1 data-active:ring-border"
               >
                 <Link
                   locale={locale}
