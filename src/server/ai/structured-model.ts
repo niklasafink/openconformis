@@ -45,7 +45,15 @@ export type ModelProviderErrorCode =
   | "PROVIDER_RESPONSE_INVALID"
   | "PROVIDER_OUTPUT_INCOMPLETE"
   | "PROVIDER_REFUSAL"
-  | "MODEL_OUTPUT_INVALID";
+  | "MODEL_OUTPUT_INVALID"
+  // Ab hier die Codes des Entscheidungsdienstes. Sie trennen die vier Fälle, die
+  // eine Vertragsprüfung unterschiedlich behandeln muss: ein ungültiger Schlüssel
+  // endet den Lauf, eine fehlerhafte Anfrage ist ein Programmfehler, eine Drosselung
+  // wartet, ein Ausfall wiederholt.
+  | "PROVIDER_CREDENTIAL_INVALID"
+  | "PROVIDER_REQUEST_INVALID"
+  | "PROVIDER_RATE_LIMITED"
+  | "PROVIDER_UNAVAILABLE";
 
 export class ModelProviderError extends Error {
   constructor(
@@ -59,6 +67,11 @@ export class ModelProviderError extends Error {
      * Header oder Antwortkörper — dort stünden Policy-Inhalte und Schlüssel.
      */
     detail?: string,
+    /**
+     * Sekunden aus dem `Retry-After`-Kopf. Die Drosselung wartet damit genau so
+     * lange, wie der Anbieter verlangt, statt zu raten.
+     */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(detail ?? defaultProviderDetail[code]);
     this.name = "ModelProviderError";
@@ -85,6 +98,10 @@ const defaultProviderDetail: Record<ModelProviderErrorCode, string> = {
   PROVIDER_REFUSAL: "Das Modell hat die Bearbeitung abgelehnt.",
   MODEL_OUTPUT_INVALID:
     "Das Modell hat kein gültiges Ergebnis nach dem vereinbarten Schema geliefert.",
+  PROVIDER_CREDENTIAL_INVALID: "Der Anbieter hat den hinterlegten Schlüssel abgelehnt.",
+  PROVIDER_REQUEST_INVALID: "Der Anbieter hat die Anfrage als ungültig abgelehnt.",
+  PROVIDER_RATE_LIMITED: "Der Anbieter hat wegen zu vieler Anfragen gedrosselt.",
+  PROVIDER_UNAVAILABLE: "Der Anbieter war vorübergehend nicht erreichbar.",
 };
 
 const maximumProviderDetailLength = 200;
