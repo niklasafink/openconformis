@@ -11,7 +11,11 @@ import { requestGoogleStructured } from "./google";
 import { requestOpenAiStructured } from "./openai";
 import { requestOpenRouterStructured } from "./openrouter";
 import { requestRequestyStructured } from "./requesty";
-import type { StructuredModelRequest, StructuredModelResponse } from "./structured-model";
+import {
+  ModelProviderError,
+  type StructuredModelRequest,
+  type StructuredModelResponse,
+} from "./structured-model";
 
 export class ProviderRouteConfigurationError extends Error {
   constructor(
@@ -76,6 +80,11 @@ function analysisBaseUrl(provider: AiRouteProvider) {
     case "anthropic":
     case "google":
       return undefined;
+    // TypeSafe ist ein Entscheidungsdienst, kein Bewertungsmodell: Jev gibt nie
+    // Text zurück. Ohne Basis-URL liefert `isAnalysisProviderAvailable` weiterhin
+    // `false`, und Jev taucht nie im Modellwähler für Analyse oder Chat auf.
+    case "typesafe":
+      return undefined;
   }
 }
 
@@ -125,6 +134,10 @@ export function requestProviderStructured<T>(
       return requestGoogleStructured(request, fetchImplementation);
     case "openai":
       return requestOpenAiStructured(request, fetchImplementation);
+    // Erreichbar nur über eine falsch gesetzte Route: Jev beantwortet getypte
+    // Fragen über `requestSystemOne` und kann kein JSON-Schema bedienen.
+    case "typesafe":
+      throw new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
   }
 }
 

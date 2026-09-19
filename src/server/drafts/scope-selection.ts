@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import type { AiRouteProvider } from "@/domain/ai/provider";
 import { appendAuditEvent } from "@/server/audit/event";
 import {
   getAnalysisModelCatalogue,
@@ -25,7 +26,7 @@ export type DraftScopeSelection = {
   organizationContext: string;
   includedRequirementKeys: string[];
   modelSelection?: {
-    routeProvider: "openrouter" | "requesty" | "anthropic" | "google" | "openai";
+    routeProvider: AiRouteProvider;
     modelProfileId: string;
     providerModelId: string;
     modelCatalogueVersion: string;

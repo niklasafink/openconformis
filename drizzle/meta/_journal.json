@@ -337,6 +337,13 @@
       "when": 1789337359191,
       "tag": "0047_policy_selection_before_ready",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1789855237668,
+      "tag": "0048_jev_enum_values",
+      "breakpoints": true
     }
   ]
 }

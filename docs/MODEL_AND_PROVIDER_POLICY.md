@@ -19,6 +19,18 @@ Initial provider adapters:
 | Anthropic  | Claude API key                               | `GET /v1/models` with provider authentication | Direct Claude access.                                                                       |
 | Google     | Gemini API key or current supported auth key | Gemini `models.list` with `x-goog-api-key`    | Direct Gemini access.                                                                       |
 | OpenAI     | OpenAI API key                               | `GET /v1/models` with bearer authentication   | Direct OpenAI access.                                                                       |
+| TypeSafe   | TypeSafe API key                             | Minimal `POST /v1/systemone` probe            | Jev decision service for the contract review. Never an analysis or chat route.              |
+
+TypeSafe is the one entry in this table that is not an assessment model. Jev returns
+only a typed value — a probability, an option or a level — and never text, so it
+cannot write a rationale and cannot be routed through the structured-output adapter.
+`analysisBaseUrl("typesafe")` therefore stays `undefined`,
+`isAnalysisProviderAvailable` keeps returning `false`, and the model picker never
+offers it. It has no documented model-list endpoint either, so its key is validated
+with the smallest real request: a two-character state and one yes/no question. A
+`401` means the key is invalid; `429` and `529` mean "not checkable right now" and
+are not shown as a key error. The contract review requires this key; every other
+part of the application works without it.
 
 Additional adapters such as Azure OpenAI, Amazon Bedrock or Vertex AI are deferred
 because their credentials and tenant configuration are not a single API-key field.
@@ -351,7 +363,7 @@ publisher, route provider and exact provider model ID as separate validated fiel
 
 ```text
 AI_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
-BYOK_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
+BYOK_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai,typesafe
 
 BYOK_REQUESTY_ANALYSIS_MODELS=
 BYOK_OPENAI_ANALYSIS_MODELS=
@@ -370,6 +382,11 @@ DEFAULT_CHAT_MODEL_PROFILE=
 MODEL_CATALOG_REFRESH_HOURS=6
 PREPROCESSING_MODEL_PROFILE=google/gemini-3.7-flash@openrouter
 ```
+
+`typesafe` in `BYOK_PROVIDER_ALLOWLIST` only permits users to connect a TypeSafe key
+for the contract review; it adds no analysis or chat route. `check-byok-config.ts`
+must never require it, so a deployment without a TypeSafe account still builds and
+runs.
 
 Operator keys are optional. Production refuses to use a configured provider unless
 its provider, exact model and credential mode are all explicitly allowed.

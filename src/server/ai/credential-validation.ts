@@ -5,6 +5,7 @@ import { z } from "zod";
 import { openRouterModelsUrl } from "./openrouter-route";
 
 import type { AiRouteProvider } from "@/domain/ai/provider";
+import { systemOneModelId } from "@/domain/ai/system-one";
 
 const modelListSchema = z.object({
   data: z
@@ -20,6 +21,11 @@ const directModelSchema = z.object({ id: z.string().min(1) });
 const googleModelSchema = z.object({ name: z.string().min(1) });
 const openRouterKeySchema = z.object({
   data: z.object({ label: z.string().max(200).optional() }),
+});
+/** Es genügt, dass die Antwort die gestellte Frage beantwortet hat. */
+const systemOneProbeSchema = z.object({
+  model: z.string().min(1),
+  answers: z.object({ probe: z.object({ noul: z.number().min(0).max(1) }) }),
 });
 
 export class CredentialValidationError extends Error {
@@ -206,6 +212,42 @@ export async function validateProviderCredential(
         throw new CredentialValidationError("MODEL_NOT_ACCESSIBLE", false);
       }
       return { provider: input.provider, accessibleModelIds: [model.data.id] };
+    }
+    case "typesafe": {
+      // TypeSafe dokumentiert kein `GET /v1/models`. Geprüft wird deshalb mit der
+      // kleinstmöglichen echten Anfrage: ein Zustand aus zwei Zeichen und eine
+      // einzige Ja/Nein-Frage. Das kostet praktisch nichts und beweist zugleich,
+      // dass der Schlüssel die Entscheidungsroute wirklich bedienen darf.
+      if (input.requiredModelId !== systemOneModelId) {
+        throw new CredentialValidationError("MODEL_NOT_ACCESSIBLE", false);
+      }
+      const probe = systemOneProbeSchema.safeParse(
+        await fetchJson(
+          "https://api.typesafe.ai/v1/systemone",
+          {
+            method: "POST",
+            headers: { ...bearer(input.secret), "content-type": "application/json" },
+            body: JSON.stringify({
+              model: systemOneModelId,
+              state: "ok",
+              questions: {
+                probe: {
+                  type: "noul",
+                  instructions: "Is this text non-empty?",
+                  criteria: { true: "The text contains characters.", false: "The text is empty." },
+                },
+              },
+            }),
+          },
+          fetchImplementation,
+        ),
+      );
+      if (!probe.success) {
+        throw new CredentialValidationError("PROVIDER_RESPONSE_INVALID", false);
+      }
+      // `accessibleModelIds` trägt genau einen Eintrag — die Datenbank verlangt
+      // `cardinality(accessible_model_ids) = 1`.
+      return { provider: input.provider, accessibleModelIds: [systemOneModelId] };
     }
     default:
       throw new CredentialValidationError("PROVIDER_NOT_SUPPORTED", false);

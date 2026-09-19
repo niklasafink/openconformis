@@ -22,9 +22,15 @@ export const aiRouteProvider = pgEnum("ai_route_provider", [
   "anthropic",
   "google",
   "openai",
+  "typesafe",
 ]);
 
-export const aiCredentialPurpose = pgEnum("ai_credential_purpose", ["analysis", "chat"]);
+export const aiCredentialPurpose = pgEnum("ai_credential_purpose", [
+  "analysis",
+  "chat",
+  "review_routing",
+  "review_escalation",
+]);
 
 export const aiCredentialStatus = pgEnum("ai_credential_status", [
   "active",
