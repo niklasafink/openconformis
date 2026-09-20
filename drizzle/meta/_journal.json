@@ -344,6 +344,13 @@
       "when": 1789855237668,
       "tag": "0048_jev_enum_values",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1789855530056,
+      "tag": "0049_contract_review",
+      "breakpoints": true
     }
   ]
 }
