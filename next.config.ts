@@ -56,6 +56,11 @@ const nextConfig: NextConfig = {
     config.resolve.alias = { ...config.resolve.alias, "@aws-sdk/client-s3": false };
     return config;
   },
+  // Dasselbe für den Entwicklungsserver, der mit Turbopack bündelt: dort zeigt
+  // der Alias auf ein leeres Modul, weil `false` nicht unterstützt wird.
+  turbopack: {
+    resolveAlias: { "@aws-sdk/client-s3": "./src/server/exports/aws-sdk-client-s3-stub.ts" },
+  },
   async headers() {
     return [
       {

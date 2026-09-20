@@ -9,7 +9,9 @@ import { samplePolicyAssetPath } from "@/domain/policies/sample-policy";
 import { docxMimeType, maximumPolicyBytes, pdfMimeType } from "@/domain/policies/upload";
 import { db } from "@/server/db/client";
 import { analyses } from "@/server/db/schema/analyses";
+import { members } from "@/server/db/schema/auth";
 import { policyVersions } from "@/server/db/schema/documents";
+import { reviewDocuments, reviewTables } from "@/server/db/schema/reviews";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
 import { createPrivateObjectStore } from "@/server/storage/object-store";
 
@@ -73,6 +75,19 @@ async function authorizePolicyVersion(input: {
       )
       .limit(1);
     if (owned) return version;
+
+    // Ein Vertrag der Vertragsprüfung gehört dem Arbeitsbereich, nicht einem Draft:
+    // wer Mitglied der Organisation der Prüfung ist, darf das Original sehen.
+    const [reviewed] = await db
+      .select({ id: reviewDocuments.id })
+      .from(reviewDocuments)
+      .innerJoin(reviewTables, eq(reviewTables.id, reviewDocuments.reviewTableId))
+      .innerJoin(members, eq(members.organizationId, reviewTables.organizationId))
+      .where(
+        and(eq(reviewDocuments.policyVersionId, version.id), eq(members.userId, input.ownerUserId)),
+      )
+      .limit(1);
+    if (reviewed) return version;
   }
 
   const draft = await getBoundActiveDraft(input.draftId);

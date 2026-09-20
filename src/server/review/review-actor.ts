@@ -73,6 +73,17 @@ function require(
   return actor;
 }
 
+/** Was die Oberfläche einem Akteur anbietet — dieselben Regeln wie die Prüfungen. */
+export function reviewPermissionsOf(actor: ReviewActor) {
+  const has = (allowed: readonly ApplicationRole[]) =>
+    actor.roles.some((role) => allowed.includes(role));
+  return {
+    canManage: has(managementRoles),
+    canConfirm: actor.emailVerified && has(confirmationRoles),
+    canOverride: actor.emailVerified && has(overrideRoles),
+  };
+}
+
 /** Tabellen, Spalten und Dokumente verwalten, Läufe starten und abbrechen. */
 export function requireManagement(actor: ReviewActor) {
   return require(actor, managementRoles, false);

@@ -11,6 +11,7 @@ import {
 } from "@/domain/review/column";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db } from "@/server/db/client";
+import { anonymousDrafts } from "@/server/db/schema/application";
 import { policies, policyVersions } from "@/server/db/schema/documents";
 import {
   reviewColumns,
@@ -350,6 +351,26 @@ export async function addReviewDocument(input: {
         if (identical) {
           effectiveVersionId = identical.id;
         } else {
+          // Eine fertige Fassung ist unveränderlich; die Datenbank lässt die Übernahme
+          // in den Arbeitsbereich nur zu, wenn der Entwurf zuvor beansprucht wurde —
+          // derselbe Schritt wie beim Analysestart.
+          const [claimed] = await transaction
+            .update(anonymousDrafts)
+            .set({
+              status: "claimed",
+              claimedByUserId: actor.userId,
+              claimedAt: new Date(),
+              updatedAt: new Date(),
+              revision: sql`${anonymousDrafts.revision} + 1`,
+            })
+            .where(
+              and(
+                eq(anonymousDrafts.id, version.anonymousDraftId!),
+                eq(anonymousDrafts.status, "active"),
+              ),
+            )
+            .returning({ id: anonymousDrafts.id });
+          if (!claimed) return { ok: false as const, code: "REVIEW_DOCUMENT_NOT_FOUND" };
           await transaction
             .update(policies)
             .set({

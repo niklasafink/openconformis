@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db/client";
-import { documentBlocks } from "@/server/db/schema/documents";
+import { documentBlocks, policyVersions } from "@/server/db/schema/documents";
 import {
   reviewCellEvidence,
   reviewCellOverrides,
@@ -368,6 +368,7 @@ export async function getReviewRunGrid(reviewRunId: string) {
     db
       .select({
         id: reviewRunDocuments.id,
+        reviewDocumentId: reviewRunDocuments.reviewDocumentId,
         ordinal: reviewRunDocuments.ordinal,
         displayName: reviewRunDocuments.displayName,
         policyVersionId: reviewRunDocuments.policyVersionId,
@@ -380,6 +381,7 @@ export async function getReviewRunGrid(reviewRunId: string) {
     db
       .select({
         id: reviewRunColumns.id,
+        reviewColumnId: reviewRunColumns.reviewColumnId,
         ordinal: reviewRunColumns.ordinal,
         label: reviewRunColumns.label,
         columnType: reviewRunColumns.columnType,
@@ -390,6 +392,58 @@ export async function getReviewRunGrid(reviewRunId: string) {
       .orderBy(asc(reviewRunColumns.ordinal)),
   ]);
   return { documents, columns };
+}
+
+/**
+ * Die Textblöcke eines Vertrags im Lauf, für die Originalansicht der Zelle. Der Weg
+ * über den Lauf statt über die Fassung prüft nebenbei die Zugehörigkeit zum
+ * Arbeitsbereich.
+ */
+export async function getReviewDocumentBlocks(input: {
+  reviewRunId: string;
+  runDocumentId: string;
+}) {
+  const { run } = await ownedRun(input.reviewRunId);
+  if (!run) return undefined;
+  const [document] = await db
+    .select({
+      policyVersionId: reviewRunDocuments.policyVersionId,
+      displayName: reviewRunDocuments.displayName,
+      mimeType: policyVersions.detectedMimeType,
+      declaredMimeType: policyVersions.declaredMimeType,
+      originalDeletedAt: policyVersions.originalDeletedAt,
+    })
+    .from(reviewRunDocuments)
+    .innerJoin(policyVersions, eq(policyVersions.id, reviewRunDocuments.policyVersionId))
+    .where(
+      and(
+        eq(reviewRunDocuments.id, input.runDocumentId),
+        eq(reviewRunDocuments.reviewRunId, run.id),
+      ),
+    )
+    .limit(1);
+  if (!document) return undefined;
+  const blocks = await db
+    .select({
+      id: documentBlocks.id,
+      blockKey: documentBlocks.blockKey,
+      ordinal: documentBlocks.ordinal,
+      blockType: documentBlocks.blockType,
+      canonicalText: documentBlocks.canonicalText,
+      headingPath: documentBlocks.headingPath,
+      pageNumber: documentBlocks.pageNumber,
+      paragraphNumber: documentBlocks.paragraphNumber,
+    })
+    .from(documentBlocks)
+    .where(eq(documentBlocks.policyVersionId, document.policyVersionId))
+    .orderBy(asc(documentBlocks.ordinal));
+  return {
+    policyVersionId: document.policyVersionId,
+    displayName: document.displayName,
+    mimeType: document.mimeType ?? document.declaredMimeType,
+    originalDeleted: document.originalDeletedAt !== null,
+    blocks,
+  };
 }
 
 /** Die Prüfungen des Arbeitsbereichs, neueste zuerst. */
@@ -433,8 +487,20 @@ export async function getReviewTable(reviewTableId: string) {
       .where(and(eq(reviewColumns.reviewTableId, table.id), isNull(reviewColumns.archivedAt)))
       .orderBy(asc(reviewColumns.ordinal)),
     db
-      .select()
+      .select({
+        id: reviewDocuments.id,
+        policyVersionId: reviewDocuments.policyVersionId,
+        ordinal: reviewDocuments.ordinal,
+        displayName: reviewDocuments.displayName,
+        originalFilename: policyVersions.originalFilename,
+        parseStatus: policyVersions.parseStatus,
+        byteSize: policyVersions.byteSize,
+        pageCount: policyVersions.pageCount,
+        mimeType: policyVersions.detectedMimeType,
+        declaredMimeType: policyVersions.declaredMimeType,
+      })
       .from(reviewDocuments)
+      .innerJoin(policyVersions, eq(policyVersions.id, reviewDocuments.policyVersionId))
       .where(eq(reviewDocuments.reviewTableId, table.id))
       .orderBy(asc(reviewDocuments.ordinal)),
     db
