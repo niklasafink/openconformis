@@ -3,8 +3,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cellCitationOutcome,
   citationCheckFromAnswer,
+  citationExcerpt,
   groundCitation,
+  normalizeQuote,
   worstCitationVerdict,
   type CitationBlock,
 } from "./citation";
@@ -96,5 +99,62 @@ describe("citation verdict", () => {
     expect(worstCitationVerdict(["unsupported", "fabricated"])).toBe("fabricated");
     expect(worstCitationVerdict(["verified"])).toBe("verified");
     expect(worstCitationVerdict([])).toBeUndefined();
+  });
+});
+
+describe("cell citation outcome", () => {
+  const verified = (confidenceBp: number) => ({
+    verdict: "verified" as const,
+    confidenceBp,
+    needsReview: false,
+  });
+  const other = (verdict: "contradicted" | "unsupported" | "fabricated") => ({
+    verdict,
+    confidenceBp: 9_000,
+    needsReview: true,
+  });
+
+  it("accepts one supporting passage even when another one is merely silent", () => {
+    expect(cellCitationOutcome([verified(9_000), other("unsupported")])).toEqual({
+      verdict: "verified",
+      needsReview: false,
+    });
+  });
+
+  it("lets a fabricated quote decide, whatever else supports the answer", () => {
+    expect(cellCitationOutcome([verified(9_900), other("fabricated")])).toEqual({
+      verdict: "fabricated",
+      needsReview: true,
+    });
+  });
+
+  it("puts a contradiction on review even next to a strong supporting passage", () => {
+    expect(cellCitationOutcome([verified(9_900), other("contradicted")]).needsReview).toBe(true);
+  });
+
+  it("needs review when the best supporting passage is below the threshold or absent", () => {
+    expect(cellCitationOutcome([verified(7_000)]).needsReview).toBe(true);
+    expect(cellCitationOutcome([])).toEqual({ verdict: "unsupported", needsReview: true });
+  });
+});
+
+describe("citation excerpt", () => {
+  it("returns short blocks whole and long blocks as an exact prefix at a sentence end", () => {
+    const short = "Kurzer  Satz\nüber zwei Zeilen.";
+    expect(citationExcerpt(short)).toBe("Kurzer Satz über zwei Zeilen.");
+
+    const long = `${"Erster Satz mit einigem Inhalt. ".repeat(40)}Schluss`;
+    const excerpt = citationExcerpt(long, 200);
+    expect(excerpt.length).toBeLessThanOrEqual(200);
+    expect(excerpt.endsWith(".")).toBe(true);
+    // Immer ein exakter Substring des normalisierten Blocks, nie eine Umschreibung.
+    expect(normalizeQuote(long)).toContain(excerpt);
+  });
+
+  it("cuts at a word boundary when the text has no sentence end", () => {
+    const text = "wort ".repeat(100);
+    const excerpt = citationExcerpt(text, 50);
+    expect(excerpt.length).toBeLessThanOrEqual(50);
+    expect(text).toContain(excerpt);
   });
 });

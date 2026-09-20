@@ -16,16 +16,23 @@ import type { JevBatchPhase } from "./jev-batching";
  *
  * Jeder Aufruf schreibt **vor** dem Absenden eine Zeile in
  * `review_model_invocations`. Der eindeutige Index `(reviewRunId, batchKey)` ist die
- * Bezahl-Idempotenz: findet ein Step-Retry dort bereits ein `succeeded`, ist die
- * Arbeit getan und die Ergebniszeilen liegen vor — er ruft nicht erneut an und
- * bezahlt nicht erneut. Weil der `batchKey` aus dem Inhalt gehasht ist und nicht aus
- * der Step-ID, gilt das auch über einen Workflow-Neustart hinweg.
+ * Bezahl-Idempotenz: findet ein Step-Retry dort bereits ein `succeeded`, liefert er
+ * die **gespeicherten Antworten** zurück, ruft nicht erneut an und bezahlt nicht
+ * erneut. Die Antworten stehen in der Zeile selbst (`response`), damit ein Absturz
+ * zwischen Antwort und Weiterverarbeitung keinen bezahlten Aufruf verliert. Weil der
+ * `batchKey` aus dem Inhalt gehasht ist und nicht aus der Step-ID, gilt das auch über
+ * einen Workflow-Neustart hinweg.
  */
 
-export type JevCallOutcome =
-  | { status: "answered"; answers: Awaited<ReturnType<typeof requestSystemOne>>["answers"] }
-  /** Dieser Batch wurde in einem früheren Anlauf schon bezahlt und gespeichert. */
-  | { status: "already_done" };
+export type JevCallOutcome = {
+  status: "answered";
+  answers: Awaited<ReturnType<typeof requestSystemOne>>["answers"];
+  /**
+   * Die Antworten stammen aus einem früheren, bereits bezahlten Anlauf. Es ging kein
+   * Request an den Anbieter.
+   */
+  replayed: boolean;
+};
 
 export type JevCallInput = {
   reviewRunId: string;
@@ -69,7 +76,11 @@ async function claimInvocation(input: JevCallInput) {
   if (claimed) return { id: claimed.id, replay: false as const };
 
   const [existing] = await db
-    .select({ id: reviewModelInvocations.id, status: reviewModelInvocations.status })
+    .select({
+      id: reviewModelInvocations.id,
+      status: reviewModelInvocations.status,
+      response: reviewModelInvocations.response,
+    })
     .from(reviewModelInvocations)
     .where(
       and(
@@ -79,16 +90,20 @@ async function claimInvocation(input: JevCallInput) {
     )
     .limit(1);
 
-  // Ein `succeeded` bedeutet: bezahlt und gespeichert. Ein `started` bedeutet: der
-  // vorige Anlauf ist mitten im Aufruf gestorben; dort *muss* erneut gefragt werden,
-  // weil kein Ergebnis vorliegt. Das ist die einzige Stelle, an der doppelt bezahlt
-  // werden kann, und sie ist auf einen Absturz je Batch begrenzt.
-  return { id: existing?.id, replay: existing?.status === "succeeded" };
+  // Ein `succeeded` mit gespeicherter Antwort bedeutet: bezahlt und gespeichert. Ein
+  // `started` bedeutet: der vorige Anlauf ist mitten im Aufruf gestorben; dort *muss*
+  // erneut gefragt werden, weil kein Ergebnis vorliegt. Das ist die einzige Stelle,
+  // an der doppelt bezahlt werden kann, und sie ist auf einen Absturz je Batch
+  // begrenzt.
+  if (existing?.status === "succeeded" && existing.response) {
+    return { id: existing.id, replay: true as const, answers: existing.response };
+  }
+  return { id: existing?.id, replay: false as const };
 }
 
 export async function callSystemOneOnce(input: JevCallInput): Promise<JevCallOutcome> {
   const claim = await claimInvocation(input);
-  if (claim.replay) return { status: "already_done" };
+  if (claim.replay) return { status: "answered", answers: claim.answers, replayed: true };
 
   const throttle = input.throttle ?? createReviewThrottle();
   const startedAt = Date.now();
@@ -109,6 +124,7 @@ export async function callSystemOneOnce(input: JevCallInput): Promise<JevCallOut
           modelId: result.resolvedModelId,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
+          response: result.answers,
           // 0,042 $ je Million Eingabe-Token; Ausgabe ist unbepreist.
           costMicrounits: result.inputTokens
             ? Math.round((result.inputTokens / 1_000_000) * 0.042 * 1_000_000)
@@ -119,7 +135,7 @@ export async function callSystemOneOnce(input: JevCallInput): Promise<JevCallOut
         .where(eq(reviewModelInvocations.id, claim.id));
     }
 
-    return { status: "answered", answers: result.answers };
+    return { status: "answered", answers: result.answers, replayed: false };
   } catch (error) {
     // Eine Drosselung ist kein Fehlschlag des Batches: der Anbieter hat gesagt, wann
     // er wieder mag. Die Zeile wird gelöscht, damit der nächste Anlauf sie neu

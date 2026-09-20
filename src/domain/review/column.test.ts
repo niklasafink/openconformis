@@ -6,9 +6,13 @@ import {
   citationQuestion,
   composeRationale,
   decisionFromAnswer,
+  decisionFromModelAnswer,
   decisionQuestion,
   injectionQuestion,
+  normalizeColumnCriteria,
   relevanceQuestion,
+  reviewColumnContentHash,
+  reviewColumnInputSchema,
   type ReviewColumnSnapshot,
 } from "./column";
 
@@ -196,5 +200,107 @@ describe("assembled rationale", () => {
         citationNumbers: [3],
       }),
     ).toBe("Governing law: Deutsches Recht Probability 88%. Evidence [3].");
+  });
+});
+
+describe("decision from a large-model answer", () => {
+  it("maps each column type and refuses an answer of the wrong shape", () => {
+    expect(
+      decisionFromModelAnswer(terminationColumn, { answerBoolean: true }, 9_100),
+    ).toMatchObject({
+      answerBoolean: true,
+      confidenceBp: 9_100,
+    });
+    expect(decisionFromModelAnswer(lawColumn, { answerChoice: "at" }, 8_000)?.criterion.label).toBe(
+      "Österreichisches Recht",
+    );
+    expect(decisionFromModelAnswer(liabilityColumn, { answerScoreLevel: 2 }, 8_000)).toMatchObject({
+      answerScoreBp: 10_000,
+    });
+
+    // Eine erfundene Option, eine Stufe ausserhalb der Skala, zwei Antworten oder eine
+    // Antwort vom falschen Typ darf nie still zur Antwort einer Zelle werden.
+    expect(decisionFromModelAnswer(lawColumn, { answerChoice: "fr" }, 8_000)).toBeUndefined();
+    expect(
+      decisionFromModelAnswer(liabilityColumn, { answerScoreLevel: 3 }, 8_000),
+    ).toBeUndefined();
+    expect(
+      decisionFromModelAnswer(
+        terminationColumn,
+        { answerBoolean: true, answerChoice: "de" },
+        8_000,
+      ),
+    ).toBeUndefined();
+    expect(
+      decisionFromModelAnswer(terminationColumn, { answerChoice: "de" }, 8_000),
+    ).toBeUndefined();
+    expect(decisionFromModelAnswer(terminationColumn, {}, 8_000)).toBeUndefined();
+  });
+});
+
+describe("column input", () => {
+  const input = {
+    label: "Anwendbares Recht",
+    instructions: "Which law governs the contract?",
+    criteria: {
+      type: "choice" as const,
+      options: [
+        { label: "Deutsch", description: "German law governs." },
+        { label: "Österreichisch", description: "Austrian law governs." },
+      ],
+    },
+  };
+
+  it("assigns option keys and keeps the hash stable for identical content", () => {
+    const parsed = reviewColumnInputSchema.parse(input);
+    const criteria = normalizeColumnCriteria(parsed.criteria)!;
+    expect(criteria.type === "choice" && criteria.options.map((option) => option.key)).toEqual([
+      "option_1",
+      "option_2",
+    ]);
+    const hash = reviewColumnContentHash({
+      label: parsed.label,
+      columnType: "choice",
+      instructions: parsed.instructions,
+      criteria,
+    });
+    expect(hash).toMatch(/^[0-9a-f]{64}$/u);
+    expect(
+      reviewColumnContentHash({
+        label: parsed.label,
+        columnType: "choice",
+        instructions: parsed.instructions,
+        criteria,
+      }),
+    ).toBe(hash);
+    expect(
+      reviewColumnContentHash({
+        label: parsed.label,
+        columnType: "choice",
+        instructions: `${parsed.instructions} Answer strictly.`,
+        criteria,
+      }),
+    ).not.toBe(hash);
+  });
+
+  it("refuses duplicate option keys, a single option and a too short instruction", () => {
+    const duplicate = reviewColumnInputSchema.parse({
+      ...input,
+      criteria: {
+        type: "choice",
+        options: [
+          { key: "de", label: "A", description: "a" },
+          { key: "de", label: "B", description: "b" },
+        ],
+      },
+    });
+    expect(normalizeColumnCriteria(duplicate.criteria)).toBeUndefined();
+    expect(() =>
+      reviewColumnInputSchema.parse({
+        ...input,
+        criteria: { type: "choice", options: [{ label: "A", description: "a" }] },
+      }),
+    ).toThrow();
+    expect(() => reviewColumnInputSchema.parse({ ...input, instructions: "kurz" })).toThrow();
   });
 });

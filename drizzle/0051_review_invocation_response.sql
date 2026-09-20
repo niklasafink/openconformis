@@ -1,0 +1,1 @@
+ALTER TABLE "review_model_invocations" ADD COLUMN "response" jsonb;

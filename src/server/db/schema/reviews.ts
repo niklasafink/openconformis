@@ -14,6 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { SystemOneAnswer } from "@/domain/ai/system-one";
 import type { ReviewColumnCriteria } from "@/domain/review/column";
 
 import { aiCredentials } from "./ai";
@@ -619,6 +620,13 @@ export const reviewModelInvocations = pgTable(
     costMicrounits: integer("cost_microunits"),
     latencyMilliseconds: integer("latency_milliseconds"),
     errorCode: text("error_code"),
+    /**
+     * Die Antworten dieses Aufrufs, nur Zahlen und Optionsschlüssel — Jev gibt nie Text
+     * zurück und enthält hier weder Vertragstext noch Schlüssel. Ohne sie wäre ein
+     * bezahlter Aufruf nach einem Absturz zwischen Antwort und Speichern verloren: der
+     * Step-Retry fände `succeeded`, hätte aber keine Antwort und müsste erneut zahlen.
+     */
+    response: jsonb("response").$type<Record<string, SystemOneAnswer>>(),
     startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },

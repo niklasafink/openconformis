@@ -96,3 +96,51 @@ export function worstCitationVerdict(
   }
   return undefined;
 }
+
+/**
+ * Das Urteil einer Zelle aus den Urteilen ihrer Belege.
+ *
+ * `worstCitationVerdict` (das strengste Urteil gewinnt) wäre für die Zelle zu grob:
+ * eine Stelle, die zum Thema nur schweigt, macht eine Antwort nicht fragwürdig, wenn
+ * eine andere sie stützt. Deshalb gilt hier:
+ *
+ * - ein erfundenes Zitat entscheidet immer — die Zelle wird nie still „fertig";
+ * - ein Widerspruch macht sie prüfbedürftig, auch wenn andere Stellen stützen;
+ * - sonst genügt **eine** tragende Stelle oberhalb der Schwelle;
+ * - ohne tragende Stelle (auch ohne jeden Beleg) ist die Antwort „nicht belegt".
+ */
+export function cellCitationOutcome(
+  checks: readonly CitationCheck[],
+  acceptThresholdBp: number = defaultCitationAcceptThresholdBp,
+): { verdict: CitationVerdict; needsReview: boolean } {
+  if (checks.some((check) => check.verdict === "fabricated")) {
+    return { verdict: "fabricated", needsReview: true };
+  }
+  if (checks.some((check) => check.verdict === "contradicted")) {
+    return { verdict: "contradicted", needsReview: true };
+  }
+  const supporting = checks.filter((check) => check.verdict === "verified");
+  if (supporting.length === 0) return { verdict: "unsupported", needsReview: true };
+  const best = Math.max(...supporting.map((check) => check.confidenceBp));
+  return { verdict: "verified", needsReview: best < acceptThresholdBp };
+}
+
+/**
+ * Ein Zitat für Anzeige und Prüfung: der ganze Block, wenn er kurz ist, sonst sein
+ * Anfang bis zum letzten Satzende oder Leerzeichen vor der Grenze. Immer ein exakter
+ * Substring des normalisierten Blocktextes, nie eine Umschreibung — Jev gibt keinen
+ * Text zurück, das Zitat wählt also der Code.
+ */
+export function citationExcerpt(canonicalText: string, maximumCharacters: number = 600): string {
+  const normalized = normalizeQuote(canonicalText);
+  if (normalized.length <= maximumCharacters) return normalized;
+  const window = normalized.slice(0, maximumCharacters);
+  const sentenceEnd = Math.max(
+    window.lastIndexOf(". "),
+    window.lastIndexOf("; "),
+    window.lastIndexOf(": "),
+  );
+  if (sentenceEnd >= maximumCharacters / 3) return window.slice(0, sentenceEnd + 1).trim();
+  const space = window.lastIndexOf(" ");
+  return (space > 0 ? window.slice(0, space) : window).trim();
+}

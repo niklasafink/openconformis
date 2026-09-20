@@ -100,6 +100,24 @@ export async function createRerunAnalysisCredential(
 }
 
 /**
+ * Kurzlebiger Schlüssel für einen Prüflauf der Vertragsprüfung. Ein Lauf hält zwei —
+ * Routing und Eskalation —, beide an dieselbe `bindingId` (die Lauf-ID) gebunden und
+ * durch den **Zweck** unterschieden. Die Lauf-ID erzeugt der Server selbst vor dem
+ * Start, einen Bindungs-Cookie gibt es dafür nicht; der Aufrufer besitzt sie, weil er
+ * sie eben erst vergeben hat.
+ */
+export async function createReviewRunCredential(input: {
+  provider: string;
+  purpose: "review_routing" | "review_escalation";
+  bindingId: string;
+  requiredModelId: string;
+  /** Ohne Angabe gilt der gespeicherte Schlüssel des Nutzers für diesen Anbieter. */
+  secret?: string;
+}) {
+  return connectTemporaryCredential(input, async () => input.bindingId);
+}
+
+/**
  * Prüft einen eingegebenen Schlüssel beim Anbieter und speichert ihn dauerhaft,
  * ohne eine Analyse zu verbinden oder zu starten. Der Start leitet später
  * seinen kurzlebigen Schlüssel aus dem gespeicherten ab.
@@ -163,7 +181,14 @@ async function connectTemporaryCredential(
   if (!allowedByokProviders().has(provider)) {
     throw new TemporaryCredentialError("BYOK_PROVIDER_DISABLED");
   }
-  if (purpose === "analysis" && !isAnalysisProviderAvailable(provider)) {
+  // Die Eskalation ruft das grosse Modell über dieselbe Route wie eine Analyse und
+  // braucht deshalb dieselbe Prüfung. Das Routing läuft über Jev, das nie eine
+  // Analyse-Route ist; im Modellmodus trägt es dagegen die BYOK-Route des Modells.
+  const usesAnalysisRoute =
+    purpose === "analysis" ||
+    purpose === "review_escalation" ||
+    (purpose === "review_routing" && isAnalysisProviderAvailable(provider));
+  if (usesAnalysisRoute && !isAnalysisProviderAvailable(provider)) {
     throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");
   }
 
@@ -173,7 +198,7 @@ async function connectTemporaryCredential(
     provider,
     secret,
     requiredModelId: input.requiredModelId,
-    route: purpose === "analysis" ? getAnalysisProviderConfiguration(provider) : undefined,
+    route: usesAnalysisRoute ? getAnalysisProviderConfiguration(provider) : undefined,
   });
   const credentialId = randomUUID();
   const now = new Date();
