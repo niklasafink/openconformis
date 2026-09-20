@@ -75,9 +75,21 @@ export function decisionQuestion(column: ReviewColumnSnapshot): SystemOneQuestio
  * einen Zustand und einen Request.
  */
 export function relevanceQuestion(column: ReviewColumnSnapshot): SystemOneQuestion {
+  return relevanceQuestionFor(column.instructions);
+}
+
+/**
+ * Dieselbe Relevanzfrage für einen frei formulierten Fragetext. Die Gap-Analyse
+ * stellt sie zu einer regulatorischen Anforderung statt zu einer Spalte — die Frage
+ * selbst bleibt dieselbe, nur ohne den Umweg über eine Spaltendefinition.
+ */
+export function relevanceQuestionFor(
+  question: string,
+  subject: "contract" | "policy" = "contract",
+): SystemOneQuestion {
   return {
     type: "noul",
-    instructions: `Does this passage contain information needed to answer the following question about the contract? Question: ${column.instructions}`,
+    instructions: `Does this passage contain information needed to answer the following question about the ${subject}? Question: ${question}`,
     criteria: {
       true: "The passage states something that bears on the question.",
       false: "The passage is unrelated to the question or merely mentions the topic in passing.",

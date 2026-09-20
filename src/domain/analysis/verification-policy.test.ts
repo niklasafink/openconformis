@@ -51,3 +51,15 @@ describe("verification policy", () => {
     expect(first).toEqual(second);
   });
 });
+
+describe("verification policy is unchanged by the Jev assist", () => {
+  it("still verifies a fulfilled result with a single reason — Jev only removes it in the executor", () => {
+    expect(
+      verificationReasons(
+        "analysis",
+        "requirement",
+        assessment({ status: "fulfilled", confidencePercent: 90 }),
+      ).filter((reason) => reason !== "drift_sample"),
+    ).toEqual(["fulfilled"]);
+  });
+});

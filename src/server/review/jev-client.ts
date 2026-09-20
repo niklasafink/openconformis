@@ -2,7 +2,11 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
-import { systemOneModelId, type SystemOneQuestion } from "@/domain/ai/system-one";
+import {
+  systemOneCostMicrounits,
+  systemOneModelId,
+  type SystemOneQuestion,
+} from "@/domain/ai/system-one";
 import { createJevThrottle, type JevThrottle } from "@/server/ai/jev-throttle";
 import { ModelProviderError } from "@/server/ai/structured-model";
 import { requestSystemOne } from "@/server/ai/typesafe";
@@ -125,10 +129,7 @@ export async function callSystemOneOnce(input: JevCallInput): Promise<JevCallOut
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
           response: result.answers,
-          // 0,042 $ je Million Eingabe-Token; Ausgabe ist unbepreist.
-          costMicrounits: result.inputTokens
-            ? Math.round((result.inputTokens / 1_000_000) * 0.042 * 1_000_000)
-            : undefined,
+          costMicrounits: systemOneCostMicrounits(result.inputTokens),
           latencyMilliseconds: result.latencyMilliseconds,
           completedAt: new Date(),
         })

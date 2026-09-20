@@ -195,3 +195,12 @@ export function answerMatchesQuestion(question: SystemOneQuestion, answer: Syste
   }
   return true;
 }
+
+/**
+ * Kosten in Mikro-Einheiten: 0,042 $ je Million Eingabe-Token, Ausgabe ist unbepreist.
+ * Ein Ort für die Rechnung, damit Vertragsprüfung und Gap-Analyse nicht auseinanderlaufen.
+ */
+export function systemOneCostMicrounits(inputTokens: number | undefined): number | undefined {
+  if (!inputTokens) return undefined;
+  return Math.round((inputTokens / 1_000_000) * 0.042 * 1_000_000);
+}

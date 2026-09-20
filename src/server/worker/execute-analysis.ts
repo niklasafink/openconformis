@@ -17,7 +17,16 @@ import {
 } from "@/domain/analysis/result-contract";
 import { conclusionInstructionKind, requiresConclusion } from "@/domain/analysis/profile";
 import type { RetrievalCandidate } from "@/domain/analysis/retrieval";
-import { verificationReasons } from "@/domain/analysis/verification-policy";
+import {
+  jevAssistIncludes,
+  parseAnalysisJevAssistMode,
+  type JevRequirementText,
+} from "@/domain/analysis/jev-assist";
+import {
+  isTriageEligible,
+  reasonsAfterTriage,
+  verificationReasons,
+} from "@/domain/analysis/verification-policy";
 import { aiRouteProviderSchema } from "@/domain/ai/provider";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
@@ -54,6 +63,12 @@ import {
 } from "@/server/db/schema/analyses";
 import { documentBlocks, policyVersions } from "@/server/db/schema/documents";
 
+import { createAnalysisJevAsk } from "./jev-assist-client";
+import {
+  checkAssessmentCitations,
+  prefilterCandidates,
+  triageVerification,
+} from "./jev-assist-flow";
 import { prepareAnalysisRetrieval } from "./retrieve-analysis";
 
 type AnalysisRecord = Awaited<ReturnType<typeof loadAnalysis>>;
@@ -633,6 +648,11 @@ async function persistItemResult(input: {
   proposed: Awaited<ReturnType<typeof assessItem>>;
   verification?: Awaited<ReturnType<typeof verifyItem>>;
   selectionReasons: string[];
+  /**
+   * Jevs Zitatprüfung zweifelt an einem Beleg. Das Ergebnis bleibt unverändert, gilt
+   * aber nie still als bestätigt.
+   */
+  citationNeedsReview?: boolean;
 }) {
   const rejected = input.verification && input.verification.result.verdict !== "confirm";
   const effectiveAssessment = rejected
@@ -649,7 +669,7 @@ async function persistItemResult(input: {
         ],
       )
     : input.proposed.assessment;
-  const verificationStatus = input.proposed.deterministicFallback
+  const baseVerificationStatus = input.proposed.deterministicFallback
     ? "needs_review"
     : !input.verification
       ? "not_selected"
@@ -658,6 +678,12 @@ async function persistItemResult(input: {
         : input.verification.result.verdict === "reject"
           ? "rejected"
           : "needs_review";
+  // Ein zweifelhafter Beleg hebt „nicht ausgewählt" und „bestanden" auf Prüfbedarf;
+  // eine Ablehnung durch das Zweitmodell bleibt die schärfere Aussage.
+  const verificationStatus =
+    input.citationNeedsReview && baseVerificationStatus !== "rejected"
+      ? "needs_review"
+      : baseVerificationStatus;
 
   await db.transaction(async (transaction) => {
     const [result] = await transaction
@@ -962,11 +988,63 @@ export async function executeAnalysisScopeItem(input: {
     .where(eq(analysisRequirementResults.scopeItemId, item.scope.id))
     .limit(1);
   if (!existing) {
-    const candidates = await loadCandidates(analysis, item);
+    const loadedCandidates = await loadCandidates(analysis, item);
+    // Jev ist optional: ohne eingefrorene Stufe oder Schlüssel ist `ask` undefiniert,
+    // und jeder Zweig unten entfällt — der Ablauf ist dann der heutige.
+    const ask = createAnalysisJevAsk(analysis);
+    const jevMode = parseAnalysisJevAssistMode(analysis.jevAssistMode);
+    const requirement: JevRequirementText = {
+      regulatoryId: item.scope.regulatoryId,
+      title: item.scope.title,
+      legalText: item.scope.legalText,
+      assessmentAspects: item.scope.assessmentAspects,
+    };
+
+    // Eingriff 3: nur die tragenden Kandidaten gehen in den Prompt — und in die
+    // Verifikation, damit auch das Zweitmodell keine gefilterte Anweisung liest.
+    const candidates =
+      ask && jevAssistIncludes(jevMode, "retrieval")
+        ? (
+            await prefilterCandidates(
+              ask,
+              { scopeItemId: item.scope.id, requirement },
+              loadedCandidates,
+            )
+          ).candidates
+        : loadedCandidates;
+
     const proposed = await assessItem(analysis, item, candidates);
-    const reasons = proposed.deterministicFallback
+
+    // Eingriff 2: Stufe zwei der Zitatprüfung, nachdem die deterministische
+    // Verankerung (Stufe eins) den Beleg im Dokument bestätigt hat.
+    const verifyWithJev = Boolean(ask) && jevAssistIncludes(jevMode, "verification");
+    const citationOutcome =
+      ask && verifyWithJev && !proposed.deterministicFallback
+        ? await checkAssessmentCitations(ask, {
+            scopeItemId: item.scope.id,
+            requirement,
+            status: proposed.assessment.status,
+            evidence: proposed.evidence,
+          })
+        : undefined;
+
+    let reasons = proposed.deterministicFallback
       ? []
       : verificationReasons(analysis.id, item.scope.requirementExternalKey, proposed.assessment);
+
+    // Eingriff 1: Triage. Nur wenn „erfüllt" der einzige Grund ist und Jev die Belege
+    // nicht anzweifelt, darf das Zweitmodell entfallen. Die Driftstichprobe steht in
+    // `reasons` und macht die Triage in ihren Fällen gegenstandslos.
+    if (ask && verifyWithJev && !citationOutcome?.needsReview && isTriageEligible(reasons)) {
+      const citedKeys = new Set(proposed.evidence.map(({ blockKey }) => blockKey));
+      const waived = await triageVerification(ask, {
+        scopeItemId: item.scope.id,
+        requirement,
+        passages: candidates.filter(({ blockKey }) => citedKeys.has(blockKey)),
+      });
+      reasons = reasonsAfterTriage(reasons, waived);
+    }
+
     const verification =
       reasons.length > 0
         ? await verifyItem(analysis, item, candidates, proposed.assessment)
@@ -977,6 +1055,7 @@ export async function executeAnalysisScopeItem(input: {
       proposed,
       verification,
       selectionReasons: reasons,
+      citationNeedsReview: citationOutcome?.needsReview,
     });
   }
   // Nach dem gespeicherten Ergebnis, damit ein fortgesetzter Lauf den fehlenden

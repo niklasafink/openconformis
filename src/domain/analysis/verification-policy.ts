@@ -26,3 +26,21 @@ export function verificationReasons(
   if (sampleValue % 100 < 5) reasons.push("drift_sample");
   return reasons;
 }
+
+/**
+ * Die Triage darf nur dort mitreden, wo „erfüllt" der **einzige** Grund ist. Trägt
+ * das Ergebnis auch niedrige Konfidenz, einen Widerspruch oder die Driftstichprobe,
+ * läuft das Zweitmodell ohnehin — Jev wird dann nicht einmal gefragt. Die
+ * Driftstichprobe bleibt damit die unabhängige Kontrolle über Jev selbst.
+ */
+export function isTriageEligible(reasons: readonly VerificationReason[]) {
+  return reasons.length === 1 && reasons[0] === "fulfilled";
+}
+
+/** Die Gründe nach der Triage: nur eine bestandene Triage nimmt „erfüllt" heraus. */
+export function reasonsAfterTriage(
+  reasons: VerificationReason[],
+  waived: boolean,
+): VerificationReason[] {
+  return waived && isTriageEligible(reasons) ? [] : reasons;
+}
