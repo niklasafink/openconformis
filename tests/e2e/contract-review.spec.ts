@@ -1,0 +1,141 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { seedFinishedReviewRun } from "./review-seed";
+
+/**
+ * Die Vertragsprüfung im Browser, gegen den `chromium-bypass`-Server mit
+ * `LOCAL_AUTH_BYPASS=true` und ohne einen einzigen KI-Aufruf: Prüfung anlegen,
+ * Beispieldokument und zwei Spalten hinzufügen, den gesperrten Start prüfen, dann
+ * einen fertigen Lauf direkt in die Testdatenbank schreiben und Zelle, Beleg und
+ * Export im Browser prüfen. Die echte TypeSafe-API wird nie gerufen.
+ */
+
+async function createReview(page: Page, name: string) {
+  await page.goto("/de/reviews");
+  await expect(page.getByRole("heading", { name: "Vertragsprüfung" })).toBeVisible();
+  await page.getByLabel("Name der Prüfung").fill(name);
+  await page.getByRole("button", { name: "Anlegen" }).click();
+  await expect(page).toHaveURL(/\/de\/reviews\/[0-9a-f-]{36}$/u);
+  return /\/reviews\/([0-9a-f-]{36})$/u.exec(page.url())![1]!;
+}
+
+async function addColumn(
+  page: Page,
+  input: { label: string; type?: "Auswahl"; instructions: string; criteria: string[][] },
+) {
+  await page.getByRole("button", { name: "Neue Spalte" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Neue Spalte" })).toBeVisible();
+  await dialog.getByLabel("Bezeichnung", { exact: true }).fill(input.label);
+  if (input.type) {
+    await dialog.getByLabel("Typ").click();
+    await page.getByRole("option", { name: input.type }).click();
+  }
+  await dialog.getByLabel("Frage an das Modell (englisch)").fill(input.instructions);
+  const labels = dialog.getByLabel("Bezeichnung im Ergebnis");
+  const descriptions = dialog.getByLabel("Beschreibung (englisch)");
+  for (const [index, [label, description]] of input.criteria.entries()) {
+    await labels.nth(index).fill(label!);
+    await descriptions.nth(index).fill(description!);
+  }
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+  // Speichern lädt die Serverdaten nach; der Entwicklungsserver kompiliert dabei nach.
+  await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+  await expect(
+    page.getByRole("columnheader", { name: new RegExp(input.label, "u") }),
+  ).toBeVisible();
+}
+
+test.describe("contract review", () => {
+  test("builds a review, locks the start without a TypeSafe key and shows a seeded cell with evidence", async ({
+    page,
+  }) => {
+    const pageErrors: Error[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error));
+
+    const reviewTableId = await createReview(page, "Lieferantenverträge 2026");
+    // Der Sidebar-Punkt ist aktiv, ohne Unterpunkte.
+    await expect(page.getByRole("link", { name: "Vertragsprüfung", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(page.getByText("Noch keine Dokumente in dieser Prüfung.")).toBeVisible();
+
+    // Beispieldokument über denselben Weg wie ein Upload.
+    await page.getByRole("button", { name: "Beispieldokument hinzufügen" }).click();
+    await expect(
+      page.getByRole("rowheader", { name: /Beispiel-IKT-Sicherheitsrichtlinie/u }),
+    ).toBeVisible();
+
+    await addColumn(page, {
+      label: "Kündigung aus wichtigem Grund",
+      instructions: "Does the document grant a right of termination for cause?",
+      criteria: [
+        ["Ja, ausdrücklich geregelt", "The document grants the right."],
+        ["Nein oder nicht geregelt", "The document is silent."],
+      ],
+    });
+    await expect(page.getByRole("columnheader", { name: /Ja\/Nein/u })).toBeVisible();
+    await addColumn(page, {
+      label: "Anwendbares Recht",
+      type: "Auswahl",
+      instructions: "Which law governs the document?",
+      criteria: [
+        ["Deutsches Recht", "German law governs."],
+        ["Österreichisches Recht", "Austrian law governs."],
+      ],
+    });
+    await expect(page.getByRole("columnheader", { name: /Auswahl/u })).toBeVisible();
+    await expect(page.getByText("Noch nicht geprüft")).toHaveCount(2);
+
+    // Im Modus `jev` ist der Start ohne TypeSafe-Schlüssel gesperrt und nennt den Grund.
+    await expect(page.getByRole("button", { name: "Prüfung starten" })).toBeDisabled();
+    await expect(page.getByTestId("review-start-reason")).toHaveText(
+      "Ohne TypeSafe-Schlüssel kann die Prüfung nicht starten.",
+    );
+    await expect(page.getByText("1 Dokument vorbereitet · 2 Spalten")).toBeVisible();
+
+    // Ein fertiger Lauf, direkt in der Testdatenbank — kein Modell, kein TypeSafe.
+    const seeded = await seedFinishedReviewRun(reviewTableId);
+    await page.reload();
+    await expect(page.getByText(/^Abgeschlossen 100 %$/u)).toBeVisible();
+    await expect(page.getByText("2 von 2 Entscheidungen")).toBeVisible();
+
+    const cell = page.getByRole("button", {
+      name: "Zelle öffnen: Beispiel-IKT-Sicherheitsrichtlinie.docx, Anwendbares Recht",
+    });
+    await expect(cell).toContainText("Deutsches Recht");
+    await expect(cell).toContainText("91,5 %");
+    await cell.click();
+
+    const sheet = page.getByTestId("review-cell-sheet");
+    await expect(sheet.getByRole("heading", { name: "Anwendbares Recht" })).toBeVisible();
+    // Der erste Aufruf kompiliert die Detail-Route im Entwicklungsserver.
+    await expect(sheet.getByText("Beleg [1].")).toBeVisible({ timeout: 20_000 });
+    await expect(sheet.getByText("Belege 1")).toBeVisible();
+    // Beleg [1] in der Liste und im Text sind dieselbe Stelle.
+    await sheet.getByRole("button", { name: "Beleg im Dokument zeigen 1" }).click();
+    await sheet.getByRole("tab", { name: "Text" }).click();
+    const highlighted = sheet.locator("[data-active] mark");
+    await expect(highlighted.first()).toBeVisible();
+    await expect(highlighted.first()).toContainText(seeded.evidenceQuotes[0]!.slice(0, 20));
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await expect(sheet).toHaveCount(0);
+
+    // Export lädt, sobald der Lauf beendet ist.
+    const download = page.waitForEvent("download");
+    await page.getByRole("link", { name: "Excel exportieren" }).click();
+    expect((await download).suggestedFilename()).toMatch(/\.xlsx$/u);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("serves the English review workspace", async ({ page }) => {
+    await page.goto("/en/reviews");
+    await expect(page.getByRole("heading", { name: "Contract review" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contract review", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(page.getByRole("button", { name: "Create" })).toBeDisabled();
+  });
+});

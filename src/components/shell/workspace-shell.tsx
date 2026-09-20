@@ -84,6 +84,7 @@ export async function WorkspaceShell({ children, locale }: WorkspaceShellProps) 
           scope: t("scope"),
           results: t("results"),
           chat: t("chat"),
+          review: t("review"),
           administration: t("administration"),
           recentProjects: t("recentProjects"),
           noProjects: t("noProjects"),

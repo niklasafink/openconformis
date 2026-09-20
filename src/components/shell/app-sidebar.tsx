@@ -1,6 +1,6 @@
 "use client";
 
-import { Asterisk, ChevronDown, ChevronRight, ListChecks, Settings } from "lucide-react";
+import { Asterisk, ChevronDown, ChevronRight, ListChecks, Settings, Table2 } from "lucide-react";
 
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -29,7 +29,7 @@ import type { AppLocale } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 
 export type WorkflowStep = "framework" | "policy" | "scope" | "results";
-export type ActiveArea = "analysis" | "chat" | "administration";
+export type ActiveArea = "analysis" | "chat" | "review" | "administration";
 
 export type SidebarLabels = Readonly<{
   brand: string;
@@ -39,6 +39,7 @@ export type SidebarLabels = Readonly<{
   scope: string;
   results: string;
   chat: string;
+  review: string;
   administration: string;
   recentProjects: string;
   noProjects: string;
@@ -81,6 +82,7 @@ const stepPath: Record<WorkflowStep, string> = {
 function activeAreaOf(pathname: string): ActiveArea | undefined {
   if (pathname.startsWith("/analyses")) return "analysis";
   if (pathname.startsWith("/chat")) return "chat";
+  if (pathname.startsWith("/reviews")) return "review";
   if (pathname.startsWith("/administration")) return "administration";
   return undefined;
 }
@@ -172,6 +174,26 @@ export function AppSidebar({
                       💬
                     </span>
                     <span>{labels.chat}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Vierter Hauptpunkt ohne Unterpunkte: der Stepper bleibt der
+                  Gap-Analyse vorbehalten. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={activeArea === "review"}
+                  tooltip={labels.review}
+                  className={activeItemClass}
+                >
+                  <Link
+                    href="/reviews"
+                    locale={locale}
+                    aria-current={activeArea === "review" ? "page" : undefined}
+                  >
+                    <Table2 className="size-3.5! text-emerald-700" />
+                    <span>{labels.review}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

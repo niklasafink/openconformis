@@ -87,7 +87,7 @@ export default defineConfig({
     },
     {
       name: "chromium-bypass",
-      testMatch: /anonymous-analysis\.spec\.ts$/u,
+      testMatch: /(?:anonymous-analysis|contract-review)\.spec\.ts$/u,
       use: { ...devices["Desktop Chrome"], baseURL: bypassBaseURL },
     },
   ],
