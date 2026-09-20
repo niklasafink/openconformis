@@ -24,7 +24,7 @@ Der frühere statische Wireframe wurde nach Prüfung seiner Referenzen entfernt.
    Konto kommt niemand hinein.
 1. Rahmenwerk wählen. Nur veröffentlichte, verfügbare Rahmenwerke sind auswählbar.
 2. Eigene Policy hochladen oder Beispiel-Policy wählen; die Auswahl ist exklusiv.
-3. Prüfungsumfang und Unternehmenskontext festlegen.
+3. Analyseprofil, Prüfungsumfang und Unternehmenskontext festlegen.
 4. Das Ergebnis ist zunächst eine gesperrte Vorschau ohne Modellaufruf; der Nutzer
    wählt dort Modell und eigenen Schlüssel und startet erst dann die echte Analyse.
    Die Häkchen der Anforderungsliste entsprechen dem gespeicherten Umfang.
@@ -50,7 +50,15 @@ Der Chat ist ein eigener sekundärer Arbeitsbereich ohne Policy-Kontext.
 - Rahmenwerk, Policy, Scope, Modellroute und Anweisungsversionen werden beim Start eingefroren.
   Wiederholungen dürfen keine zweite Analyse desselben Drafts erzeugen.
 - Bewertungen benötigen Begründungen und genaue Belege, auch beim Status „erfüllt“.
-  Keine Verbesserungsvorschläge, Textumschreibungen oder Track-Changes.
+  Die Bewertung selbst enthält keine Verbesserungsvorschläge; Textumschreibungen,
+  Formulierungsvorschläge für die Policy und Track-Changes gibt es nirgends.
+- Jede Analyse läuft in einem Profil: „Wirtschaftsprüfer“ oder „Finanzinstitut“.
+  Bewertung und Verifikation sind in beiden identisch, damit dieselbe Policy dieselbe
+  Lücke ergibt. Nur der Abschlusstext je Lücke unterscheidet sich: eine Feststellung für
+  den Prüfungsbericht oder To-dos, die benennen, was umzusetzen ist — nie, wie es zu
+  formulieren wäre. Erfüllte und nicht einschlägige Anforderungen bekommen keinen.
+  Das Profil wird im Prüfungsumfang gewählt, beim Start eingefroren und bleibt als
+  Voreinstellung des Nutzers stehen.
 - Die KI entscheidet nicht endgültig: menschliche Bestätigung und begründeter Override bleiben erhalten.
 - Belegnummern in Begründung, Belegliste und Originaldokument müssen zusammenpassen.
   Zitate sind exakte Substrings unveränderlicher Dokumentblöcke; Hervorhebungen dürfen sich

@@ -119,6 +119,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     confidencePercent: 0,
     verificationStatus: "pending",
     confirmedAt: null,
+    conclusion: null,
     evidence: [],
     pending: true,
   }));
@@ -194,6 +195,7 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
       <div className="workspace-content min-w-0">
         <AnalysisResultsWorkspace
           analysisId="preview"
+          analysisProfile={scope.analysisProfile}
           canConfirm={false}
           canOverride={false}
           policyName={policyPreview.selection.filename}

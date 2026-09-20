@@ -131,6 +131,12 @@ Exit criterion: a policy version exists and parsing is complete.
 
 ### Step 3: Define scope and context
 
+- The user selects one analysis profile: `Wirtschaftsprüfer` or `Finanzinstitut`.
+  The profile changes neither retrieval, assessment nor verification, so the same
+  policy yields the same gap in both. It only decides the closing text produced for
+  each gap: a finding for the audit report, or the to-dos that close the gap. The
+  choice is frozen into the analysis at start and is remembered as the user's default
+  for the next analysis.
 - Requirements are displayed in a dense table.
 - Columns: applicable checkbox, regulatory requirement, sub-requirements, company
   context / best practice and edit action.
@@ -194,6 +200,12 @@ error state.
 - The selected requirement controls the middle and right panes.
 - The middle pane shows regulatory text, sub-requirements, company context,
   provisional status, rationale and evidence.
+- For a gap, the middle pane also shows the profile's closing text. In the auditor
+  profile this is the finding plus its impact; in the institution profile it is the
+  gap summary plus to-dos that a reviewer can tick off. To-dos name the measure, never
+  the wording of a policy sentence. A gap left without a closing text says so
+  explicitly instead of showing nothing. Fulfilled and non-applicable requirements
+  have no closing text.
 - Every evidence reference maps to one exact document block and character range.
 - Hover and click synchronize the inline reference, evidence row and source passage.
 - Status changes require a user identity and audit event.

@@ -8,7 +8,10 @@ import { analysisRerunInputSchema, type AnalysisRerunInput } from "@/domain/anal
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { deleteTemporaryCredential } from "@/server/ai/credential-cleanup";
-import { getActiveAnalysisInstructionPair } from "@/server/ai/analysis-instruction-service";
+import {
+  conclusionInstructionOf,
+  getActiveAnalysisInstructionSet,
+} from "@/server/ai/analysis-instruction-service";
 import { resolveAnalysisModelSelection } from "@/server/ai/model-catalogue";
 import { getAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
 import { createRerunAnalysisCredential } from "@/server/ai/temporary-credential-service";
@@ -97,7 +100,9 @@ export async function rerunAnalysis(
   } catch {
     throw new AnalysisStartError("BYOK_ROUTE_NOT_EXECUTABLE");
   }
-  const instructions = await getActiveAnalysisInstructionPair();
+  const instructions = await getActiveAnalysisInstructionSet();
+  // Der Neustart prüft denselben Umfang im selben Profil wie der Ausgangslauf.
+  const conclusionInstruction = conclusionInstructionOf(instructions, source.analysisProfile);
 
   // Erst den Schlüssel prüfen: ein abgelehnter Schlüssel darf keinen laufenden
   // Lauf stoppen.
@@ -165,6 +170,9 @@ export async function rerunAnalysis(
         assessmentInstructionHash: instructions.assessment.contentHash,
         verificationInstructionId: instructions.verification.id,
         verificationInstructionHash: instructions.verification.contentHash,
+        conclusionPromptVersion: conclusionInstruction.version,
+        conclusionInstructionId: conclusionInstruction.id,
+        conclusionInstructionHash: conclusionInstruction.contentHash,
         unevaluatedWarningAccepted: !model.evaluated && input.unevaluatedWarningAccepted,
       };
       const [analysis] = await transaction
@@ -180,12 +188,14 @@ export async function rerunAnalysis(
           frameworkReleaseKey: source.frameworkReleaseKey,
           frameworkContentHash: source.frameworkContentHash,
           institutionSize: source.institutionSize,
+          analysisProfile: source.analysisProfile,
           organizationContext: source.organizationContext,
           locale: source.locale,
           configurationHash: createContentHash({
             route,
             frameworkContentHash: source.frameworkContentHash,
             institutionSize: source.institutionSize,
+            analysisProfile: source.analysisProfile,
             policySha256: source.policySha256,
             policyParserVersion: source.policyParserVersion,
             requirementKeys: selectedItems.map((item) => item.requirementExternalKey),

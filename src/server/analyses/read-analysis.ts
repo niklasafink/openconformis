@@ -9,6 +9,7 @@ import {
   analyses,
   analysisEvidence,
   analysisModelInvocations,
+  analysisRequirementConclusions,
   analysisRequirementResults,
   analysisResultOverrides,
   analysisScopeItems,
@@ -102,6 +103,7 @@ export async function getOwnedAnalysisResultWorkspace(input: {
       id: analyses.id,
       organizationId: analyses.organizationId,
       frameworkSlug: analyses.frameworkSlug,
+      analysisProfile: analyses.analysisProfile,
       organizationContext: analyses.organizationContext,
       policyVersionId: analyses.policyVersionId,
       policyName: policies.displayName,
@@ -119,11 +121,21 @@ export async function getOwnedAnalysisResultWorkspace(input: {
   // während der Lauf noch läuft. Anforderungen ohne Ergebnis fehlen deshalb
   // nicht, sie stehen so lange sichtbar auf „noch nicht bewertet".
   const rows = await db
-    .select({ scope: analysisScopeItems, result: analysisRequirementResults })
+    .select({
+      scope: analysisScopeItems,
+      result: analysisRequirementResults,
+      conclusion: analysisRequirementConclusions,
+    })
     .from(analysisScopeItems)
     .leftJoin(
       analysisRequirementResults,
       eq(analysisRequirementResults.scopeItemId, analysisScopeItems.id),
+    )
+    // Den Abschlusstext gibt es nur für Lücken, und er entsteht erst nach dem
+    // Ergebnis — deshalb auch hier links verbunden.
+    .leftJoin(
+      analysisRequirementConclusions,
+      eq(analysisRequirementConclusions.resultId, analysisRequirementResults.id),
     )
     .where(eq(analysisScopeItems.analysisId, analysis.id))
     .orderBy(asc(analysisScopeItems.displayOrder));
@@ -190,7 +202,7 @@ export async function getOwnedAnalysisResultWorkspace(input: {
       pageNumber: block.pageNumber,
       paragraphNumber: block.paragraphNumber,
     })),
-    items: rows.map(({ scope, result }) => {
+    items: rows.map(({ scope, result, conclusion }) => {
       if (!result) {
         return {
           id: `pending-${scope.id}`,
@@ -209,6 +221,7 @@ export async function getOwnedAnalysisResultWorkspace(input: {
           verificationStatus: "pending" as const,
           confirmedAt: null,
           evidence: [],
+          conclusion: null,
           pending: true,
         };
       }
@@ -237,6 +250,15 @@ export async function getOwnedAnalysisResultWorkspace(input: {
         confidencePercent: Math.round(result.confidenceBasisPoints / 100),
         verificationStatus: result.verificationStatus,
         confirmedAt: result.confirmedAt?.toISOString() ?? null,
+        conclusion: conclusion
+          ? {
+              id: conclusion.id,
+              profile: conclusion.profile,
+              summary: conclusion.summary,
+              items: conclusion.items,
+              resolvedItems: conclusion.resolvedItems,
+            }
+          : null,
         evidence: (evidenceByResult.get(result.id) ?? []).map((evidence) => ({
           id: evidence.id,
           documentBlockId: evidence.documentBlockId,
@@ -295,6 +317,7 @@ export async function getOwnedAnalysisExportData(input: {
       frameworkReleaseKey: analyses.frameworkReleaseKey,
       frameworkContentHash: analyses.frameworkContentHash,
       institutionSize: analyses.institutionSize,
+      analysisProfile: analyses.analysisProfile,
       organizationContext: analyses.organizationContext,
       locale: analyses.locale,
       status: analyses.status,
@@ -326,11 +349,19 @@ export async function getOwnedAnalysisExportData(input: {
   if (!analysis) return undefined;
 
   const rows = await db
-    .select({ scope: analysisScopeItems, result: analysisRequirementResults })
+    .select({
+      scope: analysisScopeItems,
+      result: analysisRequirementResults,
+      conclusion: analysisRequirementConclusions,
+    })
     .from(analysisScopeItems)
     .innerJoin(
       analysisRequirementResults,
       eq(analysisRequirementResults.scopeItemId, analysisScopeItems.id),
+    )
+    .leftJoin(
+      analysisRequirementConclusions,
+      eq(analysisRequirementConclusions.resultId, analysisRequirementResults.id),
     )
     .where(eq(analysisScopeItems.analysisId, analysis.id))
     .orderBy(asc(analysisScopeItems.displayOrder));
@@ -392,6 +423,7 @@ export async function getOwnedAnalysisExportData(input: {
     frameworkReleaseKey: analysis.frameworkReleaseKey,
     frameworkContentHash: analysis.frameworkContentHash,
     institutionSize: analysis.institutionSize,
+    analysisProfile: analysis.analysisProfile,
     organizationContext: analysis.organizationContext,
     locale: analysis.locale,
     status: analysis.status,
@@ -416,7 +448,7 @@ export async function getOwnedAnalysisExportData(input: {
       versionNumber: analysis.policyVersionNumber,
       pageCount: analysis.policyPageCount,
     },
-    items: rows.map(({ scope, result }) => {
+    items: rows.map(({ scope, result, conclusion }) => {
       const override = latestOverrideByResult.get(result.id);
       return {
         id: result.id,
@@ -445,6 +477,14 @@ export async function getOwnedAnalysisExportData(input: {
         verifierExplanation: result.verifierExplanation,
         confirmedByUserId: result.confirmedByUserId,
         confirmedAt: result.confirmedAt,
+        conclusion: conclusion
+          ? {
+              profile: conclusion.profile,
+              summary: conclusion.summary,
+              items: conclusion.items,
+              resolvedItems: conclusion.resolvedItems,
+            }
+          : null,
         evidence: (evidenceByResult.get(result.id) ?? []).map((evidence) => ({
           citationOrder: evidence.citationOrder,
           support: evidence.support,

@@ -3,15 +3,21 @@ import "server-only";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { defaultAnalysisProfile, type AnalysisProfile } from "@/domain/analysis/profile";
 import type { AiRouteProvider } from "@/domain/ai/provider";
 import { appendAuditEvent } from "@/server/audit/event";
 import {
   getAnalysisModelCatalogue,
   resolveAnalysisModelSelection,
 } from "@/server/ai/model-catalogue";
+import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { db, isDatabaseConfigured } from "@/server/db/client";
-import { draftAnalysisScopes, draftRequirementSelections } from "@/server/db/schema/application";
+import {
+  draftAnalysisScopes,
+  draftRequirementSelections,
+  userAnalysisPreferences,
+} from "@/server/db/schema/application";
 import { draftModelSelections } from "@/server/db/schema/ai";
 import { draftPolicySelections, policyVersions } from "@/server/db/schema/documents";
 
@@ -23,6 +29,7 @@ export type InstitutionSize = z.infer<typeof institutionSizeSchema>;
 
 export type DraftScopeSelection = {
   institutionSize: InstitutionSize;
+  analysisProfile: AnalysisProfile;
   organizationContext: string;
   includedRequirementKeys: string[];
   modelSelection?: {
@@ -55,6 +62,7 @@ export async function getDraftScopeSelection(
 
   return {
     institutionSize: scope.institutionSize,
+    analysisProfile: scope.analysisProfile,
     organizationContext: scope.organizationContext,
     includedRequirementKeys: scope.requirementSelections
       .filter((selection) => selection.included)
@@ -81,6 +89,7 @@ export async function getDraftScopeSelection(
 export async function persistDraftScope(input: {
   expectedDraftId: string;
   institutionSize: InstitutionSize;
+  analysisProfile: AnalysisProfile;
   organizationContext: string;
   includedRequirementKeys: string[];
 }) {
@@ -131,6 +140,7 @@ export async function persistDraftScope(input: {
         frameworkReleaseKey: release.id,
         frameworkContentHash: release.contentHash,
         institutionSize: input.institutionSize,
+        analysisProfile: input.analysisProfile,
         organizationContext,
       })
       .onConflictDoUpdate({
@@ -140,6 +150,7 @@ export async function persistDraftScope(input: {
           frameworkReleaseKey: release.id,
           frameworkContentHash: release.contentHash,
           institutionSize: input.institutionSize,
+          analysisProfile: input.analysisProfile,
           organizationContext,
           updatedAt: now,
         },
@@ -169,6 +180,7 @@ export async function persistDraftScope(input: {
       targetId: scope.id,
       metadata: {
         institutionSize: input.institutionSize,
+        analysisProfile: input.analysisProfile,
         includedRequirementCount: includedKeys.length,
         releaseContentHash: release.contentHash,
         ...(defaultModel ? { defaultModelProfileId: defaultModel.id } : {}),
@@ -176,7 +188,45 @@ export async function persistDraftScope(input: {
     });
   });
 
+  await rememberAnalysisProfile(input.analysisProfile);
   return { includedRequirementCount: includedKeys.length };
+}
+
+/**
+ * Das zuletzt gewählte Profil bleibt als Voreinstellung des Nutzers stehen,
+ * damit die nächste Analyse nicht wieder beim Auslieferungszustand beginnt.
+ * Schlägt das fehl, ist der gespeicherte Umfang trotzdem gültig — die
+ * Voreinstellung ist Komfort, keine Bedingung des Ablaufs.
+ */
+async function rememberAnalysisProfile(analysisProfile: AnalysisProfile) {
+  try {
+    const user = await requireAuthenticatedSessionUser();
+    await db
+      .insert(userAnalysisPreferences)
+      .values({ userId: user.id, analysisProfile })
+      .onConflictDoUpdate({
+        target: userAnalysisPreferences.userId,
+        set: { analysisProfile, updatedAt: new Date() },
+      });
+  } catch {
+    // Ohne angemeldete Sitzung gibt es nichts zu merken.
+  }
+}
+
+/** Die Voreinstellung für den nächsten Prüfungsumfang. */
+export async function getDefaultAnalysisProfile(): Promise<AnalysisProfile> {
+  if (!isDatabaseConfigured) return defaultAnalysisProfile;
+  try {
+    const user = await requireAuthenticatedSessionUser();
+    const [preference] = await db
+      .select({ analysisProfile: userAnalysisPreferences.analysisProfile })
+      .from(userAnalysisPreferences)
+      .where(eq(userAnalysisPreferences.userId, user.id))
+      .limit(1);
+    return preference?.analysisProfile ?? defaultAnalysisProfile;
+  } catch {
+    return defaultAnalysisProfile;
+  }
 }
 
 /**

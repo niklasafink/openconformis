@@ -14,6 +14,7 @@ export type AnalysisExportData = {
   frameworkReleaseKey: string;
   frameworkContentHash: string;
   institutionSize: "small" | "medium" | "large";
+  analysisProfile: "auditor" | "institution";
   organizationContext: string;
   locale: string;
   status: "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -68,6 +69,13 @@ export type AnalysisExportData = {
     verifierExplanation: string | null;
     confirmedByUserId: string | null;
     confirmedAt: Date | null;
+    /** Nur Lücken haben einen Abschlusstext; das Profil bestimmt seine Bedeutung. */
+    conclusion: {
+      profile: "auditor" | "institution";
+      summary: string;
+      items: string[];
+      resolvedItems: number[];
+    } | null;
     evidence: Array<{
       citationOrder: number;
       support: "supports" | "contradicts" | "context";
@@ -145,6 +153,11 @@ const translations = {
     policyVersion: "Policy-Version",
     pages: "Seiten",
     institutionSize: "Institutsgröße",
+    analysisProfile: "Analyseprofil",
+    finding: "Feststellung",
+    findingImpact: "Auswirkung",
+    gapSummary: "Lücke",
+    actions: "Maßnahmen",
     created: "Erstellt",
     started: "Gestartet",
     completed: "Abgeschlossen",
@@ -215,6 +228,7 @@ const translations = {
       no_assessment_possible: "Keine Einschätzung möglich",
     },
     institutionSizes: { small: "Klein", medium: "Mittel", large: "Groß" },
+    analysisProfiles: { auditor: "Wirtschaftsprüfer", institution: "Finanzinstitut" },
   },
   en: {
     overview: "Overview",
@@ -233,6 +247,11 @@ const translations = {
     policyVersion: "Policy version",
     pages: "Pages",
     institutionSize: "Institution size",
+    analysisProfile: "Analysis profile",
+    finding: "Finding",
+    findingImpact: "Impact",
+    gapSummary: "Gap",
+    actions: "Actions",
     created: "Created",
     started: "Started",
     completed: "Completed",
@@ -303,6 +322,7 @@ const translations = {
       no_assessment_possible: "No assessment possible",
     },
     institutionSizes: { small: "Small", medium: "Medium", large: "Large" },
+    analysisProfiles: { auditor: "Auditor", institution: "Financial institution" },
   },
 } as const;
 
@@ -383,6 +403,7 @@ function addOverview(workbook: ExcelJS.Workbook, data: AnalysisExportData, local
     [t.policyVersion, data.policy.versionNumber],
     [t.pages, data.policy.pageCount ?? t.notAvailable],
     [t.institutionSize, t.institutionSizes[data.institutionSize]],
+    [t.analysisProfile, t.analysisProfiles[data.analysisProfile]],
     [t.created, iso(data.createdAt, t.notAvailable)],
     [t.started, iso(data.startedAt, t.notAvailable)],
     [t.completed, iso(data.completedAt, t.notAvailable)],
@@ -407,6 +428,7 @@ function addOverview(workbook: ExcelJS.Workbook, data: AnalysisExportData, local
 
 function addResults(workbook: ExcelJS.Workbook, data: AnalysisExportData, locale: ExportLocale) {
   const t = translations[locale];
+  const auditorProfile = data.analysisProfile === "auditor";
   const sheet = workbook.addWorksheet(t.results, {
     views: [{ state: "frozen", ySplit: 1, showGridLines: false }],
   });
@@ -422,6 +444,8 @@ function addResults(workbook: ExcelJS.Workbook, data: AnalysisExportData, locale
     { width: 34 },
     { width: 72 },
     { width: 44 },
+    { width: 76 },
+    { width: 54 },
     { width: 14 },
     { width: 22 },
     { width: 54 },
@@ -445,6 +469,10 @@ function addResults(workbook: ExcelJS.Workbook, data: AnalysisExportData, locale
     t.reviewer,
     t.assessment,
     t.missingInformation,
+    // Beide Profile schreiben in dieselben zwei Spalten; die Überschrift sagt,
+    // was darin steht.
+    auditorProfile ? t.finding : t.gapSummary,
+    auditorProfile ? t.findingImpact : t.actions,
     t.confidence,
     t.verification,
     t.verifierAssessment,
@@ -476,6 +504,8 @@ function addResults(workbook: ExcelJS.Workbook, data: AnalysisExportData, locale
         item.override?.actorUserId ?? t.notAvailable,
         item.explanation,
         item.missingInformation.join("\n"),
+        item.conclusion?.summary ?? t.notAvailable,
+        item.conclusion?.items.join("\n") || t.notAvailable,
         `${item.confidencePercent}%`,
         item.verificationStatus,
         item.verifierExplanation ?? t.notAvailable,

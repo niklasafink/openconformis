@@ -45,6 +45,18 @@ export type ResultItem = {
   confidencePercent: number;
   verificationStatus: "pending" | "not_selected" | "passed" | "needs_review" | "rejected";
   confirmedAt: string | null;
+  /**
+   * Der profilabhängige Abschlusstext dieser Lücke: eine Feststellung samt
+   * Auswirkung oder die Maßnahmen, die sie schließen. Erfüllte und nicht
+   * einschlägige Anforderungen haben keinen.
+   */
+  conclusion: {
+    id: string;
+    profile: "auditor" | "institution";
+    summary: string;
+    items: string[];
+    resolvedItems: number[];
+  } | null;
   evidence: Array<{
     id: string;
     documentBlockId: string;
@@ -78,6 +90,7 @@ export type AnalysisResultLabels = {
   todos: string;
   todosProgress: string;
   todoFailed: string;
+  conclusion: AnalysisConclusionLabels;
   evidence: string;
   noEvidence: string;
   page: string;
@@ -119,8 +132,26 @@ export type AnalysisPendingLabels = {
   assessedCount: string;
 };
 
+export type AnalysisConclusionLabels = {
+  /** Überschriften des Profils „Wirtschaftsprüfer". */
+  finding: string;
+  impact: string;
+  /** Überschriften des Profils „Finanzinstitut". */
+  gap: string;
+  actions: string;
+  actionsProgress: string;
+  /** Ausdrückliche Leermeldung, wenn eine Lücke ohne Abschlusstext geblieben ist. */
+  empty: string;
+};
+
 type AnalysisResultsWorkspaceProps = {
   analysisId: string;
+  /**
+   * Bestimmt, welcher Abschlusstext je Lücke entsteht und wie er überschrieben
+   * ist. Nur für Lücken ohne eigenen Text nötig — ein vorhandener trägt sein
+   * Profil selbst.
+   */
+  analysisProfile?: "auditor" | "institution";
   canConfirm: boolean;
   canOverride: boolean;
   initialSelectedId?: string;
@@ -202,6 +233,7 @@ const statuses: ResultStatus[] = [
 
 export function AnalysisResultsWorkspace({
   analysisId,
+  analysisProfile = "auditor",
   canConfirm,
   canOverride,
   initialSelectedId,
@@ -224,6 +256,9 @@ export function AnalysisResultsWorkspace({
   const [resolvedTodosById, setResolvedTodosById] = useState<Record<string, number[]>>(() =>
     Object.fromEntries(items.map((item) => [item.id, item.resolvedTodoIndexes])),
   );
+  const [resolvedActionsById, setResolvedActionsById] = useState<Record<string, number[]>>(() =>
+    Object.fromEntries(items.map((item) => [item.id, item.conclusion?.resolvedItems ?? []])),
+  );
   // Während der Lauf arbeitet, lädt die Seite ihre Ergebnisse nach. Ohne diesen
   // Abgleich bliebe der Arbeitsplatz auf dem Stand des ersten Renderns stehen
   // und zeigte fertige Bewertungen weiter als „noch nicht bewertet".
@@ -234,6 +269,9 @@ export function AnalysisResultsWorkspace({
     setConfirmedById(Object.fromEntries(items.map((item) => [item.id, item.confirmedAt !== null])));
     setResolvedTodosById(
       Object.fromEntries(items.map((item) => [item.id, item.resolvedTodoIndexes])),
+    );
+    setResolvedActionsById(
+      Object.fromEntries(items.map((item) => [item.id, item.conclusion?.resolvedItems ?? []])),
     );
   }
   const [savingConfirmationId, setSavingConfirmationId] = useState<string>();
@@ -316,6 +354,18 @@ export function AnalysisResultsWorkspace({
   const todosProgressLabel = labels.todosProgress
     .replace("{done}", String(selectedResolvedTodos.length))
     .replace("{total}", String(selectedTodos.length));
+  const conclusion = selected.pending ? null : selected.conclusion;
+  const auditorConclusion = (conclusion?.profile ?? analysisProfile) === "auditor";
+  const selectedResolvedActions = resolvedActionsById[selected.id] ?? [];
+  const actionsProgressLabel = labels.conclusion.actionsProgress
+    .replace("{done}", String(selectedResolvedActions.length))
+    .replace("{total}", String(conclusion?.items.length ?? 0));
+  // Eine Lücke ohne Abschlusstext bleibt sichtbar leer statt stillschweigend zu
+  // fehlen: der Lauf hat ihn nicht erzeugen können.
+  const conclusionMissing =
+    !selected.pending &&
+    !conclusion &&
+    ["partially_fulfilled", "not_fulfilled", "no_assessment_possible"].includes(selected.aiStatus);
 
   function selectRequirement(id: string) {
     setSelectedId(id);
@@ -360,19 +410,30 @@ export function AnalysisResultsWorkspace({
     }
   }
 
-  async function updateTodo(resultId: string, index: number, done: boolean) {
-    setSavingTodoKey(`${resultId}:${index}`);
+  /**
+   * Hakt eine Position ab: entweder eine fehlende Information der Bewertung
+   * oder eine Maßnahme des Abschlusstexts. Beide Listen liegen serverseitig
+   * getrennt; geändert wird nur der Arbeitsstand, nie die Liste selbst.
+   */
+  async function updateTodo(
+    resultId: string,
+    index: number,
+    done: boolean,
+    list: "evidence" | "actions" = "evidence",
+  ) {
+    setSavingTodoKey(`${list}:${resultId}:${index}`);
     setTodoError(false);
     try {
       const response = await fetch(`/api/analyses/${analysisId}/results/${resultId}/todos`, {
         method: "PUT",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ index, done }),
+        body: JSON.stringify({ index, done, list }),
       });
       if (!response.ok) throw new Error("TODO_FAILED");
       const result = (await response.json()) as { resolvedTodoIndexes: number[] };
-      setResolvedTodosById((current) => ({ ...current, [resultId]: result.resolvedTodoIndexes }));
+      const setResolved = list === "actions" ? setResolvedActionsById : setResolvedTodosById;
+      setResolved((current) => ({ ...current, [resultId]: result.resolvedTodoIndexes }));
     } catch {
       setTodoError(true);
     } finally {
@@ -681,6 +742,65 @@ export function AnalysisResultsWorkspace({
                 </div>
               )}
             </details>
+            {conclusion ? (
+              <details className="result-section result-conclusion-section" open>
+                <summary>
+                  <span>
+                    {auditorConclusion ? labels.conclusion.finding : labels.conclusion.gap}
+                    {auditorConclusion || conclusion.items.length === 0 ? null : (
+                      <small>{actionsProgressLabel}</small>
+                    )}
+                  </span>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </summary>
+                <p className="result-conclusion-summary">{conclusion.summary}</p>
+                <h3>{auditorConclusion ? labels.conclusion.impact : labels.conclusion.actions}</h3>
+                {auditorConclusion ? (
+                  <ul className="result-conclusion-impact">
+                    {conclusion.items.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="result-todo-list">
+                    {conclusion.items.map((action, index) => {
+                      const done = selectedResolvedActions.includes(index);
+                      const checkboxId = `result-action-${selected.id}-${index}`;
+                      return (
+                        <li key={index} data-done={done || undefined}>
+                          <Checkbox
+                            id={checkboxId}
+                            checked={done}
+                            disabled={
+                              !canOverride || savingTodoKey === `actions:${selected.id}:${index}`
+                            }
+                            onCheckedChange={(checked) =>
+                              void updateTodo(selected.id, index, checked === true, "actions")
+                            }
+                          />
+                          <label htmlFor={checkboxId}>{action}</label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {todoError ? (
+                  <p className="result-todo-error" role="alert">
+                    {labels.todoFailed}
+                  </p>
+                ) : null}
+              </details>
+            ) : conclusionMissing ? (
+              <details className="result-section result-conclusion-section" open>
+                <summary>
+                  <span>
+                    {auditorConclusion ? labels.conclusion.finding : labels.conclusion.gap}
+                  </span>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </summary>
+                <p className="result-empty-evidence">{labels.conclusion.empty}</p>
+              </details>
+            ) : null}
             {selectedTodos.length > 0 ? (
               <details className="result-section result-todo-section" open>
                 <summary>
@@ -699,7 +819,9 @@ export function AnalysisResultsWorkspace({
                         <Checkbox
                           id={checkboxId}
                           checked={done}
-                          disabled={!canOverride || savingTodoKey === `${selected.id}:${index}`}
+                          disabled={
+                            !canOverride || savingTodoKey === `evidence:${selected.id}:${index}`
+                          }
                           onCheckedChange={(checked) =>
                             void updateTodo(selected.id, index, checked === true)
                           }

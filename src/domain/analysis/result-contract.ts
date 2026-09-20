@@ -148,6 +148,73 @@ export const requirementAssessmentJsonSchema = {
   required: ["status", "explanation", "confidencePercent", "evidence", "missingInformation"],
 } as const;
 
+/**
+ * Der Abschlusstext einer Lücke im Profil „Wirtschaftsprüfer": eine Feststellung
+ * für den Prüfungsbericht samt Auswirkung. Keine Empfehlung, kein Policy-Text.
+ */
+export const auditFindingSchema = z.object({
+  finding: z.string().trim().min(40).max(3_000),
+  riskImpact: z.array(z.string().trim().min(3).max(400)).min(1).max(4),
+});
+
+export type AuditFinding = z.infer<typeof auditFindingSchema>;
+
+export const auditFindingJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    finding: {
+      type: "string",
+      minLength: 40,
+      maxLength: 3000,
+      description:
+        "The finding for the audit report: audited subject, regulatory criterion, the deviation and the evidence it rests on.",
+    },
+    riskImpact: {
+      type: "array",
+      minItems: 1,
+      maxItems: 4,
+      items: { type: "string" },
+      description: "What the deviation means for compliance, stated as short factual points.",
+    },
+  },
+  required: ["finding", "riskImpact"],
+} as const;
+
+/**
+ * Der Abschlusstext einer Lücke im Profil „Finanzinstitut": was konkret zu tun
+ * ist, um die Lücke zu schließen. Maßnahmen, keine fertigen Policy-Sätze.
+ */
+export const remediationPlanSchema = z.object({
+  gapSummary: z.string().trim().min(20).max(1_500),
+  actions: z.array(z.string().trim().min(6).max(400)).min(1).max(8),
+});
+
+export type RemediationPlan = z.infer<typeof remediationPlanSchema>;
+
+export const remediationPlanJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    gapSummary: {
+      type: "string",
+      minLength: 20,
+      maxLength: 1500,
+      description:
+        "One or two sentences naming what the policy is missing against the requirement.",
+    },
+    actions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 8,
+      items: { type: "string" },
+      description:
+        "One concrete measure per item that closes part of the gap, each naming the mandatory aspect it covers.",
+    },
+  },
+  required: ["gapSummary", "actions"],
+} as const;
+
 export const verificationResultSchema = z.object({
   verdict: z.enum(["confirm", "reject", "uncertain"]),
   explanation: z.string().trim().min(20).max(4_000),

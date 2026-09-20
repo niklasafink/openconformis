@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { routing } from "@/i18n/routing";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
 import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
-import { getDraftScopeSelection } from "@/server/drafts/scope-selection";
+import { getDefaultAnalysisProfile, getDraftScopeSelection } from "@/server/drafts/scope-selection";
 import { getCurrentPolicySelection } from "@/server/policies/sample-service";
 import { getSelectedPolicyProcessingState } from "@/server/policies/upload-service";
 
@@ -29,12 +29,13 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [t, boundDraft, selection, processing, savedScope] = await Promise.all([
+  const [t, boundDraft, selection, processing, savedScope, defaultProfile] = await Promise.all([
     getTranslations("Scope"),
     getBoundActiveDraft(draft),
     getCurrentPolicySelection(draft),
     getSelectedPolicyProcessingState(draft),
     getDraftScopeSelection(draft),
+    getDefaultAnalysisProfile(),
   ]);
   // Ohne aktiven Draft (kein Rahmenwerk oder keine Policy gewählt) lässt sich der
   // Umfang nicht rekonstruieren. Der Sidebar-Schritt ist immer sichtbar, auch
@@ -90,6 +91,7 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
             locale={locale}
             requirements={release.requirements}
             initialSize={savedScope?.institutionSize ?? "medium"}
+            initialProfile={savedScope?.analysisProfile ?? defaultProfile}
             initialContext={savedScope?.organizationContext ?? ""}
             initialIncludedKeys={initialIncludedKeys}
             query={q}
@@ -115,6 +117,12 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
               small: t("small"),
               medium: t("medium"),
               large: t("large"),
+              profile: t("profile"),
+              profileHelp: t("profileHelp"),
+              auditor: t("auditor"),
+              auditorHint: t("auditorHint"),
+              institution: t("institution"),
+              institutionHint: t("institutionHint"),
               requirement: t("requirement"),
               subrequirements: t("subrequirements"),
               bestPractice: t("bestPractice"),

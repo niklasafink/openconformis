@@ -11,6 +11,7 @@ freeze configuration
       → schema validation
       → exact-quote grounding
       → selective independent verification
+      → profile-dependent closing text, gaps only
   → atomic completion
 ```
 
@@ -25,6 +26,8 @@ Each step receives only an analysis ID and, where needed, a scope-item ID. It lo
 - If verification rejects or remains uncertain, the effective result becomes “Keine Einschätzung möglich” and requires human review.
 - Users can override and confirm individual results without mutating the original AI record.
 - Assessment cache keys include organization, policy/retrieval hashes, provider, model, prompt, schema and privacy-profile versions.
+- The closing text runs after the stored result, reads only the frozen assessment and its verified citations, and never re-assesses or changes a status. It runs for `partially_fulfilled`, `not_fulfilled` and `Keine Einschätzung möglich` only, is written once per result, and a resumed run adds a missing one instead of producing a second. An unusable model output costs that one text, not the run; the result page then states explicitly that no closing text exists.
+- The auditor profile writes a finding with its impact; the institution profile writes a gap summary with actions. Neither may propose policy wording.
 
 ## Model routing
 

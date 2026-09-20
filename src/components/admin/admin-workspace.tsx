@@ -42,9 +42,13 @@ type Framework = {
   releases: Release[];
 };
 
+const instructionKinds = ["assessment", "verification", "finding", "remediation"] as const;
+
+type InstructionKind = (typeof instructionKinds)[number];
+
 type Instruction = {
   id: string;
-  kind: "assessment" | "verification";
+  kind: InstructionKind;
   version: string;
   status: "draft" | "published" | "archived";
   instruction: string;
@@ -781,7 +785,7 @@ function InstructionWorkspace({
   run: (action: () => Promise<unknown>) => Promise<void>;
 }) {
   const t = useTranslations("Administration");
-  const [kind, setKind] = useState<"assessment" | "verification">("assessment");
+  const [kind, setKind] = useState<InstructionKind>("assessment");
   const current = useMemo(
     () => instructions.filter((item) => item.kind === kind),
     [instructions, kind],
@@ -795,19 +799,18 @@ function InstructionWorkspace({
           <h2>{t("instructions")}</h2>
           <FileLock2 size={17} />
         </div>
+        {/* „finding" und „remediation" sind die Abschlusstexte der beiden
+            Analyseprofile; je Lauf gilt genau einer von ihnen. */}
         <div className="segmented">
-          <button
-            data-active={kind === "assessment" || undefined}
-            onClick={() => setKind("assessment")}
-          >
-            {t("assessment")}
-          </button>
-          <button
-            data-active={kind === "verification" || undefined}
-            onClick={() => setKind("verification")}
-          >
-            {t("verification")}
-          </button>
+          {instructionKinds.map((value) => (
+            <button
+              key={value}
+              data-active={kind === value || undefined}
+              onClick={() => setKind(value)}
+            >
+              {t(value)}
+            </button>
+          ))}
         </div>
         <label>
           {t("version")}

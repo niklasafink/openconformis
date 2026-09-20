@@ -706,12 +706,58 @@
   gap: 20px;
 }
 
+.scope-profile-section,
 .scope-size-section,
 .scope-context,
 .scope-requirements {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
+}
+
+.scope-profile-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.scope-profile-options {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.scope-profile-options label {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.scope-profile-options label[data-selected="true"] {
+  border-color: var(--text-primary);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.scope-profile-options strong {
+  font-size: var(--text-section-title);
+  font-weight: 600;
+}
+
+.scope-profile-options small {
+  font-size: var(--text-meta);
+  line-height: 18px;
+}
+
+.scope-profile-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .scope-size-section {
@@ -2007,12 +2053,49 @@ i[data-result-pending="true"] {
   font-weight: 600;
 }
 
-.result-todo-section summary small {
+.result-todo-section summary small,
+.result-conclusion-section summary small {
   margin-left: 8px;
   color: var(--text-tertiary);
   font-size: var(--text-meta);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+.result-conclusion-summary {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding: 9px 12px 10px;
+  color: #343943;
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.result-conclusion-section h3 {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 0;
+  color: var(--text-secondary);
+  font-size: var(--text-meta);
+  font-weight: 600;
+}
+
+.result-conclusion-impact {
+  margin: 0;
+  padding: 6px 12px 10px 28px;
+  color: #343943;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  /* Tailwinds Preflight nimmt Listen die Aufzählungszeichen. */
+  list-style: disc outside;
+}
+
+.result-conclusion-impact li + li {
+  margin-top: 4px;
+}
+
+.result-conclusion-section .result-todo-list {
+  border-top: 0;
 }
 
 .result-todo-list {

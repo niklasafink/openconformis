@@ -23,6 +23,13 @@ export const anonymousDraftStatus = pgEnum("anonymous_draft_status", [
 
 export const institutionSize = pgEnum("institution_size", ["small", "medium", "large"]);
 
+/**
+ * Die Arbeitsweise, in der eine Analyse abschließt: Feststellungen für den
+ * Prüfungsbericht oder Maßnahmen zur Schließung der Lücke. Bewertung und
+ * Verifikation bleiben in beiden Fällen dieselben.
+ */
+export const analysisProfile = pgEnum("analysis_profile", ["auditor", "institution"]);
+
 export const anonymousDrafts = pgTable(
   "anonymous_drafts",
   {
@@ -87,6 +94,7 @@ export const draftAnalysisScopes = pgTable(
     frameworkReleaseKey: text("framework_release_key").notNull(),
     frameworkContentHash: text("framework_content_hash").notNull(),
     institutionSize: institutionSize("institution_size").notNull(),
+    analysisProfile: analysisProfile("analysis_profile").default("auditor").notNull(),
     organizationContext: text("organization_context").default("").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -117,6 +125,20 @@ export const draftRequirementSelections = pgTable(
     index("draft_requirement_selections_scope_idx").on(table.draftScopeId),
   ],
 );
+
+/**
+ * Die Voreinstellung des Nutzers für neue Analysen. Der Prüfungsumfang setzt sie
+ * bei jeder Analyse neu; gespeichert bleibt sie, damit der nächste Lauf nicht
+ * wieder beim Auslieferungszustand beginnt.
+ */
+export const userAnalysisPreferences = pgTable("user_analysis_preferences", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  analysisProfile: analysisProfile("analysis_profile").default("auditor").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const anonymousDraftRelations = relations(anonymousDrafts, ({ one, many }) => ({
   claimedBy: one(users, {

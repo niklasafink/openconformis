@@ -594,3 +594,37 @@ Consequences: `DESIGN.md` §3, §4 and §5 are updated to the new values, since 
 binding documentation may not contradict the code.
 
 Decision: accepted.
+
+## D-032 Two analysis profiles with one shared gap analysis
+
+Product direction (2026-09-20): the tool serves two audiences that need the same
+analysis and a different ending. An auditor documents what was found; an institution
+wants to know what to do about it. Producing both from one prompt would have mixed
+recording with advising in a single text, and letting the audience shape the
+assessment would have made the same policy score differently depending on who ran it.
+
+Retrieval, assessment and verification therefore stay profile-neutral and unchanged.
+A third stage runs afterwards per requirement, only for `partially_fulfilled`,
+`not_fulfilled` and `Keine Einschätzung möglich`. It reads the stored result and its
+verified citations, never the raw document, and writes either a finding with its
+impact (`auditor`) or a gap summary with actions (`institution`). Both land in the
+same two columns of `analysis_requirement_conclusions`, so the export and the result
+page carry one shape.
+
+One call per gap, running inside the existing parallel requirement blocks, was chosen
+over a single batched call across all gaps: it adds no wall-clock time, keeps the
+input small (frozen assessment plus quoted evidence), isolates a truncated or invalid
+answer to one requirement, and keeps each text attributable to exactly one
+requirement, which the evidence and export invariants require.
+
+The profile is selected in step 3, frozen into the analysis and its configuration
+hash at start, and remembered per user in `user_analysis_preferences` as the default
+for the next analysis. A rerun keeps the source profile. The two closing prompts are
+administered like the others, as `analysis_instructions` of kind `finding` and
+`remediation`, and a published instruction stays subordinate to the code-owned rules.
+
+This relaxes the earlier blanket rule against improvement suggestions: actions may
+name the measure to implement, never the policy wording to write. Rewriting policy
+text and track changes remain out of scope in both profiles (`CLAUDE.md`).
+
+Decision: accepted.

@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { conclusionInstructionKind, type AnalysisProfile } from "@/domain/analysis/profile";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { requireCatalogueAdministrator } from "@/server/catalogue/administrator";
@@ -15,9 +16,24 @@ export const defaultAssessmentInstruction =
 export const defaultVerificationInstruction =
   "Prüfe Status, Begründung und jede Belegzuordnung unabhängig. Lehne optimistische Bewertungen, nicht belegte Aussagen, unvollständige Pflichtaspekte und widersprüchliche Belege ab. Wähle bei verbleibender Unsicherheit keine günstigere Bewertung.";
 
+export const defaultFindingInstruction =
+  "Formuliere je Lücke eine Feststellung für den Prüfungsbericht: geprüfter Sachverhalt, herangezogene regulatorische Anforderung, festgestellte Abweichung und die Belegstellen, auf denen sie beruht. Sachlich, ohne Empfehlung und ohne Formulierungsvorschlag für die Policy.";
+
+export const defaultRemediationInstruction =
+  "Benenne je Lücke die konkreten Maßnahmen, mit denen das Institut sie schließt: was zu regeln, zu entscheiden, zu dokumentieren, zuzuweisen oder nachzuweisen ist. Jede Maßnahme nennt den Pflichtaspekt, den sie abdeckt. Keine fertigen Policy-Formulierungen und keine Textänderungen.";
+
+export const analysisInstructionKindSchema = z.enum([
+  "assessment",
+  "verification",
+  "finding",
+  "remediation",
+]);
+
+export type AnalysisInstructionKind = z.infer<typeof analysisInstructionKindSchema>;
+
 export const analysisInstructionInputSchema = z.object({
   id: z.string().uuid().optional(),
-  kind: z.enum(["assessment", "verification"]),
+  kind: analysisInstructionKindSchema,
   version: z.string().trim().min(1).max(100),
   instruction: z.string().trim().min(40).max(20_000),
 });
@@ -29,16 +45,21 @@ export const analysisInstructionActionSchema = z.object({
 
 export type FrozenAnalysisInstruction = {
   id?: string;
-  kind: "assessment" | "verification";
+  kind: AnalysisInstructionKind;
   version: string;
   instruction: string;
   contentHash: string;
 };
 
-function builtInInstruction(kind: "assessment" | "verification"): FrozenAnalysisInstruction {
-  const instruction =
-    kind === "assessment" ? defaultAssessmentInstruction : defaultVerificationInstruction;
-  const version = kind === "assessment" ? "gap-analysis-v1" : "gap-verification-v1";
+const builtInInstructions: Record<AnalysisInstructionKind, { version: string; text: string }> = {
+  assessment: { version: "gap-analysis-v1", text: defaultAssessmentInstruction },
+  verification: { version: "gap-verification-v1", text: defaultVerificationInstruction },
+  finding: { version: "gap-finding-v1", text: defaultFindingInstruction },
+  remediation: { version: "gap-remediation-v1", text: defaultRemediationInstruction },
+};
+
+function builtInInstruction(kind: AnalysisInstructionKind): FrozenAnalysisInstruction {
+  const { version, text: instruction } = builtInInstructions[kind];
   return {
     kind,
     version,
@@ -48,7 +69,7 @@ function builtInInstruction(kind: "assessment" | "verification"): FrozenAnalysis
 }
 
 export async function getActiveAnalysisInstruction(
-  kind: "assessment" | "verification",
+  kind: AnalysisInstructionKind,
 ): Promise<FrozenAnalysisInstruction> {
   const [record] = await db
     .select()
@@ -68,17 +89,31 @@ export async function getActiveAnalysisInstruction(
     : builtInInstruction(kind);
 }
 
-export async function getActiveAnalysisInstructionPair() {
-  const [assessment, verification] = await Promise.all([
+/**
+ * Alle Anweisungen, aus denen ein Lauf wählt. Bewertung und Verifikation gelten
+ * in jedem Profil; welcher Abschlusstext gilt, entscheidet sich erst mit dem
+ * Profil des Laufs — deshalb werden beide geladen und erst danach ausgewählt.
+ */
+export async function getActiveAnalysisInstructionSet() {
+  const [assessment, verification, finding, remediation] = await Promise.all([
     getActiveAnalysisInstruction("assessment"),
     getActiveAnalysisInstruction("verification"),
+    getActiveAnalysisInstruction("finding"),
+    getActiveAnalysisInstruction("remediation"),
   ]);
-  return { assessment, verification };
+  return { assessment, verification, finding, remediation };
+}
+
+export function conclusionInstructionOf(
+  instructions: Awaited<ReturnType<typeof getActiveAnalysisInstructionSet>>,
+  profile: AnalysisProfile,
+) {
+  return instructions[conclusionInstructionKind(profile)];
 }
 
 export async function getFrozenAnalysisInstruction(input: {
   id: string | null;
-  kind: "assessment" | "verification";
+  kind: AnalysisInstructionKind;
   version: string;
   contentHash: string | null;
 }) {

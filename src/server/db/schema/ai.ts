@@ -55,9 +55,13 @@ export const aiModelRecommendation = pgEnum("ai_model_recommendation", [
 
 export const aiEvaluationStatus = pgEnum("ai_evaluation_status", ["draft", "published"]);
 
+// „finding" und „remediation" sind die profilabhängigen Abschlusstexte: die
+// Feststellung des Prüfers und die Maßnahmenliste des Instituts.
 export const analysisInstructionKind = pgEnum("analysis_instruction_kind", [
   "assessment",
   "verification",
+  "finding",
+  "remediation",
 ]);
 
 export const analysisInstructionStatus = pgEnum("analysis_instruction_status", [

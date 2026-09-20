@@ -15,6 +15,7 @@ import {
   type RequirementAssessment,
   type VerificationResult,
 } from "@/domain/analysis/result-contract";
+import { conclusionInstructionKind, requiresConclusion } from "@/domain/analysis/profile";
 import type { RetrievalCandidate } from "@/domain/analysis/retrieval";
 import { verificationReasons } from "@/domain/analysis/verification-policy";
 import { aiRouteProviderSchema } from "@/domain/ai/provider";
@@ -22,6 +23,7 @@ import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { getFrozenAnalysisInstruction } from "@/server/ai/analysis-instruction-service";
 import { buildAssessmentPrompt } from "@/server/ai/assessment-prompt";
+import { buildConclusionPrompt, conclusionRecord } from "@/server/ai/conclusion-prompt";
 import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
 import {
   ModelProviderError,
@@ -40,6 +42,7 @@ import {
   analyses,
   analysisAssessmentCache,
   analysisEvidence,
+  analysisRequirementConclusions,
   analysisModelInvocations,
   analysisRequirementResults,
   analysisRequirementVerifications,
@@ -75,25 +78,38 @@ async function loadAnalysis(analysisId: string) {
   ) {
     throw new Error("FROZEN_ROUTE_UNSUPPORTED");
   }
-  const [assessmentInstruction, verificationInstruction] = await Promise.all([
-    getFrozenAnalysisInstruction({
-      id: analysis.assessmentInstructionId,
-      kind: "assessment",
-      version: analysis.promptVersion,
-      contentHash: analysis.assessmentInstructionHash,
-    }),
-    getFrozenAnalysisInstruction({
-      id: analysis.verificationInstructionId,
-      kind: "verification",
-      version: analysis.verifierPromptVersion,
-      contentHash: analysis.verificationInstructionHash,
-    }),
-  ]);
+  const [assessmentInstruction, verificationInstruction, conclusionInstruction] = await Promise.all(
+    [
+      getFrozenAnalysisInstruction({
+        id: analysis.assessmentInstructionId,
+        kind: "assessment",
+        version: analysis.promptVersion,
+        contentHash: analysis.assessmentInstructionHash,
+      }),
+      getFrozenAnalysisInstruction({
+        id: analysis.verificationInstructionId,
+        kind: "verification",
+        version: analysis.verifierPromptVersion,
+        contentHash: analysis.verificationInstructionHash,
+      }),
+      // Läufe aus der Zeit vor den Profilen haben keine Abschlussanweisung; sie
+      // bleiben ohne diese Stufe gültig, statt beim Fortsetzen zu scheitern.
+      analysis.conclusionPromptVersion
+        ? getFrozenAnalysisInstruction({
+            id: analysis.conclusionInstructionId,
+            kind: conclusionInstructionKind(analysis.analysisProfile),
+            version: analysis.conclusionPromptVersion,
+            contentHash: analysis.conclusionInstructionHash,
+          })
+        : Promise.resolve(null),
+    ],
+  );
   return {
     ...analysis,
     routeProvider: routeProvider.data,
     assessmentInstruction,
     verificationInstruction,
+    conclusionInstruction,
   };
 }
 
@@ -248,21 +264,16 @@ async function failInvocation(
 function invocationContext(
   analysis: AnalysisRecord,
   item: ScopeRecord,
-  stage: "assessment" | "verification",
+  stage: "assessment" | "verification" | "conclusion",
   attempt: number,
 ) {
   const german = analysis.locale === "de";
-  const stageLabel =
-    stage === "assessment"
-      ? german
-        ? "Bewertung"
-        : "Assessment"
-      : german
-        ? "Verifikation"
-        : "Verification";
+  const stageLabels = german
+    ? { assessment: "Bewertung", verification: "Verifikation", conclusion: "Ergebnistext" }
+    : { assessment: "Assessment", verification: "Verification", conclusion: "Conclusion" };
   const modelId =
-    stage === "assessment" ? analysis.providerModelId : analysis.verifierProviderModelId;
-  return `${item.scope.regulatoryId}, ${stageLabel} (${german ? "Versuch" : "attempt"} ${attempt}), ${modelId}`;
+    stage === "verification" ? analysis.verifierProviderModelId : analysis.providerModelId;
+  return `${item.scope.regulatoryId}, ${stageLabels[stage]} (${german ? "Versuch" : "attempt"} ${attempt}), ${modelId}`;
 }
 
 const truncatedRetryInstruction =
@@ -702,6 +713,154 @@ async function persistItemResult(input: {
   });
 }
 
+/**
+ * Der profilabhängige Abschlusstext einer Lücke: eine Feststellung für den
+ * Prüfungsbericht oder die Maßnahmen, mit denen das Institut sie schließt.
+ *
+ * Die Stufe liest das bereits gespeicherte Ergebnis samt geprüfter Belege und
+ * bewertet nichts neu. Sie läuft nur für Lücken — erfüllte und nicht
+ * einschlägige Anforderungen haben keinen Abschlusstext — und ist über die
+ * eindeutige Zuordnung je Ergebnis wiederholbar: ein abgebrochener Lauf setzt
+ * hier fort, ohne einen zweiten Text zu erzeugen.
+ */
+async function ensureItemConclusion(analysis: AnalysisRecord, item: ScopeRecord) {
+  const instruction = analysis.conclusionInstruction;
+  if (!instruction || !analysis.conclusionPromptVersion) return;
+
+  const [result] = await db
+    .select({
+      id: analysisRequirementResults.id,
+      status: analysisRequirementResults.status,
+      explanation: analysisRequirementResults.explanation,
+      missingInformation: analysisRequirementResults.missingInformation,
+      confidenceBasisPoints: analysisRequirementResults.confidenceBasisPoints,
+      conclusionId: analysisRequirementConclusions.id,
+    })
+    .from(analysisRequirementResults)
+    .leftJoin(
+      analysisRequirementConclusions,
+      eq(analysisRequirementConclusions.resultId, analysisRequirementResults.id),
+    )
+    .where(eq(analysisRequirementResults.scopeItemId, item.scope.id))
+    .limit(1);
+  if (!result || result.conclusionId || !requiresConclusion(result.status)) return;
+
+  const citations = await db
+    .select({
+      citationOrder: analysisEvidence.citationOrder,
+      support: analysisEvidence.support,
+      exactQuote: analysisEvidence.exactQuote,
+      pageNumber: analysisEvidence.pageNumber,
+      paragraphNumber: analysisEvidence.paragraphNumber,
+    })
+    .from(analysisEvidence)
+    .where(eq(analysisEvidence.resultId, result.id))
+    .orderBy(asc(analysisEvidence.citationOrder));
+
+  const scope = item.scope;
+  const prompt = buildConclusionPrompt(
+    {
+      profile: analysis.analysisProfile,
+      locale: analysis.locale,
+      institutionSize: analysis.institutionSize,
+      organizationContext: analysis.organizationContext,
+      requirement: {
+        regulatoryId: scope.regulatoryId,
+        title: scope.title,
+        legalText: scope.legalText,
+        assessmentAspects: scope.assessmentAspects,
+        sizeGuidance: scope.sizeGuidance,
+        subrequirements: scope.subrequirements.map((subrequirement) => ({
+          regulatoryId: subrequirement.regulatoryId,
+          title: subrequirement.title,
+          legalText: subrequirement.legalText,
+          assessmentAspects: subrequirement.assessmentAspects,
+        })),
+      },
+      assessment: {
+        status: result.status,
+        explanation: result.explanation,
+        missingInformation: result.missingInformation,
+        confidencePercent: Math.round(result.confidenceBasisPoints / 100),
+      },
+      citations,
+    },
+    instruction.instruction,
+  );
+  const inputHash = createContentHash({
+    promptVersion: analysis.conclusionPromptVersion,
+    profile: analysis.analysisProfile,
+    modelId: analysis.providerModelId,
+    resultOutputHash: result.id,
+    system: prompt.system,
+    user: prompt.user,
+    schema: prompt.jsonSchema,
+  });
+
+  let truncated = false;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const invocationId = await startInvocation({
+      analysisId: analysis.id,
+      scopeItemId: scope.id,
+      stage: `conclusion_attempt_${attempt}`,
+      provider: analysis.routeProvider,
+      modelId: analysis.providerModelId,
+      inputHash,
+    });
+    const startedAt = Date.now();
+    try {
+      const response = await requestStructuredForAnalysis(analysis, {
+        modelId: analysis.providerModelId,
+        system:
+          attempt === 1
+            ? prompt.system
+            : truncated
+              ? `${prompt.system}\n${truncatedRetryInstruction}`
+              : `${prompt.system}\nA prior output failed schema validation. Return every required field exactly once.`,
+        user: prompt.user,
+        schemaName: prompt.schemaName,
+        jsonSchema: { ...prompt.jsonSchema },
+        outputSchema: prompt.outputSchema,
+        maxOutputTokens: truncated ? largerOutputBudget(analysis) : undefined,
+      });
+      const outputHash = createContentHash(response.output);
+      await finishInvocation(invocationId, startedAt, response, outputHash);
+      await db
+        .insert(analysisRequirementConclusions)
+        .values({
+          resultId: result.id,
+          profile: analysis.analysisProfile,
+          ...conclusionRecord(analysis.analysisProfile, response.output),
+          modelId: response.resolvedModelId,
+          promptVersion: analysis.conclusionPromptVersion,
+          inputHash,
+          outputHash,
+        })
+        .onConflictDoNothing({ target: analysisRequirementConclusions.resultId });
+      return;
+    } catch (error) {
+      const failure = withProviderErrorContext(
+        error,
+        invocationContext(analysis, item, "conclusion", attempt),
+      );
+      await failInvocation(invocationId, startedAt, failure, undefined, analysis.id);
+      if (error instanceof ModelProviderError) {
+        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
+          truncated = true;
+          continue;
+        }
+        // Eine gesperrte Route oder ein ungültiger Schlüssel betrifft den ganzen
+        // Lauf und muss ihn beenden. Eine unbrauchbare Antwort dagegen kostet
+        // nur diesen Text: die Bewertung samt Belegen steht bereits.
+        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
+        truncated = false;
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 /** Der Schlüssel des Nutzers lebt nur so lange wie der Lauf, der ihn braucht. */
 function deleteAnalysisCredential(analysis: Pick<AnalysisRecord, "sourceDraftId" | "ownerUserId">) {
   return deleteTemporaryCredentialsForBinding({
@@ -806,6 +965,9 @@ export async function executeAnalysisScopeItem(input: {
       selectionReasons: reasons,
     });
   }
+  // Nach dem gespeicherten Ergebnis, damit ein fortgesetzter Lauf den fehlenden
+  // Abschlusstext nachholt, statt die Anforderung ohne ihn zu lassen.
+  await ensureItemConclusion(analysis, item);
 
   // Parallel bewertete Anforderungen enden in beliebiger Reihenfolge. Der
   // Fortschritt zählt deshalb gespeicherte Ergebnisse und fällt nie zurück.

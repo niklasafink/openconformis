@@ -12,6 +12,7 @@ import { VerifiedEmailRequiredError } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import {
   analyses,
+  analysisRequirementConclusions,
   analysisRequirementResults,
   analysisResultOverrides,
   analysisScopeItems,
@@ -218,14 +219,17 @@ export class AnalysisTodoNotFoundError extends Error {
 }
 
 /**
- * Hakt eine fehlende Information des Ergebnisses als erledigt ab oder öffnet sie
- * wieder. Bewertung, Begründung und die Liste selbst bleiben unverändert.
+ * Hakt eine Position als erledigt ab oder öffnet sie wieder: entweder eine
+ * fehlende Information der Bewertung (`evidence`) oder eine Maßnahme des
+ * Abschlusstexts (`actions`). Bewertung, Begründung, Abschlusstext und die
+ * Listen selbst bleiben unverändert; nur der Arbeitsstand ändert sich.
  */
 export async function setAnalysisResultTodo(input: {
   analysisId: string;
   resultId: string;
   index: number;
   done: boolean;
+  list?: "evidence" | "actions";
 }) {
   const principal = requireAssessmentOverridePermission(await requireSessionPrincipal());
 
@@ -251,6 +255,50 @@ export async function setAnalysisResultTodo(input: {
       .limit(1);
 
     if (!target) throw new AnalysisResultNotFoundError();
+
+    const list = input.list ?? "evidence";
+    if (list === "actions") {
+      await transaction.execute(
+        sql`select ${analysisRequirementConclusions.id}
+            from ${analysisRequirementConclusions}
+            where ${analysisRequirementConclusions.resultId} = ${target.id}
+            for update`,
+      );
+      const [conclusion] = await transaction
+        .select({
+          id: analysisRequirementConclusions.id,
+          items: analysisRequirementConclusions.items,
+          resolved: analysisRequirementConclusions.resolvedItems,
+        })
+        .from(analysisRequirementConclusions)
+        .where(eq(analysisRequirementConclusions.resultId, target.id))
+        .limit(1);
+      if (!conclusion) throw new AnalysisTodoNotFoundError();
+      if (input.index >= conclusion.items.length) throw new AnalysisTodoNotFoundError();
+
+      const resolved = nextResolvedTodos(conclusion.resolved, input.index, input.done);
+      if (resolved.length === conclusion.resolved.length) return { resolvedTodoIndexes: resolved };
+
+      await transaction
+        .update(analysisRequirementConclusions)
+        .set({ resolvedItems: resolved, updatedAt: new Date() })
+        .where(eq(analysisRequirementConclusions.id, conclusion.id));
+
+      await appendAuditEvent(transaction, {
+        organizationId: principal.organizationId,
+        actorUserId: principal.userId,
+        action: input.done ? "analysis_result.action_resolved" : "analysis_result.action_reopened",
+        targetType: "analysis_requirement_conclusion",
+        targetId: conclusion.id,
+        metadata: {
+          analysisId: input.analysisId,
+          regulatoryId: target.regulatoryId,
+          todoIndex: input.index,
+        },
+      });
+
+      return { resolvedTodoIndexes: resolved };
+    }
 
     await transaction.execute(
       sql`select ${analysisRequirementResults.id}

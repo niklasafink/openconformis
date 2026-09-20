@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown, Info, Pencil } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { AnalysisProfile } from "@/domain/analysis/profile";
 import type { PublishedRequirement } from "@/server/catalogue/service";
 import type { InstitutionSize } from "@/server/drafts/scope-selection";
 
@@ -13,6 +14,7 @@ type ScopeFormProps = {
   locale: "de" | "en";
   requirements: readonly PublishedRequirement[];
   initialSize: InstitutionSize;
+  initialProfile: AnalysisProfile;
   initialContext: string;
   initialIncludedKeys: string[];
   query: string;
@@ -26,6 +28,12 @@ type ScopeFormProps = {
     small: string;
     medium: string;
     large: string;
+    profile: string;
+    profileHelp: string;
+    auditor: string;
+    auditorHint: string;
+    institution: string;
+    institutionHint: string;
     requirement: string;
     subrequirements: string;
     bestPractice: string;
@@ -44,6 +52,7 @@ export function ScopeForm({
   locale,
   requirements,
   initialSize,
+  initialProfile,
   initialContext,
   initialIncludedKeys,
   query,
@@ -52,6 +61,7 @@ export function ScopeForm({
   labels,
 }: ScopeFormProps) {
   const [institutionSize, setInstitutionSize] = useState<InstitutionSize>(initialSize);
+  const [analysisProfile, setAnalysisProfile] = useState<AnalysisProfile>(initialProfile);
   const [included, setIncluded] = useState(() => new Set(initialIncludedKeys));
   const [openRequirement, setOpenRequirement] = useState<string | null>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase(locale);
@@ -84,6 +94,35 @@ export function ScopeForm({
       {[...included].map((key) => (
         <input key={key} type="hidden" name="includedRequirement" value={key} />
       ))}
+
+      {/* Das Profil bestimmt nicht die Bewertung, sondern was am Ende je Lücke
+          entsteht: eine Feststellung für den Bericht oder Maßnahmen. */}
+      <section className="scope-profile-section" aria-labelledby="analysis-profile-label">
+        <div className="scope-section-heading">
+          <h2 id="analysis-profile-label">{labels.profile}</h2>
+          <details className="scope-help">
+            <summary aria-label={labels.profileHelp}>
+              <Info size={15} aria-hidden="true" />
+            </summary>
+            <p>{labels.profileHelp}</p>
+          </details>
+        </div>
+        <div className="scope-profile-options">
+          {(["auditor", "institution"] as const).map((profile) => (
+            <label key={profile} data-selected={analysisProfile === profile || undefined}>
+              <input
+                type="radio"
+                name="analysisProfile"
+                value={profile}
+                checked={analysisProfile === profile}
+                onChange={() => setAnalysisProfile(profile)}
+              />
+              <strong>{labels[profile]}</strong>
+              <small>{profile === "auditor" ? labels.auditorHint : labels.institutionHint}</small>
+            </label>
+          ))}
+        </div>
+      </section>
 
       <section className="scope-size-section" aria-labelledby="institution-size-label">
         <div className="scope-section-heading">

@@ -15,6 +15,14 @@ const labels = {
   todos: "To-dos",
   todosProgress: "{done} von {total} erledigt",
   todoFailed: "To-do nicht gespeichert",
+  conclusion: {
+    finding: "Feststellung",
+    impact: "Auswirkung",
+    gap: "Lücke",
+    actions: "To-dos zur Schließung",
+    actionsProgress: "{done} von {total} erledigt",
+    empty: "Für diese Lücke wurde kein Abschlusstext erzeugt.",
+  },
   evidence: "Belegstellen",
   noEvidence: "Keine Belegstellen",
   page: "Seite",
@@ -76,6 +84,7 @@ const item = {
   confidencePercent: 88,
   verificationStatus: "passed" as const,
   confirmedAt: null,
+  conclusion: null,
   evidence: [],
 };
 
@@ -180,7 +189,10 @@ describe("analysis result to-dos", () => {
     await waitFor(() => expect(screen.getByText("2 von 2 erledigt")).toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/analyses/3d594650-3436-4d0d-969e-a3b712c02ed0/results/98752346-fd91-46f0-96c3-568c729486cf/todos",
-      expect.objectContaining({ method: "PUT", body: JSON.stringify({ index: 0, done: true }) }),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ index: 0, done: true, list: "evidence" }),
+      }),
     );
   });
 
@@ -291,6 +303,101 @@ describe("analysis result confirmation UI", () => {
     expect(screen.getByRole("button", { name: "Status ändern" })).toHaveTextContent("Erfüllt");
     expect(screen.getByText("Teilweise erfüllt", { selector: "dd" })).toBeInTheDocument();
     expect(screen.getByText("Die Nachweise wurden manuell geprüft.")).toBeInTheDocument();
+  });
+
+  it("shows the auditor finding without a to-do list", () => {
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        analysisProfile="auditor"
+        canConfirm={false}
+        canOverride
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[
+          {
+            ...item,
+            conclusion: {
+              id: "conclusion-1",
+              profile: "auditor",
+              summary: "Die laufende Überwachung des Rahmens ist nicht dokumentiert.",
+              items: ["Abweichung bleibt bis zur nächsten Prüfung offen"],
+              resolvedItems: [],
+            },
+          },
+        ]}
+        labels={labels}
+      />,
+    );
+
+    expect(
+      screen.getByText("Die laufende Überwachung des Rahmens ist nicht dokumentiert."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Auswirkung")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("lets the institution tick off a generated action and stores it separately", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      if (String(input).endsWith("/document")) return Response.json({ blocks: [] });
+      return Response.json({ resolvedTodoIndexes: [0] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        analysisProfile="institution"
+        canConfirm={false}
+        canOverride
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[
+          {
+            ...item,
+            conclusion: {
+              id: "conclusion-1",
+              profile: "institution",
+              summary: "Die Policy regelt die laufende Überwachung nicht.",
+              items: ["Turnus und Verantwortliche der Überwachung festlegen"],
+              resolvedItems: [],
+            },
+          },
+        ]}
+        labels={labels}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Turnus und Verantwortliche der Überwachung festlegen"));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/analyses/3d594650-3436-4d0d-969e-a3b712c02ed0/results/98752346-fd91-46f0-96c3-568c729486cf/todos",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ index: 0, done: true, list: "actions" }),
+        }),
+      ),
+    );
+  });
+
+  it("names a gap that stayed without a closing text", () => {
+    render(
+      <AnalysisResultsWorkspace
+        analysisId="3d594650-3436-4d0d-969e-a3b712c02ed0"
+        analysisProfile="institution"
+        canConfirm={false}
+        canOverride={false}
+        policyName="IKT-Sicherheitsrichtlinie.docx"
+        organizationContext=""
+        items={[item]}
+        labels={labels}
+      />,
+    );
+
+    expect(
+      screen.getByText("Für diese Lücke wurde kein Abschlusstext erzeugt."),
+    ).toBeInTheDocument();
   });
 
   it("links an evidence reference to the matching canonical policy block", async () => {

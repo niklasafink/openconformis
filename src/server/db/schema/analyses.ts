@@ -13,7 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { anonymousDrafts, institutionSize } from "./application";
+import { analysisProfile, anonymousDrafts, institutionSize } from "./application";
 import { aiCredentials, analysisInstructions } from "./ai";
 import { organizations, users } from "./auth";
 import { documentBlocks, policyVersions } from "./documents";
@@ -134,6 +134,9 @@ export const analyses = pgTable(
     frameworkReleaseKey: text("framework_release_key").notNull(),
     frameworkContentHash: text("framework_content_hash").notNull(),
     institutionSize: institutionSize("institution_size").notNull(),
+    // Beim Start eingefroren: das Profil bestimmt, welcher Abschlusstext je
+    // Lücke entsteht und welche Anweisung dafür gilt.
+    analysisProfile: analysisProfile("analysis_profile").default("auditor").notNull(),
     organizationContext: text("organization_context").default("").notNull(),
     locale: text("locale").notNull(),
     workflowRunId: text("workflow_run_id"),
@@ -159,6 +162,12 @@ export const analyses = pgTable(
       { onDelete: "restrict" },
     ),
     verificationInstructionHash: text("verification_instruction_hash"),
+    conclusionPromptVersion: text("conclusion_prompt_version"),
+    conclusionInstructionId: uuid("conclusion_instruction_id").references(
+      () => analysisInstructions.id,
+      { onDelete: "restrict" },
+    ),
+    conclusionInstructionHash: text("conclusion_instruction_hash"),
     configurationHash: text("configuration_hash").notNull(),
     policySha256: text("policy_sha256").notNull(),
     policyParserVersion: text("policy_parser_version").notNull(),
@@ -356,6 +365,46 @@ export const analysisRequirementVerifications = pgTable(
   (table) => [uniqueIndex("analysis_requirement_verifications_result_uidx").on(table.resultId)],
 );
 
+/**
+ * Der profilabhängige Abschlusstext einer Lücke. Im Profil „auditor" steht in
+ * `summary` die Feststellung und in `items` ihre Auswirkung; im Profil
+ * „institution" steht in `summary` die Einordnung der Lücke und in `items` die
+ * Maßnahmen, die ein Mensch einzeln abhaken kann. Erfüllte und nicht
+ * einschlägige Anforderungen haben keinen Eintrag.
+ */
+export const analysisRequirementConclusions = pgTable(
+  "analysis_requirement_conclusions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resultId: uuid("result_id")
+      .notNull()
+      .references(() => analysisRequirementResults.id, { onDelete: "cascade" }),
+    profile: analysisProfile("profile").notNull(),
+    summary: text("summary").notNull(),
+    items: text("items")
+      .array()
+      .default(sql`ARRAY[]::text[]`)
+      .notNull(),
+    resolvedItems: integer("resolved_items")
+      .array()
+      .default(sql`ARRAY[]::integer[]`)
+      .notNull(),
+    modelId: text("model_id").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    inputHash: text("input_hash").notNull(),
+    outputHash: text("output_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("analysis_requirement_conclusions_result_uidx").on(table.resultId),
+    check(
+      "analysis_requirement_conclusions_summary_check",
+      sql`length(btrim(${table.summary})) between 20 and 4000`,
+    ),
+  ],
+);
+
 export const analysisEvidence = pgTable(
   "analysis_evidence",
   {
@@ -500,6 +549,17 @@ export const analysisRequirementResultRelations = relations(
     evidence: many(analysisEvidence),
     overrides: many(analysisResultOverrides),
     verification: one(analysisRequirementVerifications),
+    conclusion: one(analysisRequirementConclusions),
+  }),
+);
+
+export const analysisRequirementConclusionRelations = relations(
+  analysisRequirementConclusions,
+  ({ one }) => ({
+    result: one(analysisRequirementResults, {
+      fields: [analysisRequirementConclusions.resultId],
+      references: [analysisRequirementResults.id],
+    }),
   }),
 );
 

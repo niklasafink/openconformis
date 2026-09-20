@@ -20,6 +20,7 @@ function fixture(): AnalysisExportData {
     frameworkReleaseKey: "dora-2026-01",
     frameworkContentHash: "framework-hash",
     institutionSize: "medium",
+    analysisProfile: "auditor",
     organizationContext: "Leitungsorgan ist der Gesamtvorstand.",
     locale: "de",
     status: "completed",
@@ -73,6 +74,13 @@ function fixture(): AnalysisExportData {
         verifierExplanation: "Die Beleglage stützt den Status.",
         confirmedByUserId: null,
         confirmedAt: null,
+        conclusion: {
+          profile: "auditor",
+          summary:
+            "Die Genehmigung des IKT-Risikomanagementrahmens durch das Leitungsorgan ist für den Prüfungszeitraum nicht dokumentiert.",
+          items: ["Nachweis der Genehmigung fehlt"],
+          resolvedItems: [],
+        },
         evidence: [
           {
             citationOrder: 1,
@@ -147,6 +155,11 @@ describe("analysis Excel export", () => {
     expect(results?.getCell("E2").value).toBe("Teilweise erfüllt");
     expect(results?.getCell("F2").value).toBe("Teilweise erfüllt");
     expect(results?.getCell("G2").value).toBe("Nachweise wurden manuell geprüft.");
+    expect(results?.getCell("L1").value).toBe("Feststellung");
+    expect(results?.getCell("L2").value).toBe(
+      "Die Genehmigung des IKT-Risikomanagementrahmens durch das Leitungsorgan ist für den Prüfungszeitraum nicht dokumentiert.",
+    );
+    expect(results?.getCell("M1").value).toBe("Auswirkung");
 
     const evidence = workbook.getWorksheet("Belegstellen");
     expect(evidence?.getCell("E2").value).toBe("Die Richtlinie wird regelmäßig überprüft.");

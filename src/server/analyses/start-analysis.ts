@@ -6,7 +6,10 @@ import { analysisStartInputSchema, type AnalysisStartInput } from "@/domain/anal
 import { createCatalogueItemHash } from "@/domain/frameworks/release-content";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
-import { getActiveAnalysisInstructionPair } from "@/server/ai/analysis-instruction-service";
+import {
+  conclusionInstructionOf,
+  getActiveAnalysisInstructionSet,
+} from "@/server/ai/analysis-instruction-service";
 import { getAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
 import { ensurePersonalWorkspace } from "@/server/auth/personal-workspace";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
@@ -69,7 +72,7 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
 
   const [boundDraft, instructions] = await Promise.all([
     getBoundActiveDraft(input.draftId),
-    getActiveAnalysisInstructionPair(),
+    getActiveAnalysisInstructionSet(),
   ]);
   if (!boundDraft?.frameworkSlug) throw new AnalysisStartError("DRAFT_NOT_FOUND");
 
@@ -258,6 +261,9 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
         .where(eq(policyVersions.id, selectedPolicy.policyVersionId));
     }
 
+    // Der Abschlusstext hängt am Profil des Umfangs; seine Anweisung wird wie
+    // Bewertung und Verifikation beim Start eingefroren.
+    const conclusionInstruction = conclusionInstructionOf(instructions, scope.analysisProfile);
     const route = {
       routeProvider: modelSelection.routeProvider,
       providerModelId: modelSelection.providerModelId,
@@ -272,12 +278,16 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
       assessmentInstructionHash: instructions.assessment.contentHash,
       verificationInstructionId: instructions.verification.id,
       verificationInstructionHash: instructions.verification.contentHash,
+      conclusionPromptVersion: conclusionInstruction.version,
+      conclusionInstructionId: conclusionInstruction.id,
+      conclusionInstructionHash: conclusionInstruction.contentHash,
       unevaluatedWarningAccepted: modelSelection.unevaluatedWarningAccepted,
     };
     const configurationHash = createContentHash({
       route,
       frameworkContentHash: release.contentHash,
       institutionSize: scope.institutionSize,
+      analysisProfile: scope.analysisProfile,
       policySha256: selectedPolicy.sha256,
       policyParserVersion: selectedPolicy.parserVersion,
       requirementKeys: selectedRequirements.map(({ externalKey }) => externalKey),
@@ -295,6 +305,7 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
         frameworkReleaseKey: release.id,
         frameworkContentHash: release.contentHash,
         institutionSize: scope.institutionSize,
+        analysisProfile: scope.analysisProfile,
         organizationContext: scope.organizationContext,
         locale: draft.locale,
         configurationHash,
@@ -339,6 +350,7 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
       metadata: {
         frameworkContentHash: release.contentHash,
         modelProfileId: route.modelProfileId,
+        analysisProfile: scope.analysisProfile,
         requirementCount: selectedRequirements.length,
       },
     });

@@ -18,7 +18,13 @@ export const runtime = "nodejs";
 
 const paramsSchema = z.object({ analysisId: z.uuid(), resultId: z.uuid() });
 const inputSchema = z
-  .object({ index: z.number().int().min(0).max(11), done: z.boolean() })
+  .object({
+    index: z.number().int().min(0).max(11),
+    done: z.boolean(),
+    // „evidence" sind die fehlenden Nachweise der Bewertung, „actions" die
+    // Maßnahmen des Abschlusstexts im Profil „Finanzinstitut".
+    list: z.enum(["evidence", "actions"]).optional(),
+  })
   .strict();
 
 export async function PUT(

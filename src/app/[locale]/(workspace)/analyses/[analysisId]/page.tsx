@@ -187,6 +187,7 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
         {results ? (
           <AnalysisResultsWorkspace
             analysisId={analysis.id}
+            analysisProfile={results.analysisProfile}
             canConfirm={Boolean(principal && sameOrganization && canConfirmAssessment(principal))}
             canOverride={Boolean(principal && sameOrganization && canOverrideAssessment(principal))}
             initialSelectedId={query.requirement}
