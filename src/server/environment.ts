@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  parseAnalysisJevAssistMode,
+  type AnalysisJevAssistMode,
+} from "@/domain/analysis/jev-assist";
+
 /** Entfernt Anführungszeichen, die beim Einfügen in Vercel oft mitkopiert werden. */
 function unquote(value: string) {
   return value
@@ -42,4 +47,18 @@ export function reviewDecisionEngine(): ReviewDecisionEngine {
   if (!value) return "jev";
   if (value === "jev" || value === "model") return value;
   throw new Error("REVIEW_DECISION_ENGINE must be jev or model.");
+}
+
+/**
+ * Wie weit Jev der Gap-Analyse hilft. `off` ist der Standard und lässt die Analyse
+ * zeilengleich wie ohne TypeSafe laufen; `retrieval` filtert die Belegkandidaten,
+ * `verification` triagiert die Verifikation und prüft die Zitate, `all` beides.
+ *
+ * Anders als bei `REVIEW_DECISION_ENGINE` fällt ein unbekannter Wert **still auf
+ * `off`** zurück: `off` ist hier das heutige, erprobte Verhalten. Ein Tippfehler
+ * darf die Gap-Analyse weder blockieren noch unbemerkt über Jev leiten. Der Wert wird
+ * beim Start der Analyse eingefroren; der Lauf liest ihn danach nie wieder.
+ */
+export function analysisJevAssistMode(): AnalysisJevAssistMode {
+  return parseAnalysisJevAssistMode(configuredValue("ANALYSIS_JEV_ASSIST").toLowerCase());
 }

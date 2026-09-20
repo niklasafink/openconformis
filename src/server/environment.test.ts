@@ -2,7 +2,12 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { configuredSet, configuredValue, reviewDecisionEngine } from "./environment";
+import {
+  analysisJevAssistMode,
+  configuredSet,
+  configuredValue,
+  reviewDecisionEngine,
+} from "./environment";
 
 describe("configured environment lists", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -35,5 +40,27 @@ describe("review decision engine", () => {
   it("rejects an unknown value instead of silently running through Jev", () => {
     vi.stubEnv("REVIEW_DECISION_ENGINE", "off");
     expect(() => reviewDecisionEngine()).toThrow("REVIEW_DECISION_ENGINE");
+  });
+});
+
+describe("gap analysis Jev assist mode", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is off by default and for an empty value", () => {
+    expect(analysisJevAssistMode()).toBe("off");
+    vi.stubEnv("ANALYSIS_JEV_ASSIST", "  ");
+    expect(analysisJevAssistMode()).toBe("off");
+  });
+
+  it.each(["retrieval", "verification", "all"])("accepts %s in any case", (mode) => {
+    vi.stubEnv("ANALYSIS_JEV_ASSIST", ` "${mode.toUpperCase()}" `);
+    expect(analysisJevAssistMode()).toBe(mode);
+  });
+
+  it("falls back to off for an unknown value instead of blocking or enabling Jev", () => {
+    vi.stubEnv("ANALYSIS_JEV_ASSIST", "on");
+    expect(analysisJevAssistMode()).toBe("off");
+    vi.stubEnv("ANALYSIS_JEV_ASSIST", "jev");
+    expect(analysisJevAssistMode()).toBe("off");
   });
 });

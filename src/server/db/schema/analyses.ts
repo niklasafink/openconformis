@@ -173,6 +173,14 @@ export const analyses = pgTable(
     policyParserVersion: text("policy_parser_version").notNull(),
     requirementCount: integer("requirement_count").notNull(),
     unevaluatedWarningAccepted: boolean("unevaluated_warning_accepted").default(false).notNull(),
+    // Jev-Hilfe, beim Start eingefroren: der Lauf liest nie die Umgebungsvariable.
+    // `off` ist der heutige Ablauf ohne TypeSafe. Steht dort etwas anderes, sind Modell
+    // und kurzlebiger Schlüssel gesetzt — ohne Schlüssel friert der Start `off` ein.
+    jevAssistMode: text("jev_assist_mode").default("off").notNull(),
+    jevModelId: text("jev_model_id"),
+    jevCredentialId: uuid("jev_credential_id").references(() => aiCredentials.id, {
+      onDelete: "restrict",
+    }),
     failureCode: text("failure_code"),
     // Gekürzte Begründung des Anbieters. Ohne sie ist ein Konfigurationsfehler
     // vom Modellfehler nicht zu unterscheiden. Enthält nie Policy-Text oder Schlüssel.
@@ -190,6 +198,14 @@ export const analyses = pgTable(
     uniqueIndex("analyses_ai_credential_uidx")
       .on(table.aiCredentialId)
       .where(sql`${table.aiCredentialId} IS NOT NULL`),
+    check(
+      "analyses_jev_assist_mode_check",
+      sql`${table.jevAssistMode} in ('off', 'retrieval', 'verification', 'all')`,
+    ),
+    check(
+      "analyses_jev_assist_frozen_check",
+      sql`${table.jevAssistMode} = 'off' or (${table.jevModelId} is not null and ${table.jevCredentialId} is not null)`,
+    ),
     uniqueIndex("analyses_workflow_run_uidx")
       .on(table.workflowRunId)
       .where(sql`${table.workflowRunId} IS NOT NULL`),

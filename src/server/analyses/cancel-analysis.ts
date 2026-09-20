@@ -4,7 +4,10 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getRun } from "workflow/api";
 
 import { appendAuditEvent } from "@/server/audit/event";
-import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
+import {
+  deleteAnalysisAssistCredential,
+  deleteTemporaryCredentialsForBinding,
+} from "@/server/ai/credential-cleanup";
 import { db } from "@/server/db/client";
 import { analyses } from "@/server/db/schema/analyses";
 
@@ -33,6 +36,7 @@ export async function cancelOwnedAnalysis(input: { analysisId: string; ownerUser
         organizationId: analyses.organizationId,
         sourceDraftId: analyses.sourceDraftId,
         workflowRunId: analyses.workflowRunId,
+        jevCredentialId: analyses.jevCredentialId,
       })
       .from(analyses)
       .where(and(eq(analyses.id, input.analysisId), eq(analyses.ownerUserId, input.ownerUserId)))
@@ -67,6 +71,12 @@ export async function cancelOwnedAnalysis(input: { analysisId: string; ownerUser
       bindingId: result.analysis.sourceDraftId,
       ownerUserId: input.ownerUserId,
     });
+    if (result.analysis.jevCredentialId) {
+      await deleteAnalysisAssistCredential({
+        draftId: result.analysis.sourceDraftId,
+        ownerUserId: input.ownerUserId,
+      });
+    }
     if (result.analysis.workflowRunId) {
       // Nur beschleunigend: auch ohne Abbruch endet der Workflow am Status.
       await getRun(result.analysis.workflowRunId)

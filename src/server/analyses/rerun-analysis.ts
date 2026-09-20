@@ -22,6 +22,7 @@ import { analyses, analysisScopeItems } from "@/server/db/schema/analyses";
 import { launchAnalysisWorkflow } from "@/server/workflows/launch";
 
 import { cancelOwnedAnalysis } from "./cancel-analysis";
+import { connectAnalysisJevAssist, jevAssistHashPart } from "./jev-assist-start";
 import { AnalysisStartError, type StartAnalysisResult } from "./start-analysis";
 
 type SourceAnalysis = typeof analyses.$inferSelect;
@@ -113,6 +114,14 @@ export async function rerunAnalysis(
     requiredModelId: model.providerModelId,
     secret: input.apiKey,
   });
+  // Optional: ohne gespeicherten TypeSafe-Schlüssel oder bei `off` bleibt der Lauf
+  // wie bisher.
+  const jev = await connectAnalysisJevAssist(draftId);
+  const discardJevCredential = async () => {
+    if (jev.credentialId) {
+      await deleteTemporaryCredential({ credentialId: jev.credentialId, ownerUserId: user.id });
+    }
+  };
 
   let result: StartAnalysisResult;
   try {
@@ -184,6 +193,9 @@ export async function rerunAnalysis(
           sourceDraftId: draftId,
           policyVersionId: source.policyVersionId,
           aiCredentialId: credential.credentialId,
+          jevAssistMode: jev.mode,
+          jevModelId: jev.modelId,
+          jevCredentialId: jev.credentialId,
           frameworkSlug: source.frameworkSlug,
           frameworkReleaseKey: source.frameworkReleaseKey,
           frameworkContentHash: source.frameworkContentHash,
@@ -199,6 +211,7 @@ export async function rerunAnalysis(
             policySha256: source.policySha256,
             policyParserVersion: source.policyParserVersion,
             requirementKeys: selectedItems.map((item) => item.requirementExternalKey),
+            ...jevAssistHashPart(jev),
           }),
           policySha256: source.policySha256,
           policyParserVersion: source.policyParserVersion,
@@ -245,6 +258,7 @@ export async function rerunAnalysis(
       credentialId: credential.credentialId,
       ownerUserId: user.id,
     });
+    await discardJevCredential();
     throw error;
   }
 
@@ -253,6 +267,7 @@ export async function rerunAnalysis(
       credentialId: credential.credentialId,
       ownerUserId: user.id,
     });
+    await discardJevCredential();
     return reusePending({ id: result.analysisId, status: result.status });
   }
   await launchAnalysisWorkflow(result.analysisId);

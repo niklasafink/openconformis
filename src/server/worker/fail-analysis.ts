@@ -3,7 +3,10 @@ import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { appendAuditEvent } from "@/server/audit/event";
-import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
+import {
+  deleteAnalysisAssistCredential,
+  deleteTemporaryCredentialsForBinding,
+} from "@/server/ai/credential-cleanup";
 import { db } from "@/server/db/client";
 import { analyses } from "@/server/db/schema/analyses";
 
@@ -30,6 +33,7 @@ export async function markAnalysisRetriesExhausted(
         ownerUserId: analyses.ownerUserId,
         sourceDraftId: analyses.sourceDraftId,
         failureDetail: analyses.failureDetail,
+        jevCredentialId: analyses.jevCredentialId,
       })
       .from(analyses)
       .where(eq(analyses.id, analysisId))
@@ -43,6 +47,7 @@ export async function markAnalysisRetriesExhausted(
         cleanupCredential: true,
         sourceDraftId: analysis.sourceDraftId,
         ownerUserId: analysis.ownerUserId,
+        hasJevCredential: Boolean(analysis.jevCredentialId),
       };
     }
 
@@ -81,6 +86,7 @@ export async function markAnalysisRetriesExhausted(
       cleanupCredential: true,
       sourceDraftId: analysis.sourceDraftId,
       ownerUserId: analysis.ownerUserId,
+      hasJevCredential: Boolean(analysis.jevCredentialId),
     };
   });
 
@@ -90,6 +96,12 @@ export async function markAnalysisRetriesExhausted(
       bindingId: result.sourceDraftId,
       ownerUserId: result.ownerUserId,
     });
+    if (result.hasJevCredential) {
+      await deleteAnalysisAssistCredential({
+        draftId: result.sourceDraftId,
+        ownerUserId: result.ownerUserId,
+      });
+    }
   }
   return { changed: result.changed };
 }

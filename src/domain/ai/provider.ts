@@ -55,6 +55,9 @@ export const aiCredentialPurposeSchema = z.enum([
   "chat",
   "review_routing",
   "review_escalation",
+  // Jev als optionale Hilfe der Gap-Analyse. Ein eigener Zweck, damit der Schlüssel
+  // weder mit dem Analyse-Schlüssel des Drafts noch mit einem Prüflauf kollidiert.
+  "analysis_assist",
 ]);
 
 export type AiCredentialPurpose = z.infer<typeof aiCredentialPurposeSchema>;

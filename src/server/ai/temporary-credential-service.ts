@@ -118,6 +118,23 @@ export async function createReviewRunCredential(input: {
 }
 
 /**
+ * Kurzlebiger TypeSafe-Schlüssel für die optionale Jev-Hilfe einer Analyse, gebunden
+ * an den Draft des Laufs. Er stammt immer aus dem gespeicherten Schlüssel des Nutzers:
+ * einen Betreiber-Schlüssel gibt es nicht, und ein Schlüssel in einer Anfrage würde
+ * durch Workflow-Payloads laufen. Der Aufrufer besitzt den Draft, weil er ihn eben
+ * erst geprüft oder angelegt hat.
+ */
+export async function createAnalysisAssistCredential(input: {
+  bindingId: string;
+  requiredModelId: string;
+}) {
+  return connectTemporaryCredential(
+    { ...input, provider: "typesafe", purpose: "analysis_assist" },
+    async () => input.bindingId,
+  );
+}
+
+/**
  * Prüft einen eingegebenen Schlüssel beim Anbieter und speichert ihn dauerhaft,
  * ohne eine Analyse zu verbinden oder zu starten. Der Start leitet später
  * seinen kurzlebigen Schlüssel aus dem gespeicherten ab.

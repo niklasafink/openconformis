@@ -30,6 +30,7 @@ export const aiCredentialPurpose = pgEnum("ai_credential_purpose", [
   "chat",
   "review_routing",
   "review_escalation",
+  "analysis_assist",
 ]);
 
 export const aiCredentialStatus = pgEnum("ai_credential_status", [

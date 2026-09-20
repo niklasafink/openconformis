@@ -77,6 +77,20 @@ export async function deleteTemporaryCredentialsForBinding(input: {
   });
 }
 
+/**
+ * Räumt den optionalen Jev-Schlüssel einer Analyse ab. Er hängt am selben Draft wie
+ * der Analyse-Schlüssel, hat aber einen eigenen Zweck. Aufrufer rufen dies nur, wenn
+ * die Analyse einen Jev-Schlüssel eingefroren hat — ohne ihn bleibt der Abschluss
+ * unverändert.
+ */
+export function deleteAnalysisAssistCredential(input: { draftId: string; ownerUserId: string }) {
+  return deleteTemporaryCredentialsForBinding({
+    purpose: "analysis_assist",
+    bindingId: input.draftId,
+    ownerUserId: input.ownerUserId,
+  });
+}
+
 export async function expireTemporaryCredentials() {
   const now = new Date();
   return db.transaction(async (transaction) => {

@@ -24,7 +24,10 @@ import { appendAuditEvent } from "@/server/audit/event";
 import { getFrozenAnalysisInstruction } from "@/server/ai/analysis-instruction-service";
 import { buildAssessmentPrompt } from "@/server/ai/assessment-prompt";
 import { buildConclusionPrompt, conclusionRecord } from "@/server/ai/conclusion-prompt";
-import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
+import {
+  deleteAnalysisAssistCredential,
+  deleteTemporaryCredentialsForBinding,
+} from "@/server/ai/credential-cleanup";
 import {
   ModelProviderError,
   withProviderErrorContext,
@@ -862,12 +865,23 @@ async function ensureItemConclusion(analysis: AnalysisRecord, item: ScopeRecord)
 }
 
 /** Der Schlüssel des Nutzers lebt nur so lange wie der Lauf, der ihn braucht. */
-function deleteAnalysisCredential(analysis: Pick<AnalysisRecord, "sourceDraftId" | "ownerUserId">) {
-  return deleteTemporaryCredentialsForBinding({
+async function deleteAnalysisCredential(
+  analysis: Pick<AnalysisRecord, "sourceDraftId" | "ownerUserId" | "jevCredentialId">,
+) {
+  const deleted = await deleteTemporaryCredentialsForBinding({
     purpose: "analysis",
     bindingId: analysis.sourceDraftId,
     ownerUserId: analysis.ownerUserId,
   });
+  // Nur wenn der Lauf einen Jev-Schlüssel eingefroren hat; sonst bleibt der Abschluss
+  // exakt wie ohne Jev.
+  if (analysis.jevCredentialId) {
+    await deleteAnalysisAssistCredential({
+      draftId: analysis.sourceDraftId,
+      ownerUserId: analysis.ownerUserId,
+    });
+  }
+  return deleted;
 }
 
 /** Wie viele Anforderungen eines Laufs gleichzeitig beim Anbieter liegen. */

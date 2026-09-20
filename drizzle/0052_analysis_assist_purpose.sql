@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ai_credential_purpose" ADD VALUE 'analysis_assist';
