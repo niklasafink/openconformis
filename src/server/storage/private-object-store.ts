@@ -7,16 +7,13 @@ export type PrivateObjectMetadata = {
   intentId?: string;
 };
 
-export type PutPrivateObjectInput = {
-  objectKey: string;
-  bytes: Uint8Array;
-  contentType: string;
-  metadata?: Record<string, string>;
-};
-
+/**
+ * Geschrieben wird ausschließlich vom Browser gegen Vercel Blob; der Server
+ * liest, prüft und löscht nur. Deshalb hat dieser Vertrag bewusst keine
+ * Schreiboperation.
+ */
 export interface PrivateObjectStore {
   headObject(objectKey: string): Promise<PrivateObjectMetadata | null>;
   getObjectBytes(objectKey: string, maximumBytes: number): Promise<Uint8Array>;
-  putObjectBytes(input: PutPrivateObjectInput): Promise<void>;
   deleteObject(objectKey: string): Promise<void>;
 }

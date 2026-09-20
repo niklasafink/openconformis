@@ -186,9 +186,11 @@ IP addresses do not decide entitlement and are not stored in the grant table.
 ## 10. Portable self-hosting boundary
 
 The control plane is Vercel-compatible Next.js. Durable work uses PostgreSQL and
-`pg-boss` in a portable Docker worker. Local development uses Docker Compose with
-PostgreSQL and MinIO; official hosting uses EU PostgreSQL and Cloudflare R2 through
-the same S3 adapter.
+`pg-boss` in a portable Docker worker. Local development uses Docker Compose for
+PostgreSQL only; object storage is a private Vercel Blob store in Frankfurt in every
+environment, local included. A self-hosted deployment that must avoid Blob needs a
+new driver plus a server-side upload route: the browser currently uploads to Blob
+directly, so there is no provider-neutral write path to reuse.
 
 Self-hosted defaults:
 

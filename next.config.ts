@@ -48,6 +48,14 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false,
   reactStrictMode: true,
+  // `exceljs` zieht `unzipper` mit, das nur zum Lesen von ZIPs aus S3 träge
+  // `@aws-sdk/client-s3` nachlädt. Diesen Zweig ruft die Anwendung nie auf, und
+  // seit dem Wegfall des S3-Treibers ist das Paket keine Abhängigkeit mehr.
+  // Ohne diesen Stub bricht der Export-Build an einem Modul, das niemand lädt.
+  webpack(config) {
+    config.resolve.alias = { ...config.resolve.alias, "@aws-sdk/client-s3": false };
+    return config;
+  },
   async headers() {
     return [
       {

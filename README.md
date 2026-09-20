@@ -20,7 +20,7 @@ Workflow arguments contain opaque database IDs only. Policy text and API keys ar
 
 1. Install Node 24 and pnpm 9.12.
 2. Copy `.env.example` to `.env.local` and configure Neon Auth plus the two Neon database URLs.
-3. For the production-equivalent path, connect a private Vercel Blob store and set `STORAGE_DRIVER=vercel-blob`. MinIO remains an optional local-only object-store fallback.
+3. Connect a private Vercel Blob store and set `STORAGE_DRIVER=vercel-blob`. Blob is the only object-store driver; the browser uploads to it directly, locally included.
 4. Run `pnpm db:migrate` and `pnpm db:seed:catalogue`.
 5. Run `pnpm dev`. Workflow SDK runs its local development world through Next.js.
 

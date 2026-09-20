@@ -96,12 +96,19 @@ References:
 
 ## D-005 Object storage
 
-Selected: private Cloudflare R2 through the S3-compatible storage adapter, using the
-EU jurisdiction for the official deployment. Local development uses MinIO through
-the same adapter. A confidential pilot additionally requires malware scanning and a
-reviewed deletion/back-up policy.
+Originally selected: private Cloudflare R2 through an S3-compatible adapter, with
+MinIO for local development.
 
-Decision: accepted.
+Superseded: the implemented storage is a **private Vercel Blob store in Frankfurt
+(`fra1`)**, and it is the only supported driver. The browser uploads straight to
+Blob through `@vercel/blob/client`; the server only heads, reads and deletes. The
+S3 adapter and its MinIO container were removed in favour of that single path —
+they never carried an upload, because no server-side write was ever wired up.
+
+A confidential pilot additionally requires malware scanning and a reviewed
+deletion/back-up policy.
+
+Decision: accepted, storage provider superseded.
 
 ## D-006 Regulatory content ownership
 
