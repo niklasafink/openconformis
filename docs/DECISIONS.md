@@ -628,3 +628,60 @@ name the measure to implement, never the policy wording to write. Rewriting poli
 text and track changes remain out of scope in both profiles (`CLAUDE.md`).
 
 Decision: accepted.
+
+## D-033 Jev assist in the gap analysis, default off
+
+Product direction (2026-09-20): the gap analysis is the proven part of the product,
+and the contract review already shows what Jev can do cheaply — routing evidence,
+re-checking quotes, triaging escalation. Three of those patterns fit the gap analysis
+too, and each attacks a real weakness: the second model runs on every `fulfilled`
+result even where nothing is to be gained; an exact-substring check proves a quote
+_exists_, not that it _carries_ the claim; and foreign policy text reaches the prompt
+guarded by a single instruction line.
+
+`ANALYSIS_JEV_ASSIST=off|retrieval|verification|all` switches them on, and the default
+is `off` for one reason: nothing has been measured yet. The gates of D-023 (zero
+accepted fabricated evidence, at most 5 % false-positive `Erfüllt`) cannot be checked
+without a real TypeSafe key and real runs, and a change to a tested feature must not
+ship on a hope. The switch stays `off` until `docs/JEV_ASSIST_ACCEPTANCE.md` has been
+worked through; an intervention that worsens either figure is withdrawn, not tuned.
+
+- **Verification triage.** Jev answers as a choice whether the cited passages carry
+  "fulfilled". The second model is skipped only if "fulfilled" is the _sole_ reason
+  and Jev supports it at 0.8 or more. Low confidence, a contradicting citation and the
+  5 % drift sample keep the second model without asking Jev, so the drift sample stays
+  the independent control over Jev itself. Contradiction, silence, low confidence, a
+  wrong answer type and any failure all leave the second model running.
+- **Citation check, stage two.** Runs after `validateAndGroundAssessment`, which stays
+  stage one and always runs. A quote that Jev sees contradicting its own label, or no
+  quote in the direction of the status reaching 0.8, sets `verificationStatus` to
+  `needs_review`. The result itself is never changed.
+- **Retrieval pre-filter.** Removes candidates that are clearly irrelevant (below
+  0.25) or read as an instruction to a reader (from 0.5); context blocks stay only next
+  to a kept match. It can only remove, so it can neither admit a fabricated citation
+  (grounding runs against the reduced packet) nor add text to the prompt. If nothing
+  would remain, or Jev fails, the unfiltered packet is used, never an empty one. The
+  reduced packet also goes to the verifier so it does not read the removed instruction.
+
+Jev stays optional in the gap analysis. Without a saved TypeSafe key, or with any
+failure, the analysis runs as it does today: no error, no blocked start. The effective
+mode is frozen at start — an analysis that starts without a key is recorded as `off`,
+not as the mode the environment asked for, so the audit trail claims nothing that did
+not happen. `analyses` gains `jev_assist_mode`, `jev_model_id` and `jev_credential_id`
+(a check requires model and key whenever the mode is not `off`); the run reads only
+these, never the environment. The Jev key is a short-lived credential of its own
+purpose `analysis_assist`, derived from the user's saved key, bound to the draft and
+deleted with the analysis key. The purpose is a separate enum value in its own
+migration (0052) ahead of the columns (0053). An unknown environment value falls back
+to `off`, unlike `REVIEW_DECISION_ENGINE`: here `off` is the tested behaviour, so a
+typo may neither block analyses nor route them through Jev.
+
+Every Jev request is logged in `analysis_model_invocations` as provider `typesafe` with
+stages `jev_prefilter`, `jev_triage` and `jev_citation`; input and output are hashes,
+never policy text or key.
+
+Consequences: `git revert` of the Jev commits leaves a working application; the two
+migrations are additive. `scripts/check-byok-config.ts` still does not require
+`typesafe`.
+
+Decision: accepted.

@@ -364,6 +364,8 @@ publisher, route provider and exact provider model ID as separate validated fiel
 ```text
 AI_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai
 BYOK_PROVIDER_ALLOWLIST=openrouter,requesty,anthropic,google,openai,typesafe
+REVIEW_DECISION_ENGINE=jev
+ANALYSIS_JEV_ASSIST=off
 
 BYOK_REQUESTY_ANALYSIS_MODELS=
 BYOK_OPENAI_ANALYSIS_MODELS=
@@ -384,9 +386,15 @@ PREPROCESSING_MODEL_PROFILE=google/gemini-3.7-flash@openrouter
 ```
 
 `typesafe` in `BYOK_PROVIDER_ALLOWLIST` only permits users to connect a TypeSafe key
-for the contract review; it adds no analysis or chat route. `check-byok-config.ts`
-must never require it, so a deployment without a TypeSafe account still builds and
-runs.
+for the contract review and the optional gap-analysis assist; it adds no analysis or
+chat route. `check-byok-config.ts` must never require it, so a deployment without a
+TypeSafe account still builds and runs.
+
+`ANALYSIS_JEV_ASSIST` stays `off` until the §13 gates (zero accepted fabricated
+evidence, at most 5% false-positive `Erfüllt`) have been measured with the assist on;
+see `docs/JEV_ASSIST_ACCEPTANCE.md`. The assist is not a model route and does not
+change which model is evaluated: the gates apply to the combination of the analysis
+model and the assist mode.
 
 Operator keys are optional. Production refuses to use a configured provider unless
 its provider, exact model and credential mode are all explicitly allowed.

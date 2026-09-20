@@ -40,6 +40,20 @@ There is no persistent application worker, Redis, Fly.io or Render service. Verc
 6. Structured output is schema-validated, exact quotes are hash-checked and risk-selected results receive a separate verifier pass.
 7. Completion, sponsored-credit consumption and the 24-hour original-document deadline are committed atomically.
 
+## Contract review path
+
+The contract review is the second axis next to the gap analysis: _n_ contracts × _m_ decision columns as a grid, each cell a typed answer with exact evidence (docs/DECISIONS.md D-029 and D-030). A contract is a `policy_version`, so upload, OCR, parsing and `document_blocks` are the document path above, unchanged.
+
+- **Tables** (`src/server/db/schema/reviews.ts`): `review_tables`, `review_documents` and `review_columns` hold what the user defines; `review_runs`, `review_run_documents` and `review_run_columns` are the frozen snapshot of one run; `review_cells` holds the answers, with `review_cell_evidence` and `review_cell_overrides` beneath them; `review_evidence_packets` and `review_model_invocations` keep routing results and every Jev or model request. The unique key `(run_document_id, run_column_id)` on `review_cells` is the idempotency key of the run, and `(review_run_id, batch_key)` on `review_model_invocations` keeps a retried step from paying for the same Jev request twice.
+- **Parent and child workflows** (`src/workflows/review.ts`, `review-document.ts`): the parent claims up to eight contracts, starts one child workflow per contract with `start()` and sleeps durably for 20 seconds; children wake it on completion, and the sleep interval doubles as the watchdog for a child that died. The parent never computes a cell. It finalizes only on open cells, so a run ends as `completed`, `completed_with_gaps` or `failed`. Arguments are IDs only.
+- **Keys**: two short-lived credentials per run, purposes `review_routing` and `review_escalation`, bound to the run ID. Only the parent's finalize step and the cancel path delete them, never a child.
+- **Engine**: `REVIEW_DECISION_ENGINE=jev|model`, default `jev`, frozen in `review_runs.decision_engine`. With `jev`, Jev routes evidence, decides cells and checks quotes in two stages, and cells below the confidence threshold or with a doubtful citation escalate to the large model within a capped budget. The rationale is assembled by code from criterion, quotes and probability.
+- **Path without Jev**: `REVIEW_DECISION_ENGINE=model` runs the same grid through the user's own large model without any TypeSafe request. The gap analysis, chat and administration never depend on TypeSafe: `check-byok-config.ts` does not require it, and `typesafe` has no analysis base URL, so it never appears as an analysis or chat route.
+
+## Optional Jev assist in the gap analysis
+
+`ANALYSIS_JEV_ASSIST=off|retrieval|verification|all` (default `off`, D-033) adds three interventions to the per-requirement step: a retrieval pre-filter before the assessment prompt, a citation check after grounding and a triage of the second-model verification. The mode and a short-lived TypeSafe credential are frozen in `analyses` at start; without a saved TypeSafe key the analysis runs as `off`. In `off` there is no Jev request at all. The 5 % drift sample is unchanged. Acceptance with a real key is described in `docs/JEV_ASSIST_ACCEPTANCE.md`.
+
 ## Data protection
 
 - Workflow input and output contain opaque IDs, never policy text or API keys.
