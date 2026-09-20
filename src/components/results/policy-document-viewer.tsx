@@ -1,8 +1,8 @@
 "use client";
 
-import { FileText } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { DocumentMark, documentKindFromName } from "@/components/policies/document-chip";
 import { listMarkerPattern } from "@/domain/policies/document-structure";
 
 import type { DocumentBlock } from "./analysis-results-workspace";
@@ -195,7 +195,10 @@ export function PolicyDocumentViewer({
   return (
     <>
       <div className="result-policy-header">
-        <FileText size={18} aria-hidden="true" />
+        <DocumentMark
+          kind={original?.kind ?? documentKindFromName(labels.policyName)}
+          className="size-5 rounded-[5px] text-[8px]"
+        />
         <strong>{labels.policyName}</strong>
         {original && !originalFailed ? (
           <div className="result-policy-modes" role="tablist" aria-label={labels.original}>

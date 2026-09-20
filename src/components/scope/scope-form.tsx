@@ -3,6 +3,7 @@
 import { ArrowRight, ChevronDown, Info, Pencil } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import type { PublishedRequirement } from "@/server/catalogue/service";
 import type { InstitutionSize } from "@/server/drafts/scope-selection";
 
@@ -170,14 +171,10 @@ export function ScopeForm({
 
       <div className="scope-actions">
         {actionsNote}
-        <button
-          className="button button-primary"
-          type="submit"
-          disabled={included.size === 0 || policyPending}
-        >
+        <Button type="submit" disabled={included.size === 0 || policyPending}>
           {labels.continue}
-          <ArrowRight size={16} aria-hidden="true" />
-        </button>
+          <ArrowRight aria-hidden="true" />
+        </Button>
       </div>
 
       {selectedRequirement ? (

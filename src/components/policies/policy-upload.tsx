@@ -1,10 +1,12 @@
 "use client";
 
-import { FileText, Upload, X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
+import { DocumentChip } from "@/components/policies/document-chip";
+import { Button } from "@/components/ui/button";
 import { docxMimeType, maximumPolicyBytes, pdfMimeType } from "@/domain/policies/upload";
 
 type PolicyUploadProps = Readonly<{
@@ -116,38 +118,41 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
   }
 
   if (!draftId) {
-    return <div className="policy-upload-unavailable">{labels.unavailable}</div>;
+    return (
+      <div className="grid min-h-36 place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-5 text-center text-body text-muted-foreground">
+        {labels.unavailable}
+      </div>
+    );
   }
 
   return (
-    <div className="policy-upload-control">
+    <div className="grid gap-3">
       {file ? (
-        <div className="policy-file-selection">
-          <span className="policy-file-icon" aria-hidden="true">
-            <FileText size={18} />
-          </span>
-          <div>
-            <strong>{file.name}</strong>
-            <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-          </div>
-          <button
-            className="button button-tertiary"
-            type="button"
-            aria-label={labels.remove}
-            disabled={status !== "idle"}
-            onClick={() => {
-              setFile(null);
-              setError(null);
-              setStatus("idle");
-              if (inputRef.current) inputRef.current.value = "";
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
+        <DocumentChip
+          name={file.name}
+          meta={`${(file.size / 1024 / 1024).toFixed(2)} MB`}
+          className="min-h-20 px-3"
+          action={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              aria-label={labels.remove}
+              disabled={status !== "idle"}
+              onClick={() => {
+                setFile(null);
+                setError(null);
+                setStatus("idle");
+                if (inputRef.current) inputRef.current.value = "";
+              }}
+            >
+              <X />
+            </Button>
+          }
+        />
       ) : (
         <button
-          className="policy-dropzone"
+          className="group grid min-h-36 w-full cursor-pointer place-content-center justify-items-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-5 py-6 text-center transition-colors hover:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-dragging:border-ring data-dragging:bg-accent"
           data-dragging={dragging || undefined}
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -163,9 +168,14 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
             chooseFile(event.dataTransfer.files[0]);
           }}
         >
-          <Upload size={20} aria-hidden="true" />
-          <span>{labels.dropzone}</span>
-          <small>{labels.select}</small>
+          <span
+            aria-hidden="true"
+            className="grid size-9 place-items-center rounded-lg border border-border bg-card text-muted-foreground shadow-xs"
+          >
+            <Upload size={16} />
+          </span>
+          <span className="text-body font-medium">{labels.dropzone}</span>
+          <span className="text-meta text-muted-foreground">{labels.select}</span>
         </button>
       )}
 
@@ -179,18 +189,19 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
 
       {error ? <p className="field-error">{error}</p> : null}
       {file ? (
-        <button
-          className="button button-primary policy-upload-submit"
+        <Button
+          className="justify-self-end"
           type="button"
           disabled={status !== "idle"}
           onClick={uploadFile}
         >
+          <Upload />
           {status === "uploading"
             ? labels.uploading
             : status === "uploaded"
               ? labels.uploaded
               : labels.upload}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

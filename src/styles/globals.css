@@ -73,6 +73,11 @@
   --status-na-bg: #f0f2f5;
   --status-review: #5c55b6;
   --status-review-bg: #efeffb;
+
+  /* Dateiarten. Sie sind kein Status, sondern die Herkunft eines Dokuments:
+     dieselbe Datei trägt in Auswahl, Upload und Ergebnis dieselbe Marke. */
+  --file-pdf: #d0342c;
+  --file-docx: #2b579a;
   color-scheme: light;
 }
 
@@ -673,151 +678,6 @@
   font-weight: 600;
 }
 
-.policy-source-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.policy-source-card {
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  padding: 20px;
-}
-
-.policy-source-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding-bottom: 18px;
-}
-
-.policy-source-heading h2 {
-  margin: 0;
-  font-size: var(--text-section-title);
-  font-weight: 600;
-}
-
-.policy-source-heading p {
-  margin: 2px 0 0;
-  color: var(--text-secondary);
-}
-
-.policy-source-icon {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-secondary);
-}
-
-.policy-dropzone {
-  display: grid;
-  width: 100%;
-  min-height: 144px;
-  cursor: pointer;
-  place-content: center;
-  gap: 5px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface-subtle);
-  padding: 20px;
-  text-align: center;
-}
-
-.policy-dropzone[data-dragging="true"] {
-  border-color: var(--selection);
-  background: var(--selection-soft);
-}
-
-.policy-dropzone small,
-.sample-policy-row span {
-  color: var(--text-secondary);
-}
-
-.policy-upload-control {
-  display: grid;
-  gap: 10px;
-}
-
-.policy-upload-unavailable {
-  display: grid;
-  min-height: 144px;
-  place-items: center;
-  border: 1px dashed var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface-subtle);
-  padding: 20px;
-  color: var(--text-secondary);
-}
-
-.policy-file-selection {
-  display: grid;
-  min-height: 84px;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px;
-}
-
-.policy-file-selection > div {
-  display: grid;
-  min-width: 0;
-}
-
-.policy-file-selection strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.policy-file-selection span {
-  color: var(--text-secondary);
-}
-
-.policy-file-icon {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: 6px;
-  background: var(--selection-soft);
-  color: var(--selection);
-}
-
-.field-error {
-  margin: 0;
-  color: var(--status-not-met);
-}
-
-.policy-upload-submit {
-  justify-self: end;
-}
-
-.sample-policy-row {
-  display: flex;
-  min-height: 144px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.sample-policy-row > div {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
 .scope-summary {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
@@ -1354,19 +1214,42 @@
   padding-top: 20px;
 }
 
+/*
+ * Die Flächen außerhalb der shadcn-Oberflächen verwenden dieselbe Geometrie wie
+ * `src/components/ui/button.tsx`: 36 px hoch, 10 px Radius, heller Rahmen auf
+ * weißer Fläche. Neue Bedienelemente kommen aus der Bibliothek, diese Regeln
+ * halten nur die verbliebenen Altflächen auf demselben Stand.
+ */
 .button {
   display: inline-flex;
   min-height: 36px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0 12px;
+  color: var(--text-primary);
+  font-size: var(--text-control);
   font-weight: 500;
+  box-shadow: 0 1px 2px rgb(10 10 10 / 5%);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-subtle);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .button-primary {
+  border-color: transparent;
   background: var(--action);
   color: white;
 }
@@ -1377,13 +1260,26 @@
 
 .button-primary:disabled {
   cursor: not-allowed;
-  background: #d6d8dc;
-  color: #737985;
+  background: var(--action);
+  color: white;
+  opacity: 0.5;
+}
+
+.button-secondary {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--surface-subtle);
 }
 
 .button-tertiary {
   border-color: transparent;
   background: transparent;
+  box-shadow: none;
   color: var(--text-secondary);
   padding-inline: 8px;
 }
@@ -1393,10 +1289,6 @@
 }
 
 @media (max-width: 1023px) {
-  .policy-source-grid {
-    grid-template-columns: 1fr;
-  }
-
   .setup-page {
     width: min(100% - 40px, 900px);
   }
@@ -2719,21 +2611,6 @@ i[data-result-pending="true"] {
   background: var(--surface-subtle);
 }
 
-.result-dialog > footer button {
-  min-height: 36px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: var(--text-body);
-  font-weight: 650;
-}
-
-.result-dialog > footer .button-secondary {
-  background: var(--surface);
-  color: var(--text-primary);
-}
-
 @media (max-width: 1199px) {
   .result-workspace {
     grid-template-rows: auto auto auto minmax(0, 1fr);
@@ -2921,6 +2798,8 @@ i[data-result-pending="true"] {
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-file-pdf: var(--file-pdf);
+  --color-file-docx: var(--file-docx);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);

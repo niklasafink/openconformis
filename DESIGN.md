@@ -118,6 +118,8 @@ colours.
   --status-na-bg: #f0f2f5;
   --status-review: #5c55b6;
   --status-review-bg: #efeffb;
+  --file-pdf: #d0342c;
+  --file-docx: #2b579a;
 }
 ```
 
@@ -145,12 +147,15 @@ requiring additional cards.
 
 | Element                                |                                Radius |
 | -------------------------------------- | ------------------------------------: |
-| Button, input, row selection           |                                  6 px |
-| Dialog, upload area, substantial panel |                                 10 px |
+| Button, input, select, document chip   |                                 10 px |
+| Compact button, row selection          |                                  8 px |
+| Dialog, upload area, substantial panel |                              10–14 px |
 | Status chip                            | 999 px, only when a chip is necessary |
 
-No shadow on ordinary tables, panels or cards. Dropdowns and dialogs use one quiet
-shadow: `0 12px 32px rgb(15 23 42 / 12%)`.
+No shadow on ordinary tables, panels or cards. Controls that sit on a surface —
+buttons, inputs, selects, document chips — carry one hairline shadow
+(`0 1px 2px rgb(10 10 10 / 5%)`). Dropdowns and dialogs use one quiet shadow:
+`0 12px 32px rgb(15 23 42 / 12%)`.
 
 ### Borders
 
@@ -218,11 +223,13 @@ the URL and analysis state. Reloading must preserve progress and selection.
 
 ### Buttons
 
-- Standard height: 32 px; compact table action: 24 px.
-- Horizontal padding: 12 px compact, 16 px standard.
-- Primary action: dark navy fill, white text.
-- Secondary: white surface, border, primary text.
-- Tertiary: no border, subtle hover background.
+- Standard height: 36 px; compact (`sm`) 32 px; table action (`xs`) 24 px.
+- Horizontal padding: 12 px standard, 10 px compact.
+- Radius: 10 px standard, 8 px compact — buttons read as soft rectangles, not pills.
+- Icon and label sit 8 px apart; icons are 16 px line icons, never filled marks.
+- Primary action: dark navy fill, white text, hairline shadow.
+- Secondary (`outline`): white surface, border, primary text, hairline shadow.
+- Tertiary (`ghost`): no border, subtle hover background.
 - Destructive: red only when the action truly destroys data.
 - Only one primary button per action region.
 - Disabled buttons preserve contrast and expose a reason where the user may not know
@@ -230,13 +237,27 @@ the URL and analysis state. Reloading must preserve progress and selection.
 
 ### Inputs and selects
 
-- Standard height: 32 px.
+- Standard height: 36 px, matching a standard button in the same row; radius 10 px.
 - Search and status select at the same hierarchy have equal height.
 - Labels stay visible; placeholders are examples, not labels.
 - Error text appears directly below the field.
 - Custom dropdowns support ArrowUp, ArrowDown, Home, End, Enter, Escape and typeahead.
 - Menus choose above or below only if viewport collision requires it. The framework
   picker in chat is explicitly anchored below the trigger.
+
+### Documents
+
+A file is always named the same way, in every step: the `DocumentChip`
+(`src/components/policies/document-chip.tsx`) shows a coloured file mark, the file
+name and one optional metadata line.
+
+- File mark: 24 px square, 6 px radius, file type in 9 px on the type colour
+  (`--file-pdf`, `--file-docx`); unknown types stay neutral. Dense bars use 20 px.
+- The mark replaces the generic document glyph so PDF and Word are distinguishable
+  without reading.
+- Names truncate at the end; the metadata line carries size, pages or version.
+- Upload dropzone: dashed border, 10 px radius, muted surface, a bordered icon tile,
+  and the accepted formats as metadata.
 
 ### Tables
 

@@ -3,6 +3,7 @@
 import { ChevronDown, Download, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { PolicyDocumentViewer, type PolicyOriginal } from "./policy-document-viewer";
@@ -859,22 +860,17 @@ export function AnalysisResultsWorkspace({
               ) : null}
             </div>
             <footer>
-              <button
+              <Button
                 type="button"
-                className="button-secondary"
+                variant="outline"
                 disabled={savingOverride}
                 onClick={() => setOverrideOpen(false)}
               >
                 {labels.cancel}
-              </button>
-              <button
-                type="button"
-                className="button-primary"
-                disabled={savingOverride}
-                onClick={() => void saveOverride()}
-              >
+              </Button>
+              <Button type="button" disabled={savingOverride} onClick={() => void saveOverride()}>
                 {savingOverride ? labels.saving : labels.save}
-              </button>
+              </Button>
             </footer>
           </section>
         </div>
