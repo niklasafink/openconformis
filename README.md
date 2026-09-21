@@ -48,6 +48,14 @@ pnpm dev:https                                                      # https://lo
 
 `dev:https` sets `NEXT_PUBLIC_APP_URL` itself, so `.env.local` keeps pointing at
 `http://localhost:3000` and plain `pnpm dev` continues to work unchanged.
+
+It also points the local workflow queue at the HTTPS address
+(`WORKFLOW_LOCAL_BASE_URL`) and hands Next the mkcert root certificate
+(`--experimental-https-ca`). Without both, the queue calls `http://localhost`,
+the request fails with `Queue operation failed: fetch failed`, and an uploaded
+file stays on `uploaded` forever because the ingestion workflow never starts.
+Set `CAROOT` if your mkcert root lives outside
+`~/Library/Application Support/mkcert`.
 Certificates land in `certificates/` and are ignored by git.
 
 Without the `-install` step the server still runs, but the browser shows a

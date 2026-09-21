@@ -4,6 +4,7 @@ import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { nextProcessingPollDelay } from "@/domain/policies/processing-poll";
 import { Link } from "@/i18n/navigation";
 
 type PolicyProcessingStatusProps = Readonly<{
@@ -37,6 +38,7 @@ export function PolicyProcessingStatus({
     if (failed) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
 
     async function poll() {
       try {
@@ -55,7 +57,7 @@ export function PolicyProcessingStatus({
       } catch {
         // Ein einzelner Netzwerkfehler beendet das Warten nicht.
       }
-      if (!cancelled) timer = setTimeout(poll, 2_000);
+      if (!cancelled) timer = setTimeout(poll, nextProcessingPollDelay(attempt++));
     }
 
     void poll();
