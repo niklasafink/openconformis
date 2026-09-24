@@ -31,9 +31,7 @@ type ScopeFormProps = {
     profile: string;
     profileHelp: string;
     auditor: string;
-    auditorHint: string;
     institution: string;
-    institutionHint: string;
     requirement: string;
     subrequirements: string;
     bestPractice: string;
@@ -118,7 +116,6 @@ export function ScopeForm({
                 onChange={() => setAnalysisProfile(profile)}
               />
               <strong>{labels[profile]}</strong>
-              <small>{profile === "auditor" ? labels.auditorHint : labels.institutionHint}</small>
             </label>
           ))}
         </div>

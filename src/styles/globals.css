@@ -749,11 +749,6 @@
   font-weight: 600;
 }
 
-.scope-profile-options small {
-  font-size: var(--text-meta);
-  line-height: 18px;
-}
-
 .scope-profile-options input {
   position: absolute;
   opacity: 0;
