@@ -45,11 +45,12 @@ export function AuthForm({
   const [failure, setFailure] = useState<LocalFailure | null>(initialError ? "generic" : null);
   const [pending, setPending] = useState(false);
 
+  // Der Rücksprung geht immer auf den Origin, den der Browser gerade offen hat.
+  // `NEXT_PUBLIC_APP_URL` taugt dafür nicht: weicht der Entwicklungsserver auf
+  // einen freien Port aus, zeigte der Rücksprung auf einen Port, auf dem diese
+  // Anwendung nicht läuft — die Anmeldung gelänge, käme aber nie an.
   function absoluteCallbackUrl() {
-    return new URL(
-      callbackUrl,
-      process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin,
-    ).toString();
+    return new URL(callbackUrl, window.location.origin).toString();
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {

@@ -26,10 +26,9 @@ export function ForgotPasswordForm({ locale }: ForgotPasswordFormProps) {
     setPending(true);
     setError(null);
     try {
-      const redirectTo = new URL(
-        `/${locale}/reset-password`,
-        process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin,
-      ).toString();
+      // Derselbe Grund wie in `AuthForm`: der Rücksprung gehört auf den Origin,
+      // den der Browser offen hat, nicht auf einen konfigurierten Port.
+      const redirectTo = new URL(`/${locale}/reset-password`, window.location.origin).toString();
       const result = await authClient.requestPasswordReset({ email, redirectTo });
       if (result.error) {
         const classified = classifyAuthFailure(result.error);

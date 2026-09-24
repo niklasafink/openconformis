@@ -99,6 +99,7 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
             actionsNote={
               pendingPolicy ? (
                 <PolicyProcessingStatus
+                  key={pendingPolicy.policyVersionId}
                   draftId={boundDraft.id}
                   policyVersionId={pendingPolicy.policyVersionId}
                   failed={pendingPolicy.failed}

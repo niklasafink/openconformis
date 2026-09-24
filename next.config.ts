@@ -47,6 +47,11 @@ const nextConfig: NextConfig = {
     ],
   },
   poweredByHeader: false,
+  // Next blockiert Dev-Ressourcen (HMR, Client-Bundles) für jeden Host außer dem,
+  // über den der Server gestartet wurde. Wer lokal `127.0.0.1` statt `localhost`
+  // aufruft, bekam dadurch eine Seite ohne Client-Bundle: das Anmeldeformular
+  // hydrierte nie und schickte Adresse und Passwort als GET in die URL.
+  allowedDevOrigins: ["localhost", "127.0.0.1", "[::1]"],
   reactStrictMode: true,
   // `exceljs` zieht `unzipper` mit, das nur zum Lesen von ZIPs aus S3 träge
   // `@aws-sdk/client-s3` nachlädt. Diesen Zweig ruft die Anwendung nie auf, und

@@ -29,41 +29,6 @@ function signInRedirect(request: NextRequest, authError?: string, next?: string)
   return NextResponse.redirect(signIn);
 }
 
-/**
- * Hält die Entwicklungsumgebung auf einem kanonischen Origin, damit host-gebundene
- * Session-Cookies nicht zwischen `localhost` und `127.0.0.1` verloren gehen.
- *
- * Der Vergleich läuft über den tatsächlichen `Host`-Header, nicht über
- * `request.nextUrl.origin`: Next.js normalisiert `nextUrl` im Dev-Modus auf
- * `localhost`, sodass eine auf `127.0.0.1` konfigurierte App-URL nie übereinstimmt
- * und die Weiterleitung auf dieselbe Adresse zeigt — eine Endlosschleife, die
- * jeden Request der Anwendung trifft.
- */
-function canonicalDevelopmentOriginRedirect(request: NextRequest) {
-  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.NODE_ENV === "production" || !configuredAppUrl) return null;
-
-  let configuredOrigin: URL;
-  try {
-    configuredOrigin = new URL(configuredAppUrl);
-  } catch {
-    return null;
-  }
-
-  const requestHost = request.headers.get("host");
-  if (!requestHost || requestHost === configuredOrigin.host) return null;
-
-  const target = request.nextUrl.clone();
-  target.protocol = configuredOrigin.protocol;
-  target.host = configuredOrigin.host;
-
-  // Letzte Sicherung gegen eine Schleife: eine Weiterleitung auf die angefragte
-  // Adresse selbst bringt nichts und wiederholt sich endlos.
-  if (target.toString() === request.nextUrl.toString()) return null;
-
-  return NextResponse.redirect(target);
-}
-
 function copySetCookies(source: Response, target: NextResponse) {
   for (const cookie of source.headers.getSetCookie()) {
     target.headers.append("set-cookie", cookie);
@@ -141,10 +106,29 @@ async function requireSession(request: NextRequest) {
   return copySetCookies(result, signInRedirect(request, undefined, originalTarget));
 }
 
+/**
+ * Hier stand eine Weiterleitung, die die Entwicklungsumgebung auf den in
+ * `NEXT_PUBLIC_APP_URL` konfigurierten Origin zwang, damit host-gebundene
+ * Session-Cookies nicht zwischen `localhost` und `127.0.0.1` zerfallen.
+ *
+ * Sie ist entfernt und gehört nicht zurück, weil sie ihre Aufgabe gar nicht
+ * erfüllen konnte: Next.js kürzt im Dev-Modus den `Location`-Header einer
+ * Middleware-Weiterleitung auf den reinen Pfad, sobald der Port gleich bleibt.
+ * Der Hostname wurde also nie getauscht — die Weiterleitung landete wieder auf
+ * `127.0.0.1` und lief endlos. Scheinbar funktioniert hat sie nur, weil sie
+ * zusätzlich den Port aus der Konfiguration erzwang. Genau das machte die
+ * Anwendung unbenutzbar, sobald `next dev` auf den nächsten freien Port
+ * auswich (belegter Port 3000 durch ein zweites Projekt): Jede Anfrage ging auf
+ * einen Port, auf dem diese Anwendung nicht lief, die Anmeldung kam nie an und
+ * endete wieder auf der Anmeldefläche.
+ *
+ * Lokal bleibt `localhost` der einzige brauchbare Hostname: Der Neon-Auth-Dienst
+ * beantwortet eine Anmeldung von `127.0.0.1` mit 403, und welche Herkunft er
+ * akzeptiert, steht in der Neon-Konsole, nicht in diesem Repository. Das ist
+ * eine Unbequemlichkeit; eine Weiterleitung, die jeden Request auf einen toten
+ * Port schickt, war ein Ausfall.
+ */
 export default async function proxy(request: NextRequest) {
-  const canonicalRedirect = canonicalDevelopmentOriginRedirect(request);
-  if (canonicalRedirect) return canonicalRedirect;
-
   // Rücksprung aus Anmeldelink oder OAuth. Es wird bewusst nicht vorab auf einen
   // Challenge-Cookie geprüft: der wird ausschließlich im OAuth-Fluss gesetzt
   // (siehe `src/server/middleware/oauth.ts` der Bibliothek), ein Anmeldelink setzt
