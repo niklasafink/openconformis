@@ -207,8 +207,12 @@ export function ScopeForm({
 
       <div className="scope-actions">
         {actionsNote}
-        <Button type="submit" disabled={included.size === 0 || policyPending}>
-          {labels.continue}
+        <Button
+          type="submit"
+          disabled={included.size === 0 || policyPending}
+          className="rounded-full px-4"
+        >
+          <span>{labels.continue}</span>
           <ArrowRight aria-hidden="true" />
         </Button>
       </div>

@@ -696,14 +696,35 @@
   color: var(--text-secondary);
 }
 
+/*
+ * Der Umfang füllt wie die Rahmenwerkauswahl genau die Höhe unter der Kopfzeile:
+ * Nur die Anforderungsliste scrollt, die Weiter-Schaltfläche bleibt unten stehen.
+ * Reicht die Höhe für die Mindestmaße nicht, scrollt das Formular selbst — die
+ * Aktionszeile klebt dann am unteren Rand, statt aus dem Bild zu laufen.
+ */
 .scope-setup-page {
+  display: flex;
   width: min(1480px, calc(100% - 48px));
+  height: calc(100dvh - var(--header-height));
+  flex-direction: column;
   padding-top: 38px;
+  padding-bottom: 0;
 }
 
 .scope-form {
-  display: grid;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
   gap: 20px;
+}
+
+.scope-profile-section,
+.scope-size-section,
+.scope-context,
+.scope-actions {
+  flex-shrink: 0;
 }
 
 .scope-profile-section,
@@ -846,7 +867,11 @@
 }
 
 .scope-requirements {
+  display: flex;
   min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -880,7 +905,8 @@
 }
 
 .scope-table-body {
-  max-height: min(52dvh, 650px);
+  min-height: 180px;
+  flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -996,9 +1022,13 @@
 }
 
 .scope-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  padding-bottom: 24px;
+  background: var(--canvas);
   gap: 12px;
 }
 
