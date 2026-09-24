@@ -282,6 +282,7 @@
       "openEvidence": "Open evidence",
       "originalView": "Original",
       "textView": "Text",
+      "resizeColumns": "Resize columns",
       "originalUnavailable": "The original document is no longer available; the extracted text is shown instead.",
       "status": {
         "fulfilled": "Fulfilled",

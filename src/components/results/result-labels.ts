@@ -50,6 +50,7 @@ export async function loadAnalysisResultLabels(): Promise<AnalysisResultLabels> 
     documentFailed: t("results.documentFailed"),
     assessmentPane: t("results.assessmentPane"),
     policyPane: t("results.policyPane"),
+    resizeColumns: t("results.resizeColumns"),
     openEvidence: t("results.openEvidence"),
     originalView: t("results.originalView"),
     textView: t("results.textView"),

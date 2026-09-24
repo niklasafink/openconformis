@@ -5,6 +5,13 @@ import { AnalysisResultsWorkspace, explanationPoints } from "./analysis-results-
 import { splitEvidenceHighlight } from "./policy-document-viewer";
 import { RequirementSelectionProvider } from "./requirement-selection";
 
+// Die verschiebbaren Spalten messen sich selbst; jsdom kennt den Beobachter nicht.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 const labels = {
   checked: "geprüft",
   requirement: "Anforderung",
@@ -50,6 +57,7 @@ const labels = {
   documentFailed: "Policy konnte nicht geladen werden",
   assessmentPane: "Bewertung",
   policyPane: "Policy",
+  resizeColumns: "Spaltenbreite ändern",
   openEvidence: "Belegstelle öffnen",
   originalView: "Original",
   textView: "Text",

@@ -5,9 +5,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 import { PolicyDocumentViewer, type PolicyOriginal } from "./policy-document-viewer";
 import { useRequirementSelection } from "./requirement-selection";
+
+/**
+ * Der Rahmen eines Panels scrollt sonst zusätzlich zur Spalte darin: gescrollt
+ * wird ausschließlich in der Anforderungsliste, im Bewertungsdetail und im
+ * Originaldokument, damit Übersicht und Spaltenköpfe stehen bleiben.
+ */
+const panelStyle = { overflow: "hidden" } as const;
 
 export type ResultStatus =
   | "fulfilled"
@@ -118,6 +126,7 @@ export type AnalysisResultLabels = {
   documentFailed: string;
   assessmentPane: string;
   policyPane: string;
+  resizeColumns: string;
   openEvidence: string;
   originalView: string;
   textView: string;
@@ -544,8 +553,19 @@ export function AnalysisResultsWorkspace({
         </button>
       </div>
 
-      <div className="result-columns">
-        <section className="result-list" aria-label={labels.requirement}>
+      {/* Die drei Bereiche sind gegeneinander verschiebbar: Anforderungsliste,
+          Bewertung und Originaldokument brauchen je nach Policy andere Breiten.
+          Die Griffe dazwischen sind sichtbar und mit den Pfeiltasten bedienbar. */}
+      <ResizablePanelGroup className="result-columns">
+        <ResizablePanel
+          className="result-list"
+          style={panelStyle}
+          defaultSize="20%"
+          minSize="160px"
+          maxSize="40%"
+          role="region"
+          aria-label={labels.requirement}
+        >
           <div className="result-column-header result-list-header">
             {selection ? (
               <Checkbox
@@ -575,7 +595,6 @@ export function AnalysisResultsWorkspace({
                 >
                   <span>
                     <strong>{item.regulatoryId}</strong>
-                    <small>{item.title}</small>
                   </span>
                   <i
                     data-result-status={item.pending ? undefined : item.status}
@@ -599,11 +618,21 @@ export function AnalysisResultsWorkspace({
               );
             })}
           </div>
-        </section>
+        </ResizablePanel>
 
-        <section
+        <ResizableHandle
+          className="result-column-resizer"
+          withHandle
+          aria-label={labels.resizeColumns}
+        />
+
+        <ResizablePanel
           className="result-detail"
+          style={panelStyle}
+          defaultSize="40%"
+          minSize="260px"
           data-mobile-hidden={mobilePane !== "assessment" || undefined}
+          role="region"
           aria-label={selected.title}
         >
           <div className="result-column-header result-detail-header">
@@ -884,11 +913,21 @@ export function AnalysisResultsWorkspace({
               </div>
             </details>
           </div>
-        </section>
+        </ResizablePanel>
 
-        <section
+        <ResizableHandle
+          className="result-column-resizer"
+          withHandle
+          aria-label={labels.resizeColumns}
+        />
+
+        <ResizablePanel
           className="result-evidence"
+          style={panelStyle}
+          defaultSize="40%"
+          minSize="260px"
           data-mobile-hidden={mobilePane !== "policy" || undefined}
+          role="region"
           aria-label={labels.policyText}
         >
           <PolicyDocumentViewer
@@ -917,8 +956,8 @@ export function AnalysisResultsWorkspace({
             registerScrollContainer={registerScrollContainer}
             registerBlock={registerBlock}
           />
-        </section>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       {overrideOpen ? (
         <div

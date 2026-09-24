@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DocumentMark, documentKindFromName } from "@/components/policies/document-chip";
 import { listMarkerPattern } from "@/domain/policies/document-structure";
@@ -177,6 +177,14 @@ export function PolicyDocumentViewer({
 }: PolicyDocumentViewerProps) {
   const [mode, setMode] = useState<"original" | "text">(original ? "original" : "text");
   const [originalFailed, setOriginalFailed] = useState(false);
+  const textScrollRef = useRef<HTMLDivElement | null>(null);
+  const bindTextScroll = useCallback(
+    (node: HTMLDivElement | null) => {
+      textScrollRef.current = node;
+      registerScrollContainer(node);
+    },
+    [registerScrollContainer],
+  );
 
   // Fällt das Original weg — gelöscht nach Aufbewahrungsfrist, Speicher nicht
   // erreichbar —, bleibt der geparste Text die belastbare Ansicht.
@@ -191,6 +199,20 @@ export function PolicyDocumentViewer({
         pageNumber: activeEvidence.pageNumber ?? activeBlock?.pageNumber ?? null,
       }
     : undefined;
+
+  // Beim Wechsel zurück auf den Text steht die Belegstelle sonst irgendwo
+  // außerhalb des Sichtfelds: der Text behält seinen Scrollstand, das Original
+  // hat inzwischen eine andere Stelle gezeigt.
+  const previousMode = useRef(mode);
+  useEffect(() => {
+    const changed = previousMode.current !== mode;
+    previousMode.current = mode;
+    if (!changed || mode !== "text") return;
+    const container = textScrollRef.current;
+    const block = container?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!container || !block) return;
+    container.scrollTo({ top: Math.max(0, block.offsetTop - 80) });
+  }, [mode]);
 
   return (
     <>
@@ -221,9 +243,13 @@ export function PolicyDocumentViewer({
           </div>
         ) : null}
       </div>
-      {showOriginal ? (
+      {/* Beide Ansichten bleiben im Baum. Das Umschalten blendet nur um, statt
+          das Original erneut zu laden und jede PDF-Seite neu zu zeichnen —
+          sonst dauert jeder Wechsel so lange wie das erste Öffnen. */}
+      {original && !originalFailed ? (
         original.kind === "pdf" ? (
           <PdfOriginal
+            active={showOriginal}
             original={original}
             target={target}
             labels={labels}
@@ -231,33 +257,37 @@ export function PolicyDocumentViewer({
           />
         ) : (
           <DocxOriginal
+            active={showOriginal}
             original={original}
             target={target}
             labels={labels}
             onFailed={() => setOriginalFailed(true)}
           />
         )
-      ) : (
-        <div className="result-column-scroll result-document-scroll" ref={registerScrollContainer}>
-          {original && originalFailed ? (
-            <p className="result-document-state">{labels.originalUnavailable}</p>
-          ) : null}
-          {blocksFailed ? (
-            <p className="result-document-state" role="alert">
-              {labels.failed}
-            </p>
-          ) : !blocks ? (
-            <p className="result-document-state">{labels.loading}</p>
-          ) : (
-            <DocumentText
-              blocks={blocks}
-              activeEvidence={activeEvidence}
-              pageLabel={labels.page}
-              registerBlock={registerBlock}
-            />
-          )}
-        </div>
-      )}
+      ) : null}
+      <div
+        className="result-column-scroll result-document-scroll"
+        data-hidden={showOriginal || undefined}
+        ref={bindTextScroll}
+      >
+        {original && originalFailed ? (
+          <p className="result-document-state">{labels.originalUnavailable}</p>
+        ) : null}
+        {blocksFailed ? (
+          <p className="result-document-state" role="alert">
+            {labels.failed}
+          </p>
+        ) : !blocks ? (
+          <p className="result-document-state">{labels.loading}</p>
+        ) : (
+          <DocumentText
+            blocks={blocks}
+            activeEvidence={activeEvidence}
+            pageLabel={labels.page}
+            registerBlock={registerBlock}
+          />
+        )}
+      </div>
     </>
   );
 }
@@ -385,11 +415,13 @@ function originalUrl(original: PolicyOriginal, path: "original" | "rendered") {
 /* ------------------------------- Word ---------------------------------- */
 
 function DocxOriginal({
+  active,
   original,
   target,
   labels,
   onFailed,
 }: {
+  active: boolean;
   original: PolicyOriginal;
   target: EvidenceTarget | undefined;
   labels: PolicyDocumentLabels;
@@ -420,15 +452,21 @@ function DocxOriginal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [original.policyVersionId, original.draftId]);
 
+  // Ausgeblendet hat kein Element eine Position: Markierung und Sprung warten,
+  // bis die Ansicht wieder sichtbar ist.
   useEffect(() => {
     const content = contentRef.current;
-    if (!content || html === undefined) return;
+    if (!active || !content || html === undefined) return;
     const marked = highlightQuoteInElement(content, target?.quote, target?.blockText);
     if (marked && scrollRef.current) scrollToElement(scrollRef.current, marked);
-  }, [html, target?.quote, target?.blockText]);
+  }, [active, html, target?.quote, target?.blockText]);
 
   return (
-    <div className="result-column-scroll result-original-scroll" ref={scrollRef}>
+    <div
+      className="result-column-scroll result-original-scroll"
+      data-hidden={!active || undefined}
+      ref={scrollRef}
+    >
       {html === undefined ? (
         <p className="result-document-state">{labels.loading}</p>
       ) : (
@@ -521,11 +559,13 @@ type PdfDocumentHandle = Awaited<
 > | null;
 
 function PdfOriginal({
+  active,
   original,
   target,
   labels,
   onFailed,
 }: {
+  active: boolean;
   original: PolicyOriginal;
   target: EvidenceTarget | undefined;
   labels: PolicyDocumentLabels;
@@ -571,13 +611,18 @@ function PdfOriginal({
   );
 
   return (
-    <div className="result-column-scroll result-original-scroll" ref={scrollRef}>
+    <div
+      className="result-column-scroll result-original-scroll"
+      data-hidden={!active || undefined}
+      ref={scrollRef}
+    >
       {!document_ ? (
         <p className="result-document-state">{labels.loading}</p>
       ) : (
         pageNumbers.map((pageNumber) => (
           <PdfPage
             key={pageNumber}
+            active={active}
             document={document_}
             pageNumber={pageNumber}
             scrollRef={scrollRef}
@@ -653,12 +698,14 @@ function overlayElement(kind: "block" | "quote", box: Box) {
 }
 
 function PdfPage({
+  active,
   document: handle,
   pageNumber,
   scrollRef,
   target,
   label,
 }: {
+  active: boolean;
   document: NonNullable<PdfDocumentHandle>;
   pageNumber: number;
   scrollRef: React.RefObject<HTMLDivElement | null>;
@@ -687,8 +734,11 @@ function PdfPage({
     return () => observer.disconnect();
   }, [scrollRef, visible]);
 
+  // Ausgeblendet hat die Seite keine Breite; der Maßstab fiele auf die
+  // Rohgröße des PDF zurück. Gezeichnet wird deshalb erst in der sichtbaren
+  // Ansicht — gesehen hat sie bis dahin ohnehin niemand.
   useEffect(() => {
-    if (!visible || rendered) return;
+    if (!active || !visible || rendered) return;
     let cancelled = false;
 
     void (async () => {
@@ -743,7 +793,7 @@ function PdfPage({
     return () => {
       cancelled = true;
     };
-  }, [handle, pageNumber, rendered, visible]);
+  }, [active, handle, pageNumber, rendered, visible]);
 
   // Die Belegstelle wird über der gezeichneten Seite eingezeichnet: ein Rahmen
   // um den Belegblock und gelbe Flächen genau über den Zeichen des Zitats. Die
@@ -755,7 +805,9 @@ function PdfPage({
     const page = containerRef.current;
     const layer = textLayerRef.current;
     const overlay = overlayRef.current;
-    if (!page || !layer || !overlay) return;
+    // Ausgeblendet misst der Browser jede Fläche mit null: die Markierung säße
+    // neben ihrem Text. Sie entsteht erst wieder mit der sichtbaren Ansicht.
+    if (!active || !page || !layer || !overlay) return;
     overlay.replaceChildren();
     if (!quote?.trim()) return;
 
@@ -799,7 +851,7 @@ function PdfPage({
     if (focus && scroll) {
       scroll.scrollTo({ top: Math.max(0, page.offsetTop + focus.top - 96), behavior: "smooth" });
     }
-  }, [quote, blockText, rendered, scrollRef]);
+  }, [active, quote, blockText, rendered, scrollRef]);
 
   return (
     <div

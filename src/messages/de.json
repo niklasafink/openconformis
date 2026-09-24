@@ -282,6 +282,7 @@
       "openEvidence": "Belegstelle öffnen",
       "originalView": "Original",
       "textView": "Text",
+      "resizeColumns": "Spaltenbreite ändern",
       "originalUnavailable": "Das Originaldokument ist nicht mehr verfügbar; gezeigt wird der ausgelesene Text.",
       "status": {
         "fulfilled": "Erfüllt",

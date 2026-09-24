@@ -1580,12 +1580,13 @@ i[data-result-status="no_assessment_possible"] {
   background: var(--status-review);
 }
 
+/* 20 / 40 / 40 als Ausgangsbreite; die Griffe dazwischen verschieben sie.
+   Die Liste bleibt schmal, damit das Originaldokument lesbar ist. */
 .result-columns {
-  display: grid;
+  display: flex;
+  height: auto;
   flex: 1;
   min-height: 0;
-  /* 20 / 40 / 40: die Liste bleibt schmal, damit das Originaldokument lesbar ist. */
-  grid-template-columns: minmax(0, 2fr) minmax(0, 4fr) minmax(0, 4fr);
 }
 
 .result-list,
@@ -1595,12 +1596,39 @@ i[data-result-status="no_assessment_possible"] {
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
-  border-right: 1px solid var(--border);
 }
 
 .result-evidence {
-  border-right: 0;
   background: var(--canvas);
+}
+
+/* Der Griff ist die Trennlinie zwischen zwei Bereichen und zeigt mit dem
+   Steg in der Mitte, dass sie sich verschieben lässt. */
+.result-column-resizer {
+  width: 1px;
+  background: var(--border);
+  cursor: col-resize;
+}
+
+.result-column-resizer > div {
+  width: 3px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--border-strong, #cfd3da);
+  transition: background 120ms ease;
+}
+
+/* Die Bibliothek meldet den Zustand am Griff: Sie erkennt auch die Mausnähe
+   neben der 1px-Linie, die allein zu schmal zum Treffen wäre. */
+.result-column-resizer[data-separator="hover"] > div,
+.result-column-resizer[data-separator="active"] > div,
+.result-column-resizer[data-separator="focus"] > div {
+  background: var(--selection);
+}
+
+.result-column-resizer:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--selection) 35%, transparent);
+  outline-offset: 1px;
 }
 
 .result-column-header,
@@ -1625,7 +1653,7 @@ i[data-result-status="no_assessment_possible"] {
 .result-list-row {
   display: flex;
   width: 100%;
-  min-height: 52px;
+  min-height: 44px;
   cursor: pointer;
   align-items: center;
   justify-content: space-between;
@@ -1650,20 +1678,10 @@ i[data-result-status="no_assessment_possible"] {
   min-width: 0;
 }
 
-.result-list-row strong,
-.result-list-row small {
-  display: block;
-}
-
 .result-list-row strong {
-  margin-bottom: 2px;
-  font-size: var(--text-body);
-}
-
-.result-list-row small {
+  display: block;
   overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--text-meta);
+  font-size: var(--text-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2206,6 +2224,13 @@ i[data-result-pending="true"] {
   scroll-behavior: smooth;
 }
 
+/* Die abgewählte Ansicht bleibt geladen und behält ihren Scrollstand; sichtbar
+   ist immer nur eine von beiden. */
+.result-document-scroll[data-hidden="true"],
+.result-original-scroll[data-hidden="true"] {
+  display: none;
+}
+
 /* Ausgelesener Text als lesbares Dokument, nicht als Blockliste. */
 .result-text-document {
   max-width: 820px;
@@ -2720,17 +2745,20 @@ i[data-result-pending="true"] {
     color: var(--selection);
   }
 
+  /* Schmale Fenster teilen nicht drei Bereiche auf: Die Breiten stehen fest,
+     die Griffe entfallen und die Umschaltung oben wählt den zweiten Bereich. */
   .result-columns {
+    display: grid;
     grid-template-columns: minmax(250px, 0.72fr) minmax(0, 2fr);
   }
 
-  .result-columns > [data-mobile-hidden="true"] {
+  .result-columns > [data-mobile-hidden="true"],
+  .result-column-resizer {
     display: none;
   }
 
-  .result-detail,
-  .result-evidence {
-    border-right: 0;
+  .result-list {
+    border-right: 1px solid var(--border);
   }
 }
 
