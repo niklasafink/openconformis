@@ -10,7 +10,6 @@ import { Link } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { listSavedCredentials } from "@/server/ai/saved-credential-service";
-import { reviewDecisionEngine } from "@/server/environment";
 import {
   getReviewCellDelta,
   getReviewRunGrid,
@@ -92,12 +91,6 @@ export default async function ReviewGridPage({ params }: ReviewGridPageProps) {
     }
   }
 
-  let decisionEngine: "jev" | "model" = "jev";
-  try {
-    decisionEngine = reviewDecisionEngine();
-  } catch {
-    decisionEngine = "jev";
-  }
   const permissions = reviewPermissionsOf(actor);
 
   return (
@@ -111,7 +104,6 @@ export default async function ReviewGridPage({ params }: ReviewGridPageProps) {
         <ReviewWorkspace
           locale={locale}
           reviewTableId={review.table.id}
-          decisionEngine={decisionEngine}
           documents={review.documents.map((document) => ({
             id: document.id,
             policyVersionId: document.policyVersionId,

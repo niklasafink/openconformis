@@ -351,9 +351,7 @@
       "files": "{count, plural, =1 {1 file} other {# files}}",
       "decisions": "{done} of {total} decisions",
       "running": "{count} in progress",
-      "escalation": "Escalation rate {percent}%",
-      "engineJev": "Decisions by Jev, second opinion by the selected model",
-      "engineModel": "Decisions entirely by the selected model"
+      "escalation": "Escalation rate {percent}%"
     },
     "toolbar": {
       "newColumn": "New column",
@@ -367,11 +365,7 @@
       "cancelFailed": "The run could not be cancelled."
     },
     "grid": {
-      "document": "Document",
-      "source": "Source",
       "emptyTitle": "No documents in this review yet.",
-      "emptyHint": "Add contracts as PDF or DOCX, or choose the sample document.",
-      "noColumns": "No column yet. Define what to check in every contract.",
       "editColumn": "Edit column",
       "removeColumn": "Remove column",
       "removeDocument": "Remove document",
@@ -413,26 +407,18 @@
       "columns": "{count, plural, =1 {1 column} other {# columns}}",
       "action": "Start review",
       "starting": "Starting review …",
-      "reasonNoDocuments": "At least one document is missing.",
       "reasonNoColumns": "At least one column is missing.",
       "reasonDocumentNotReady": "At least one document is still being processed.",
-      "reasonNoTypesafeKey": "The review cannot start without a TypeSafe key.",
-      "reasonNoModelKey": "No API key is saved for the selected model.",
+      "reasonNoModelKey": "No API key is saved.",
       "reasonRunActive": "A run is still active.",
       "failed": "The review could not be started.",
-      "typesafeKey": "TypeSafe key",
-      "typesafeKeyTitle": "TypeSafe key for evidence routing and cell decisions",
-      "typesafeSaved": "••••{lastFour} saved",
-      "modelKeyTitle": "Model access for the second opinion",
-      "model": "Model",
-      "selected": "Selected",
+      "apiKeyTitle": "Model access through your OpenRouter key",
       "apiKey": "API key",
       "savedKey": "••••{lastFour} saved",
       "removeSavedKey": "Remove saved key",
       "addKey": "Add",
       "addingKey": "Adding …",
       "keyFailed": "The key could not be verified.",
-      "modelFailed": "The model could not be applied.",
       "pollingFailed": "The connection to the server is interrupted; the state keeps being polled."
     },
     "upload": {

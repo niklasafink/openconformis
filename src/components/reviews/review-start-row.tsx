@@ -6,25 +6,20 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import {
-  deleteSavedCredentialRequest,
-  describeKeyFailure,
   postJson,
   ReachabilityLight,
   StartAnalysisButton,
   useSavedCredentials,
   type SavedCredential,
 } from "@/components/results/model-access-panel";
-import { ModelKeyForm } from "@/components/results/model-key-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
-import { systemOneModelId } from "@/domain/ai/system-one";
 
 type ReviewStartRowProps = Readonly<{
   reviewTableId: string;
-  decisionEngine: "jev" | "model";
   documentCount: number;
   readyDocumentCount: number;
   columnCount: number;
@@ -35,14 +30,13 @@ type ReviewStartRowProps = Readonly<{
 }>;
 
 /**
- * Die Startzeile: links der Stand („n Dokumente vorbereitet"), rechts die
- * Voraussetzungen und die Primäraktion. Der Modellzugang ist derselbe wie in der
- * Ergebnis-Vorschau der Gap-Analyse; im Modus `jev` kommt der TypeSafe-Schlüssel
- * hinzu. Fehlt eine Voraussetzung, ist Start deaktiviert und nennt den Grund.
+ * Die Startzeile: links der Stand („n Dokumente vorbereitet"), rechts der Zugang
+ * und die Primäraktion. Der Zugang ist ein einziges Feld — der eigene
+ * OpenRouter-Schlüssel des Nutzers; das Modell kommt aus dem Katalog und wird
+ * hier nicht einzeln gewählt. Fehlt eine Voraussetzung, ist Start deaktiviert.
  */
 export function ReviewStartRow({
   reviewTableId,
-  decisionEngine,
   documentCount,
   readyDocumentCount,
   columnCount,
@@ -56,70 +50,28 @@ export function ReviewStartRow({
   const id = useId();
   const keyLabels = { keyErrors: keyErrorMessages, keyFailed: t("keyFailed") };
   const keys = useSavedCredentials(savedCredentials, keyLabels);
-  const [modelProfileId, setModelProfileId] = useState(catalogue.models[0]?.id ?? "");
-  const [typesafeKey, setTypesafeKey] = useState("");
-  const [typesafeSaved, setTypesafeSaved] = useState(
-    savedCredentials.find((entry) => entry.provider === "typesafe") ?? null,
-  );
-  const [typesafeError, setTypesafeError] = useState<string | null>(null);
-  const [typesafePending, setTypesafePending] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
-  const [typesafeOpen, setTypesafeOpen] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
-  const model = catalogue.models.find((entry) => entry.id === modelProfileId);
-  const modelKeySaved = Boolean(keys.savedFor(model));
-  const needsTypesafe = decisionEngine === "jev";
+  // Ein Schlüssel, eine Route: der Katalog führt die Analysemodelle über
+  // OpenRouter. Der erste Eintrag ist das Standardmodell der Auswahl.
+  const model =
+    catalogue.models.find((entry) => entry.routeProvider === "openrouter") ?? catalogue.models[0];
+  const saved = keys.savedFor(model);
 
+  // Ohne Dokument sagt der leere Zustand der Tabelle schon alles; die Startzeile
+  // nennt nur Gründe, die dort nicht sichtbar sind.
   const reason =
     documentCount === 0
-      ? t("reasonNoDocuments")
+      ? null
       : columnCount === 0
         ? t("reasonNoColumns")
         : readyDocumentCount < documentCount
           ? t("reasonDocumentNotReady")
-          : needsTypesafe && !typesafeSaved
-            ? t("reasonNoTypesafeKey")
-            : !model || !modelKeySaved
-              ? t("reasonNoModelKey")
-              : null;
-
-  async function addTypesafeKey() {
-    const typed = typesafeKey.trim();
-    if (typesafePending || typed.length < 8) return;
-    setTypesafePending(true);
-    setTypesafeError(null);
-    try {
-      const response = await postJson("/api/ai-credentials/saved", {
-        provider: "typesafe",
-        requiredModelId: systemOneModelId,
-        apiKey: typed,
-      });
-      const payload = (await response.json().catch(() => ({ code: "RESPONSE_INVALID" }))) as {
-        lastFour?: string;
-        code?: string;
-        detail?: string;
-      };
-      if (!response.ok) {
-        setTypesafeError(describeKeyFailure(keyLabels, payload, response.status));
-        return;
-      }
-      setTypesafeSaved({ provider: "typesafe", lastFour: payload.lastFour ?? typed.slice(-4) });
-      setTypesafeKey("");
-      setTypesafeOpen(false);
-    } catch {
-      setTypesafeError(`${keyErrorMessages.NETWORK_ERROR ?? t("keyFailed")} (NETWORK_ERROR)`);
-    } finally {
-      setTypesafePending(false);
-    }
-  }
-
-  async function removeTypesafeKey() {
-    const response = await deleteSavedCredentialRequest("typesafe").catch(() => null);
-    if (!response?.ok) return setTypesafeError(t("keyFailed"));
-    setTypesafeSaved(null);
-  }
+          : !model || !saved
+            ? t("reasonNoModelKey")
+            : null;
 
   async function start() {
     if (!model || reason || pending) return;
@@ -136,7 +88,6 @@ export function ReviewStartRow({
         code?: string;
       };
       if (!response.ok || !payload.reviewRunId) {
-        if (payload.code === "REVIEW_TYPESAFE_KEY_REQUIRED") setTypesafeSaved(null);
         if (payload.code === "REVIEW_MODEL_KEY_REQUIRED") keys.forget(model.routeProvider);
         setStartError(errorMessages[payload.code ?? ""] ?? t("failed"));
         return;
@@ -168,103 +119,61 @@ export function ReviewStartRow({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {needsTypesafe ? (
-          <Popover open={typesafeOpen} onOpenChange={setTypesafeOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2" title={t("typesafeKeyTitle")}>
-                <ReachabilityLight connected={Boolean(typesafeSaved)} />
-                {t("typesafeKey")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-4">
-              <div className="grid gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${id}-typesafe`}>{t("typesafeKey")}</Label>
-                  <Input
-                    id={`${id}-typesafe`}
-                    type="password"
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={20_000}
-                    placeholder={
-                      typesafeSaved
-                        ? t("typesafeSaved", { lastFour: typesafeSaved.lastFour })
-                        : undefined
-                    }
-                    disabled={typesafePending}
-                    value={typesafeKey}
-                    onChange={(event) => setTypesafeKey(event.target.value)}
-                  />
-                  {typesafeSaved ? (
-                    <button
-                      type="button"
-                      className="justify-self-start text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      onClick={() => void removeTypesafeKey()}
-                    >
-                      {t("removeSavedKey")}
-                    </button>
-                  ) : null}
-                </div>
-                {typesafeError ? (
-                  <p role="alert" className="text-xs leading-snug text-destructive">
-                    {typesafeError}
-                  </p>
-                ) : null}
-                <Button
-                  type="button"
-                  className="w-full"
-                  disabled={typesafePending || typesafeKey.trim().length < 8}
-                  onClick={() => void addTypesafeKey()}
-                >
-                  {typesafePending ? (
-                    <>
-                      <LoaderCircle aria-hidden="true" className="animate-spin" />
-                      {t("addingKey")}
-                    </>
-                  ) : (
-                    t("addKey")
-                  )}
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        ) : null}
-        <Popover open={modelOpen} onOpenChange={setModelOpen}>
+        <Popover open={keyOpen} onOpenChange={setKeyOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2" title={t("modelKeyTitle")}>
-              <ReachabilityLight connected={modelKeySaved} />
-              {model?.name ?? t("model")}
+            <Button variant="outline" size="sm" className="gap-2" title={t("apiKeyTitle")}>
+              <ReachabilityLight connected={Boolean(saved)} />
+              {t("apiKey")}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80 p-4">
-            <ModelKeyForm
-              apiKey={keys.apiKey}
-              catalogue={catalogue}
-              error={keys.keyError}
-              keyOptional={modelKeySaved}
-              keyPlaceholder={
-                modelKeySaved
-                  ? t("savedKey", { lastFour: keys.savedFor(model)?.lastFour ?? "" })
-                  : undefined
-              }
-              onRemoveSavedKey={
-                modelKeySaved && model ? () => void keys.removeKey(model) : undefined
-              }
-              removeSavedKeyLabel={t("removeSavedKey")}
-              labels={{ model: t("model"), selected: t("selected"), apiKey: t("apiKey") }}
-              modelProfileId={modelProfileId}
-              onApiKeyChange={keys.setApiKey}
-              onModelChange={(next) => {
-                setModelProfileId(next);
-                keys.setKeyError(null);
-              }}
-              onSubmit={() => {
-                if (model) void keys.addKey(model).then((ok) => ok && setModelOpen(false));
-              }}
-              pending={keys.adding || pending}
-              submitLabel={t("addKey")}
-              submittingLabel={t("addingKey")}
-            />
+            <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor={`${id}-api-key`}>{t("apiKey")}</Label>
+                <Input
+                  id={`${id}-api-key`}
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={20_000}
+                  placeholder={saved ? t("savedKey", { lastFour: saved.lastFour }) : undefined}
+                  disabled={keys.adding}
+                  value={keys.apiKey}
+                  onChange={(event) => keys.setApiKey(event.target.value)}
+                />
+                {saved && model ? (
+                  <button
+                    type="button"
+                    className="justify-self-start text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    onClick={() => void keys.removeKey(model)}
+                  >
+                    {t("removeSavedKey")}
+                  </button>
+                ) : null}
+              </div>
+              {keys.keyError ? (
+                <p role="alert" className="text-xs leading-snug text-destructive">
+                  {keys.keyError}
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={!model || keys.adding || keys.apiKey.trim().length < 8}
+                onClick={() => {
+                  if (model) void keys.addKey(model).then((ok) => ok && setKeyOpen(false));
+                }}
+              >
+                {keys.adding ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="animate-spin" />
+                    {t("addingKey")}
+                  </>
+                ) : (
+                  t("addKey")
+                )}
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
         <StartAnalysisButton

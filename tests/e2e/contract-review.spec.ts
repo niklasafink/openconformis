@@ -7,7 +7,7 @@ import { seedFinishedReviewRun } from "./review-seed";
  * `LOCAL_AUTH_BYPASS=true` und ohne einen einzigen KI-Aufruf: Prüfung anlegen,
  * Beispieldokument und zwei Spalten hinzufügen, den gesperrten Start prüfen, dann
  * einen fertigen Lauf direkt in die Testdatenbank schreiben und Zelle, Beleg und
- * Export im Browser prüfen. Die echte TypeSafe-API wird nie gerufen.
+ * Export im Browser prüfen. Es wird kein Anbieter gerufen.
  */
 
 async function createReview(page: Page, name: string) {
@@ -47,7 +47,7 @@ async function addColumn(
 }
 
 test.describe("contract review", () => {
-  test("builds a review, locks the start without a TypeSafe key and shows a seeded cell with evidence", async ({
+  test("builds a review, locks the start without an API key and shows a seeded cell with evidence", async ({
     page,
   }) => {
     const pageErrors: Error[] = [];
@@ -88,14 +88,14 @@ test.describe("contract review", () => {
     await expect(page.getByRole("columnheader", { name: /Auswahl/u })).toBeVisible();
     await expect(page.getByText("Noch nicht geprüft")).toHaveCount(2);
 
-    // Im Modus `jev` ist der Start ohne TypeSafe-Schlüssel gesperrt und nennt den Grund.
+    // Ohne gespeicherten API-Key ist der Start gesperrt und nennt den Grund.
     await expect(page.getByRole("button", { name: "Prüfung starten" })).toBeDisabled();
     await expect(page.getByTestId("review-start-reason")).toHaveText(
-      "Ohne TypeSafe-Schlüssel kann die Prüfung nicht starten.",
+      "Es ist kein API-Key gespeichert.",
     );
     await expect(page.getByText("1 Dokument vorbereitet · 2 Spalten")).toBeVisible();
 
-    // Ein fertiger Lauf, direkt in der Testdatenbank — kein Modell, kein TypeSafe.
+    // Ein fertiger Lauf, direkt in der Testdatenbank — ohne Modellaufruf.
     const seeded = await seedFinishedReviewRun(reviewTableId);
     await page.reload();
     await expect(page.getByText(/^Abgeschlossen 100 %$/u)).toBeVisible();

@@ -67,7 +67,6 @@ export type RunSnapshot = {
 type ReviewWorkspaceProps = Readonly<{
   locale: AppLocale;
   reviewTableId: string;
-  decisionEngine: "jev" | "model";
   documents: TableDocument[];
   columns: TableColumn[];
   run: RunSnapshot | null;
@@ -111,7 +110,6 @@ const bodyCell = "h-11 border-b border-border px-1 align-middle";
 function ReviewGridView({
   locale,
   reviewTableId,
-  decisionEngine,
   documents,
   columns,
   run,
@@ -308,9 +306,6 @@ function ReviewGridView({
         <span>{t("metrics.decisions", { done: completedCells, total: totalCells })}</span>
         <span>{t("metrics.running", { count: runningCount })}</span>
         <span>{t("metrics.escalation", { percent: escalationPercent })}</span>
-        <span className="ml-auto hidden md:inline">
-          {decisionEngine === "jev" ? t("metrics.engineJev") : t("metrics.engineModel")}
-        </span>
       </div>
 
       {head ? (
@@ -372,7 +367,6 @@ function ReviewGridView({
       {canManage && !runActive ? (
         <ReviewStartRow
           reviewTableId={reviewTableId}
-          decisionEngine={decisionEngine}
           documentCount={documents.length}
           readyDocumentCount={readyDocuments}
           columnCount={columns.length}
@@ -433,10 +427,7 @@ function ReviewGridView({
               <th
                 scope="col"
                 className={`${headerCell} left-0 z-20 min-w-64 border-r border-border`}
-              >
-                {t("grid.document")}
-                <span className="ml-2 font-normal text-muted-foreground">{t("grid.source")}</span>
-              </th>
+              />
               {columns.map((column) => (
                 <th
                   key={column.id}
@@ -483,14 +474,7 @@ function ReviewGridView({
                   </div>
                 </th>
               ))}
-              {columns.length === 0 ? (
-                <th
-                  scope="col"
-                  className={`${headerCell} w-full font-normal text-muted-foreground`}
-                >
-                  {t("grid.noColumns")}
-                </th>
-              ) : null}
+              {columns.length === 0 ? <th className={`${headerCell} w-full`} /> : null}
             </tr>
           </thead>
           <tbody>
@@ -586,7 +570,6 @@ function ReviewGridView({
                 <td colSpan={Math.max(2, columns.length + 1)} className="px-4 py-10">
                   <div className="mx-auto grid max-w-md justify-items-center gap-2 text-center">
                     <p className="text-body font-medium">{t("grid.emptyTitle")}</p>
-                    <p className="text-meta text-muted-foreground">{t("grid.emptyHint")}</p>
                     {canManage ? (
                       <div className="mt-2 w-full text-left">{addDocumentControls}</div>
                     ) : null}

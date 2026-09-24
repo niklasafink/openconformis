@@ -351,9 +351,7 @@
       "files": "{count, plural, =1 {1 Datei} other {# Dateien}}",
       "decisions": "{done} von {total} Entscheidungen",
       "running": "{count} laufend",
-      "escalation": "Eskalationsquote {percent} %",
-      "engineJev": "Entscheidung über Jev, Zweitmeinung über das gewählte Modell",
-      "engineModel": "Entscheidung vollständig über das gewählte Modell"
+      "escalation": "Eskalationsquote {percent} %"
     },
     "toolbar": {
       "newColumn": "Neue Spalte",
@@ -367,11 +365,7 @@
       "cancelFailed": "Der Lauf konnte nicht abgebrochen werden."
     },
     "grid": {
-      "document": "Dokument",
-      "source": "Quelle",
       "emptyTitle": "Noch keine Dokumente in dieser Prüfung.",
-      "emptyHint": "Fügen Sie Verträge als PDF oder DOCX hinzu oder wählen Sie das Beispieldokument.",
-      "noColumns": "Noch keine Spalte. Legen Sie fest, was in jedem Vertrag zu prüfen ist.",
       "editColumn": "Spalte bearbeiten",
       "removeColumn": "Spalte entfernen",
       "removeDocument": "Dokument entfernen",
@@ -413,26 +407,18 @@
       "columns": "{count, plural, =1 {1 Spalte} other {# Spalten}}",
       "action": "Prüfung starten",
       "starting": "Prüfung startet …",
-      "reasonNoDocuments": "Es fehlt mindestens ein Dokument.",
       "reasonNoColumns": "Es fehlt mindestens eine Spalte.",
       "reasonDocumentNotReady": "Mindestens ein Dokument ist noch nicht fertig aufbereitet.",
-      "reasonNoTypesafeKey": "Ohne TypeSafe-Schlüssel kann die Prüfung nicht starten.",
-      "reasonNoModelKey": "Für das gewählte Modell ist kein API-Key gespeichert.",
+      "reasonNoModelKey": "Es ist kein API-Key gespeichert.",
       "reasonRunActive": "Ein Lauf ist noch aktiv.",
       "failed": "Die Prüfung konnte nicht gestartet werden.",
-      "typesafeKey": "TypeSafe-Schlüssel",
-      "typesafeKeyTitle": "TypeSafe-Schlüssel für Belegrouting und Zellentscheidung",
-      "typesafeSaved": "••••{lastFour} gespeichert",
-      "modelKeyTitle": "Modellzugang für die Zweitmeinung",
-      "model": "Modell",
-      "selected": "Ausgewählt",
+      "apiKeyTitle": "Modellzugang über Ihren OpenRouter-Schlüssel",
       "apiKey": "API-Key",
       "savedKey": "••••{lastFour} gespeichert",
       "removeSavedKey": "Gespeicherten Key entfernen",
       "addKey": "Hinzufügen",
       "addingKey": "Wird hinzugefügt …",
       "keyFailed": "Der Schlüssel konnte nicht bestätigt werden.",
-      "modelFailed": "Das Modell konnte nicht übernommen werden.",
       "pollingFailed": "Die Verbindung zum Server ist unterbrochen; der Stand wird weiter abgefragt."
     },
     "upload": {
