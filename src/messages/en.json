@@ -154,8 +154,6 @@
     "bestPractice": "Best practice",
     "details": "Details",
     "noSubrequirements": "None",
-    "context": "Company context",
-    "contextPlaceholder": "Optional context on governance, responsibilities, or existing evidence",
     "included": "applicable",
     "continue": "Continue",
     "policyProcessing": "Processing the document in the background …",

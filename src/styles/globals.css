@@ -722,14 +722,12 @@
 
 .scope-profile-section,
 .scope-size-section,
-.scope-context,
 .scope-actions {
   flex-shrink: 0;
 }
 
 .scope-profile-section,
 .scope-size-section,
-.scope-context,
 .scope-requirements {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -790,8 +788,7 @@
   gap: 7px;
 }
 
-.scope-section-heading h2,
-.scope-context label {
+.scope-section-heading h2 {
   margin: 0;
   font-size: var(--text-section-title);
   font-weight: 600;
@@ -994,31 +991,6 @@
   background: transparent;
   color: var(--selection);
   font-weight: 600;
-}
-
-.scope-context {
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  align-items: start;
-  padding: 16px 18px;
-}
-
-.scope-context label {
-  padding-top: 9px;
-}
-
-.scope-context textarea {
-  min-height: 76px;
-  resize: vertical;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 10px 12px;
-  outline: 0;
-}
-
-.scope-context textarea:focus {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 1px var(--focus);
 }
 
 .scope-actions {

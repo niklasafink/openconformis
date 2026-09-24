@@ -92,7 +92,6 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
             requirements={release.requirements}
             initialSize={savedScope?.institutionSize ?? "medium"}
             initialProfile={savedScope?.analysisProfile ?? defaultProfile}
-            initialContext={savedScope?.organizationContext ?? ""}
             initialIncludedKeys={initialIncludedKeys}
             query={q}
             policyPending={Boolean(pendingPolicy)}
@@ -127,8 +126,6 @@ export default async function ScopePage({ params, searchParams }: ScopePageProps
               bestPractice: t("bestPractice"),
               details: t("details"),
               noSubrequirements: t("noSubrequirements"),
-              context: t("context"),
-              contextPlaceholder: t("contextPlaceholder"),
               included: t("included"),
               continue: t("continue"),
             }}

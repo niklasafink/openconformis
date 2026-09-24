@@ -15,7 +15,6 @@ type ScopeFormProps = {
   requirements: readonly PublishedRequirement[];
   initialSize: InstitutionSize;
   initialProfile: AnalysisProfile;
-  initialContext: string;
   initialIncludedKeys: string[];
   query: string;
   /** Die Policy wird noch aufbereitet; Weiter bleibt bis dahin gesperrt. */
@@ -37,8 +36,6 @@ type ScopeFormProps = {
     bestPractice: string;
     details: string;
     noSubrequirements: string;
-    context: string;
-    contextPlaceholder: string;
     included: string;
     continue: string;
   };
@@ -51,7 +48,6 @@ export function ScopeForm({
   requirements,
   initialSize,
   initialProfile,
-  initialContext,
   initialIncludedKeys,
   query,
   policyPending = false,
@@ -192,17 +188,6 @@ export function ScopeForm({
             </article>
           ))}
         </div>
-      </section>
-
-      <section className="scope-context">
-        <label htmlFor="organization-context">{labels.context}</label>
-        <textarea
-          id="organization-context"
-          name="organizationContext"
-          maxLength={5_000}
-          defaultValue={initialContext}
-          placeholder={labels.contextPlaceholder}
-        />
       </section>
 
       <div className="scope-actions">

@@ -15,7 +15,6 @@ export async function saveScopeAndContinue(formData: FormData) {
   const draftId = String(formData.get("draftId") ?? "");
   const institutionSize = institutionSizeSchema.parse(formData.get("institutionSize"));
   const analysisProfile = analysisProfileSchema.parse(formData.get("analysisProfile"));
-  const organizationContext = String(formData.get("organizationContext") ?? "");
   const includedRequirementKeys = formData
     .getAll("includedRequirement")
     .map(String)
@@ -25,7 +24,9 @@ export async function saveScopeAndContinue(formData: FormData) {
     expectedDraftId: draftId,
     institutionSize,
     analysisProfile,
-    organizationContext,
+    // Der Unternehmenskontext wird im Umfang nicht mehr erfasst; das Feld bleibt
+    // im Schnappschuss, damit ältere Analysen und der Export unverändert lesen.
+    organizationContext: "",
     includedRequirementKeys,
   });
 
