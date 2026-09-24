@@ -283,7 +283,6 @@ export function PolicyDocumentViewer({
           <DocumentText
             blocks={blocks}
             activeEvidence={activeEvidence}
-            pageLabel={labels.page}
             registerBlock={registerBlock}
           />
         )}
@@ -305,12 +304,10 @@ type EvidenceTarget = { quote: string; blockText?: string; pageNumber: number | 
 function DocumentText({
   blocks,
   activeEvidence,
-  pageLabel,
   registerBlock,
 }: {
   blocks: DocumentBlock[];
   activeEvidence: ActiveEvidence | undefined;
-  pageLabel: string;
   registerBlock: (blockId: string, node: HTMLElement | null) => void;
 }) {
   const content = (block: DocumentBlock) => {
@@ -336,19 +333,9 @@ function DocumentText({
   });
 
   const nodes: ReactNode[] = [];
-  let previousPage: number | null = null;
   for (let index = 0; index < blocks.length;) {
     const block = blocks[index];
     if (!block) break;
-
-    if (block.pageNumber !== null && previousPage !== null && block.pageNumber !== previousPage) {
-      nodes.push(
-        <div key={`page-${block.pageNumber}-${block.id}`} className="result-text-page">
-          {pageLabel} {block.pageNumber}
-        </div>,
-      );
-    }
-    previousPage = block.pageNumber ?? previousPage;
 
     if (block.blockType === "list_item" || block.blockType === "table_cell") {
       const group: DocumentBlock[] = [];

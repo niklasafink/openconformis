@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Asterisk, ChevronDown, Cpu, LoaderCircle, Plus } from "lucide-react";
+import { ArrowRight, Asterisk, ChevronDown, Cpu, FileText, LoaderCircle, Plus } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ type Labels = Record<
   | "framework"
   | "noFramework"
   | "frameworkHint"
+  | "document"
+  | "noDocument"
+  | "documentHint"
   | "model"
   | "modelHint"
   | "send"
@@ -40,6 +43,13 @@ type Labels = Record<
   | "disclaimer",
   string
 >;
+
+/** Eine im Chat auswählbare Policy-Fassung des angemeldeten Nutzers. */
+export type ChatDocumentOption = {
+  policyVersionId: string;
+  displayName: string;
+  source: "sample" | "upload";
+};
 
 type Citation = {
   citationOrder: number;
@@ -75,6 +85,7 @@ export function ChatWorkspace({
   locale,
   catalogue,
   frameworks,
+  documents = [],
   initialThreadId,
   initialCredentials,
   labels,
@@ -84,6 +95,8 @@ export function ChatWorkspace({
   locale: "de" | "en";
   catalogue: AnalysisModelCatalogue;
   frameworks: readonly Framework[];
+  /** Dokumente, über die der Chat belegen darf; leer heißt: nur Rahmenwerk. */
+  documents?: readonly ChatDocumentOption[];
   initialThreadId?: string;
   initialCredentials: Credential[];
   labels: Labels;
@@ -94,6 +107,7 @@ export function ChatWorkspace({
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [frameworkSlug, setFrameworkSlug] = useState("");
+  const [policyVersionId, setPolicyVersionId] = useState("");
   const [modelProfileId, setModelProfileId] = useState(catalogue.models[0]?.id ?? "");
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -107,6 +121,9 @@ export function ChatWorkspace({
   const pendingQuestion = useRef<string | null>(null);
   const selectedModel = catalogue.models.find((model) => model.id === modelProfileId);
   const selectedFramework = frameworks.find((framework) => framework.id === frameworkSlug);
+  const selectedDocument = documents.find(
+    (document) => document.policyVersionId === policyVersionId,
+  );
   const activeCredential = useMemo(
     () =>
       credentials.find(
@@ -169,6 +186,7 @@ export function ChatWorkspace({
         body: JSON.stringify({
           threadId,
           frameworkSlug: threadId ? undefined : frameworkSlug || undefined,
+          policyVersionId: threadId ? undefined : policyVersionId || undefined,
           message: question,
           credentialId,
           modelProfileId: selectedModel.id,
@@ -336,6 +354,41 @@ export function ChatWorkspace({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {documents.length > 0 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 px-2 font-normal text-muted-foreground hover:text-foreground"
+                disabled={Boolean(threadId)}
+              >
+                <FileText className="size-4" />
+                <span className="max-w-56 truncate">
+                  {selectedDocument?.displayName ?? labels.document}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="bottom" className="min-w-64">
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                {labels.documentHint}
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={policyVersionId} onValueChange={setPolicyVersionId}>
+                <DropdownMenuRadioItem value="">{labels.noDocument}</DropdownMenuRadioItem>
+                {documents.map((document) => (
+                  <DropdownMenuRadioItem
+                    value={document.policyVersionId}
+                    key={document.policyVersionId}
+                  >
+                    <span className="truncate">{document.displayName}</span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -6,7 +6,7 @@ import type { AnalysisResultLabels } from "./analysis-results-workspace";
 export async function loadAnalysisResultLabels(): Promise<AnalysisResultLabels> {
   const t = await getTranslations("AnalysisRun");
   return {
-    checked: t("results.checked"),
+    requirementsCount: t("results.requirementsCount"),
     requirement: t("results.requirement"),
     subrequirements: t("results.subrequirements"),
     organizationContext: t("results.organizationContext"),

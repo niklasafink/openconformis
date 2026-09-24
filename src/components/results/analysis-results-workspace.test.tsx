@@ -13,7 +13,7 @@ globalThis.ResizeObserver ??= class {
 };
 
 const labels = {
-  checked: "geprüft",
+  requirementsCount: "Anforderungen",
   requirement: "Anforderung",
   subrequirements: "Subanforderungen",
   organizationContext: "Unternehmenskontext",
@@ -575,9 +575,10 @@ describe("requirements without an assessment", () => {
       "Punkt eins",
       "Punkt zwei",
     ]);
-    // Keine Gliederungspfade oder Absatznummern je Block, nur der Seitenwechsel.
+    // Keine Gliederungspfade, Absatznummern oder Seitentrenner zwischen den Blöcken.
     expect(screen.queryByText("Governance")).not.toBeInTheDocument();
-    expect(screen.getByText("Seite 2")).toBeInTheDocument();
+    expect(screen.queryByText("Seite 2")).not.toBeInTheDocument();
+    expect(screen.getByText("Seite zwei.")).toBeInTheDocument();
   });
 });
 

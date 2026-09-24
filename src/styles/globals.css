@@ -734,46 +734,9 @@
   background: var(--surface);
 }
 
-.scope-profile-section {
-  display: grid;
-  gap: 12px;
-  padding: 16px 18px;
-}
-
-.scope-profile-options {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-
-.scope-profile-options label {
-  display: grid;
-  gap: 2px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-subtle);
-  padding: 12px 14px;
-  cursor: pointer;
-  color: var(--text-secondary);
-}
-
-.scope-profile-options label[data-selected="true"] {
-  border-color: var(--text-primary);
-  background: var(--surface);
-  color: var(--text-primary);
-}
-
-.scope-profile-options strong {
-  font-size: var(--text-section-title);
-  font-weight: 600;
-}
-
-.scope-profile-options input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
+/* Profil und Institutsgröße sind je eine Zeile: Überschrift links,
+   die Auswahl als Segmentschalter rechts daneben. */
+.scope-profile-section,
 .scope-size-section {
   display: flex;
   align-items: center;
@@ -829,6 +792,7 @@
   line-height: 18px;
 }
 
+.scope-profile-options,
 .institution-size-options {
   display: flex;
   gap: 4px;
@@ -838,6 +802,7 @@
   padding: 3px;
 }
 
+.scope-profile-options label,
 .institution-size-options label {
   display: flex;
   min-width: 88px;
@@ -850,6 +815,11 @@
   font-weight: 500;
 }
 
+.scope-profile-options label {
+  padding: 0 14px;
+}
+
+.scope-profile-options label[data-selected="true"],
 .institution-size-options label[data-selected="true"] {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -857,6 +827,7 @@
   color: var(--text-primary);
 }
 
+.scope-profile-options input,
 .institution-size-options input {
   position: absolute;
   opacity: 0;
@@ -2300,22 +2271,6 @@ i[data-result-pending="true"] {
   margin: 0;
   padding: 6px 9px;
   background: #fff;
-}
-
-.result-text-page {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 1.8em 0 1.2em;
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.result-text-page::before,
-.result-text-page::after {
-  flex: 1;
-  border-top: 1px solid var(--border);
-  content: "";
 }
 
 .result-text-block {

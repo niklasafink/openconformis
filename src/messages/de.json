@@ -163,7 +163,7 @@
   "Chat": {
     "title": "Wie kann ich helfen?",
     "message": "Nachricht",
-    "placeholder": "Frage zum regulatorischen Rahmenwerk stellen …",
+    "placeholder": "Frage zum Rahmenwerk oder zum ausgewählten Dokument stellen …",
     "framework": "Rahmenwerk",
     "noFramework": "Kein Rahmenwerk ausgewählt",
     "model": "Modell",
@@ -181,7 +181,10 @@
     "noKey": "Kein API-Key",
     "keyConnected": "Key ••••{lastFour}",
     "keyExpires": "Gültig bis {time}",
-    "frameworkHint": "Quellen des Rahmenwerks werden als Belege herangezogen.",
+    "frameworkHint": "Anforderungen des Rahmenwerks werden als Belege herangezogen.",
+    "document": "Dokument",
+    "noDocument": "Kein Dokument ausgewählt",
+    "documentHint": "Belege stammen aus den geparsten Blöcken dieses Dokuments.",
     "modelHint": "Modell wählen"
   },
   "ResultsPreview": {
@@ -235,7 +238,7 @@
     "queuedNote": "Sie können diese Seite geöffnet lassen. Der Worker verarbeitet den Lauf im Hintergrund.",
     "pollingFailed": "Der Status konnte kurzzeitig nicht aktualisiert werden. Ein neuer Versuch läuft automatisch.",
     "results": {
-      "checked": "geprüft",
+      "requirementsCount": "Anforderungen",
       "requirement": "Anforderung",
       "subrequirements": "Subanforderungen",
       "organizationContext": "Unternehmenskontext",
@@ -279,10 +282,10 @@
       "documentFailed": "Der Policy-Text konnte nicht geladen werden.",
       "assessmentPane": "Bewertung",
       "policyPane": "Policy",
+      "resizeColumns": "Spaltenbreite ändern",
       "openEvidence": "Belegstelle öffnen",
       "originalView": "Original",
       "textView": "Text",
-      "resizeColumns": "Spaltenbreite ändern",
       "originalUnavailable": "Das Originaldokument ist nicht mehr verfügbar; gezeigt wird der ausgelesene Text.",
       "status": {
         "fulfilled": "Erfüllt",

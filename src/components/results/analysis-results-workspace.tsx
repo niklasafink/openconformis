@@ -88,7 +88,7 @@ export type DocumentBlock = {
 };
 
 export type AnalysisResultLabels = {
-  checked: string;
+  requirementsCount: string;
   status: Record<ResultStatus, string>;
   requirement: string;
   subrequirements: string;
@@ -500,9 +500,9 @@ export function AnalysisResultsWorkspace({
 
   return (
     <div className="result-workspace">
-      <div className="result-summary" aria-label={labels.checked}>
+      <div className="result-summary" aria-label={labels.requirementsCount}>
         <span>
-          <strong>{reviewItems.length}</strong> {labels.checked}
+          <strong>{reviewItems.length}</strong> {labels.requirementsCount}
         </span>
         <div className="result-summary-statuses">
           <div>

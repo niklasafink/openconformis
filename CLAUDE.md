@@ -32,7 +32,9 @@ Der frühere statische Wireframe wurde nach Prüfung seiner Referenzen entfernt.
    bei Bedarf Status begründet überschreiben und nach Excel exportieren.
 
 Die Sidebar ist der gemeinsame Stepper; jeder Schritt darf eine eigene URL haben.
-Der Chat ist ein eigener sekundärer Arbeitsbereich ohne Policy-Kontext.
+Der Chat ist ein eigener sekundärer Arbeitsbereich. Er belegt aus dem gewählten
+Rahmenwerk und aus den geparsten Blöcken des gewählten Dokuments, ändert aber
+keinen Analysezustand und vergibt keinen Erfüllungsstatus.
 
 ## Verbindliche Regeln
 

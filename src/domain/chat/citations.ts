@@ -8,6 +8,7 @@ export type ValidatedChatCitation = Pick<
   | "sourceType"
   | "requirementId"
   | "subrequirementId"
+  | "documentBlockId"
   | "label"
   | "locator"
   | "sourceHash"
@@ -37,6 +38,7 @@ export function validateChatCitations(
         sourceType: source.sourceType,
         requirementId: source.requirementId,
         subrequirementId: source.subrequirementId,
+        documentBlockId: source.documentBlockId,
         label: source.label,
         locator: source.locator,
         exactQuote: source.text,

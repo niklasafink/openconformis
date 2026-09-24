@@ -11,6 +11,7 @@ import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { listActiveTemporaryCredentials } from "@/server/ai/temporary-credential-service";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { listFrameworkCatalogue } from "@/server/catalogue/service";
+import { listChatDocuments } from "@/server/chat/documents";
 
 type ChatPageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -30,14 +31,16 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
 
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  const [t, catalogue, frameworks, credentials, savedCredentials, user] = await Promise.all([
-    getTranslations("Chat"),
-    getChatModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
-    listFrameworkCatalogue(locale).catch(() => []),
-    listActiveTemporaryCredentials("chat").catch(() => []),
-    listSavedCredentials().catch(() => []),
-    requireAuthenticatedSessionUser().catch(() => null),
-  ]);
+  const [t, catalogue, frameworks, documents, credentials, savedCredentials, user] =
+    await Promise.all([
+      getTranslations("Chat"),
+      getChatModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
+      listFrameworkCatalogue(locale).catch(() => []),
+      listChatDocuments().catch(() => []),
+      listActiveTemporaryCredentials("chat").catch(() => []),
+      listSavedCredentials().catch(() => []),
+      requireAuthenticatedSessionUser().catch(() => null),
+    ]);
 
   return (
     <>
@@ -48,6 +51,11 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
           locale={locale}
           catalogue={catalogue}
           frameworks={frameworks.filter((framework) => framework.availability === "included")}
+          documents={documents.map((document) => ({
+            policyVersionId: document.policyVersionId,
+            displayName: document.displayName,
+            source: document.source,
+          }))}
           initialThreadId={thread}
           userName={user ? firstName(user) : undefined}
           initialCredentials={credentials.map((credential) => ({
@@ -62,6 +70,9 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
             framework: t("framework"),
             noFramework: t("noFramework"),
             frameworkHint: t("frameworkHint"),
+            document: t("document"),
+            noDocument: t("noDocument"),
+            documentHint: t("documentHint"),
             model: t("model"),
             modelHint: t("modelHint"),
             send: t("send"),

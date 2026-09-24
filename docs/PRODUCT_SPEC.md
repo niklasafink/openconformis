@@ -220,6 +220,13 @@ Exit criterion: review policy is satisfied; export becomes available.
 
 - Chat is a full-page secondary workspace opened from the application navigation.
 - A user can optionally choose one framework; an empty value means no framework.
+- A user can optionally choose one of their own ready policy documents; an empty
+  value means no document. Both selections are frozen when the thread is created.
+- Retrieval is lexical over the published requirements of the selected release and
+  over the immutable parsed blocks of the selected document version. Both corpora
+  are ranked separately so a long document cannot crowd out the requirements.
+- Document blocks are only offered and only loaded when the policy belongs to the
+  signed-in user's workspace or to the draft bound to the current browser.
 - The dropdown always opens below its trigger.
 - A separate model selector sits at the right of the composer before Send and opens
   above the trigger. It groups models by publisher and preserves draft text when the
@@ -227,7 +234,8 @@ Exit criterion: review policy is satisfied; export becomes available.
 - Responses must cite regulatory sources or analysis evidence when making factual
   claims.
 - Chat may explain findings, locate evidence and compare requirements.
-- It must not alter analysis state or derive remediation wording in version one.
+- It must not alter analysis state, assign a compliance status, or derive
+  remediation or policy wording.
 - Conversation history is scoped to the authenticated account/organization and can
   be deleted.
 - The official sponsored grant is never used for chat. Chat requires a valid

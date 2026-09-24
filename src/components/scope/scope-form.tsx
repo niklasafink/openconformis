@@ -111,7 +111,7 @@ export function ScopeForm({
                 checked={analysisProfile === profile}
                 onChange={() => setAnalysisProfile(profile)}
               />
-              <strong>{labels[profile]}</strong>
+              <span>{labels[profile]}</span>
             </label>
           ))}
         </div>

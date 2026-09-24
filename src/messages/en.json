@@ -163,7 +163,7 @@
   "Chat": {
     "title": "How can I help?",
     "message": "Message",
-    "placeholder": "Ask a question about the regulatory framework …",
+    "placeholder": "Ask about the framework or the selected document …",
     "framework": "Framework",
     "noFramework": "No framework selected",
     "model": "Model",
@@ -181,7 +181,10 @@
     "noKey": "No API key",
     "keyConnected": "Key ••••{lastFour}",
     "keyExpires": "Valid until {time}",
-    "frameworkHint": "Sources of the framework are used as evidence.",
+    "frameworkHint": "Requirements of the framework are used as evidence.",
+    "document": "Document",
+    "noDocument": "No document selected",
+    "documentHint": "Evidence comes from the parsed blocks of this document.",
     "modelHint": "Choose model"
   },
   "ResultsPreview": {
@@ -235,7 +238,7 @@
     "queuedNote": "You can leave this page open. The worker processes the run in the background.",
     "pollingFailed": "The status could not be refreshed temporarily. Another attempt will run automatically.",
     "results": {
-      "checked": "reviewed",
+      "requirementsCount": "requirements",
       "requirement": "Requirement",
       "subrequirements": "Subrequirements",
       "organizationContext": "Company context",
@@ -279,10 +282,10 @@
       "documentFailed": "The policy text could not be loaded.",
       "assessmentPane": "Assessment",
       "policyPane": "Policy",
+      "resizeColumns": "Resize columns",
       "openEvidence": "Open evidence",
       "originalView": "Original",
       "textView": "Text",
-      "resizeColumns": "Resize columns",
       "originalUnavailable": "The original document is no longer available; the extracted text is shown instead.",
       "status": {
         "fulfilled": "Fulfilled",
