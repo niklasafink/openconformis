@@ -345,7 +345,6 @@
     "creating": "Wird angelegt …",
     "createFailed": "Die Prüfung konnte nicht angelegt werden.",
     "emptyList": "Noch keine Prüfung angelegt.",
-    "emptyListHint": "Eine Prüfung stellt mehrere Verträge denselben Fragen gegenüber: je Vertrag eine Zeile, je Frage eine Spalte, je Zelle eine getypte Antwort mit exaktem Beleg.",
     "listName": "Prüfung",
     "listUpdated": "Zuletzt geändert",
     "listOpen": "Öffnen",

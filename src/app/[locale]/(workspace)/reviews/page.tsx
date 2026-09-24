@@ -51,9 +51,8 @@ export default async function ReviewListPage({ params }: ReviewListPageProps) {
             errorMessages={errorMessages}
           />
           {tables.length === 0 ? (
-            <div className="grid max-w-xl gap-1 rounded-lg border border-dashed border-border px-5 py-8">
+            <div className="max-w-xl rounded-lg border border-dashed border-border px-5 py-8">
               <p className="text-body font-medium">{t("emptyList")}</p>
-              <p className="text-meta text-muted-foreground">{t("emptyListHint")}</p>
             </div>
           ) : (
             <div className="rounded-lg border border-border bg-card">

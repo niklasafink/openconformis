@@ -345,7 +345,6 @@
     "creating": "Creating …",
     "createFailed": "The review could not be created.",
     "emptyList": "No review yet.",
-    "emptyListHint": "A review asks several contracts the same questions: one row per contract, one column per question, one typed answer with exact evidence per cell.",
     "listName": "Review",
     "listUpdated": "Last changed",
     "listOpen": "Open",
