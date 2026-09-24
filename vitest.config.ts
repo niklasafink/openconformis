@@ -18,6 +18,10 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // `next-intl/middleware` importiert `next/server` ohne Dateiendung. Nur über
+    // Vites Auflösung findet der Test die Exportkarte von Next; extern belassen
+    // scheitert der Import.
+    server: { deps: { inline: ["next-intl"] } },
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
   },

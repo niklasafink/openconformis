@@ -1,9 +1,9 @@
 import createMiddleware from "next-intl/middleware";
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { routing } from "@/i18n/routing";
 import { auth, isAuthenticationConfigured } from "@/server/auth";
+import { mergeRefreshedCookieHeader } from "@/server/auth/session-cookies";
 
 const handleInternationalization = createMiddleware(routing);
 const verifierParameter = "neon_auth_session_verifier";
@@ -107,6 +107,39 @@ async function requireSession(request: NextRequest) {
 }
 
 /**
+ * Reicht die vom Auth-Gate aufgefrischten Sitzungscookies an dieselbe Anfrage
+ * weiter.
+ *
+ * Das Gate hält den Sitzungsstand in einem kurzlebigen, signierten Cookie. Läuft
+ * dessen Frist ab — nach wenigen Minuten ohne Klick —, holt es den Stand beim
+ * Auth-Dienst nach und hängt das erneuerte Cookie als `Set-Cookie` an die
+ * Antwort. Der Browser kennt es damit erst bei der *nächsten* Anfrage. Die Seite
+ * dieser Anfrage sah bisher weiterhin das abgelaufene Cookie: Jede
+ * Server-Komponente fragte den Auth-Dienst deshalb noch einmal selbst, und
+ * sobald dessen Antwort ein aufgefrischtes Cookie enthielt, scheiterte das
+ * Schreiben mitten im Rendern — Cookies lassen sich dort nicht setzen. Die
+ * Sitzungsauflösung brach ab, und die Oberfläche zeigte nach einer Pause einen
+ * abgemeldeten Zustand, obwohl die Sitzung gültig war und das Gate sie soeben
+ * bestätigt hatte.
+ *
+ * `next-intl` kopiert die Header der übergebenen Anfrage in die weitergereichte
+ * Anfrage; eine Kopie mit zusammengeführtem Cookie-Header genügt daher. Sie
+ * bekommt bewusst keinen Rumpf: Sie dient allein der Lokalisierung, und ein hier
+ * gelesener Rumpf fehlte der eigentlichen Anfrage.
+ */
+function withRefreshedSessionCookies(request: NextRequest, gate: NextResponse) {
+  const refreshed = gate.headers.getSetCookie();
+  if (refreshed.length === 0) return request;
+
+  const merged = mergeRefreshedCookieHeader(request.headers.get("cookie") ?? "", refreshed);
+  const headers = new Headers(request.headers);
+  if (merged) headers.set("cookie", merged);
+  else headers.delete("cookie");
+
+  return new NextRequest(request.url, { headers, method: request.method });
+}
+
+/**
  * Hier stand eine Weiterleitung, die die Entwicklungsumgebung auf den in
  * `NEXT_PUBLIC_APP_URL` konfigurierten Origin zwang, damit host-gebundene
  * Session-Cookies nicht zwischen `localhost` und `127.0.0.1` zerfallen.
@@ -163,7 +196,8 @@ export default async function proxy(request: NextRequest) {
   if (isAuthenticationConfigured && !isPublicAuthPage && !isLocalAuthBypassEnabled) {
     const sessionCheck = await requireSession(request);
     if (sessionCheck.headers.get("location")) return sessionCheck;
-    return copySetCookies(sessionCheck, await handleInternationalization(request));
+    const authenticatedRequest = withRefreshedSessionCookies(request, sessionCheck);
+    return copySetCookies(sessionCheck, await handleInternationalization(authenticatedRequest));
   }
 
   return handleInternationalization(request);
