@@ -19,7 +19,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "dev:https": "PORT=${PORT:-3000}; NEXT_PUBLIC_APP_URL=https://localhost:$PORT WORKFLOW_LOCAL_BASE_URL=https://localhost:$PORT next dev --port $PORT --experimental-https --experimental-https-ca \"${CAROOT:-$HOME/Library/Application Support/mkcert}/rootCA.pem\" --experimental-https-key certificates/localhost-key.pem --experimental-https-cert certificates/localhost.pem",
+    "dev:https": "PORT=${PORT:-3001}; NEXT_PUBLIC_APP_URL=https://localhost:$PORT WORKFLOW_LOCAL_BASE_URL=https://localhost:$PORT next dev --port $PORT --experimental-https --experimental-https-ca \"${CAROOT:-$HOME/Library/Application Support/mkcert}/rootCA.pem\" --experimental-https-key certificates/localhost-key.pem --experimental-https-cert certificates/localhost.pem",
     "build": "node --import tsx scripts/check-byok-config.ts && next build --webpack",
     "start": "next start",
     "lint": "eslint .",

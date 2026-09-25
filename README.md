@@ -43,10 +43,11 @@ password, which is the one step that cannot be scripted:
 ```bash
 "$HOME/Library/Caches/mkcert/mkcert-v1.4.4-darwin-arm64" -install   # once, asks for your password
 pnpm dev:certs                                                      # once, or when the certificate expires
-pnpm dev:https                                                      # https://localhost:3000
+pnpm dev:https                                                      # https://localhost:3001
 ```
 
-`dev:https` sets `NEXT_PUBLIC_APP_URL` itself, so `.env.local` keeps pointing at
+`dev:https` always uses port 3001 (3000 is often taken by another local app) and
+sets `NEXT_PUBLIC_APP_URL` itself, so `.env.local` keeps pointing at
 `http://localhost:3000` and plain `pnpm dev` continues to work unchanged.
 
 It also points the local workflow queue at the HTTPS address
