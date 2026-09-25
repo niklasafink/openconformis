@@ -42,5 +42,6 @@ put a second account into the workspace of a first one:
    The new membership is placed before the second account's own workspace, so it opens
    the first account's workspace after signing out and in again. Roles: `admin`
    (manager), `analyst` or `reviewer` (preparer only), `viewer` (read-only).
+
 3. To undo it, run the same command with `--remove`; the second account returns to its
    own workspace.
