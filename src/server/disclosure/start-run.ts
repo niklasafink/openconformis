@@ -1,0 +1,228 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { z } from "zod";
+
+import { checkEngineVersion } from "@/domain/disclosure/checks/types";
+import { createContentHash } from "@/domain/frameworks/content-hash";
+import { appendAuditEvent } from "@/server/audit/event";
+import { db, isDatabaseConfigured } from "@/server/db/client";
+import { disclosureCaseDocuments, disclosureRuns } from "@/server/db/schema/disclosure";
+import { policyVersions } from "@/server/db/schema/documents";
+import { launchDisclosurePlausibilityWorkflow } from "@/server/workflows/launch";
+
+import { requirePreparer, resolveDisclosureActor } from "./actor";
+import { ownedCase } from "./manage-case";
+
+export class DisclosureRunError extends Error {
+  constructor(public readonly code: string) {
+    super(code);
+    this.name = "DisclosureRunError";
+  }
+}
+
+/**
+ * Start eines Plausicheck-Laufs. `modelProfileId` ist die Modellwahl für die Einordnung
+ * über das Nutzermodell; ohne sie laufen nur die deterministischen Prüfungen. Schlüssel
+ * stehen nie im Body — der Server leitet sie aus dem gespeicherten Schlüssel ab.
+ */
+export const disclosureRunStartSchema = z.object({
+  modelProfileId: z.string().trim().min(1).max(300).optional(),
+  modelCatalogueVersion: z.string().trim().min(1).max(128).optional(),
+});
+
+export type DisclosureRunStartInput = z.infer<typeof disclosureRunStartSchema>;
+
+export type StartDisclosureRunResult = {
+  runId: string;
+  status: "queued" | "running" | "completed" | "completed_with_gaps" | "failed" | "cancelled";
+  reused: boolean;
+};
+
+type Executor = Pick<typeof db, "select">;
+
+async function findOpenRun(executor: Executor, caseId: string) {
+  const [run] = await executor
+    .select({
+      runId: disclosureRuns.id,
+      status: disclosureRuns.status,
+      configurationHash: disclosureRuns.configurationHash,
+    })
+    .from(disclosureRuns)
+    .where(
+      and(
+        eq(disclosureRuns.caseId, caseId),
+        eq(disclosureRuns.kind, "plausibility"),
+        inArray(disclosureRuns.status, ["queued", "running"]),
+      ),
+    )
+    .orderBy(asc(disclosureRuns.createdAt))
+    .limit(1);
+  return run;
+}
+
+/** Die eingefrorenen Eingaben eines Laufs; ohne Modellwahl bleibt die Route leer. */
+export type FrozenModel = {
+  routeProvider: string;
+  providerModelId: string;
+  modelProfileId: string;
+  modelCatalogueVersion: string;
+  promptVersion: string;
+};
+
+export function disclosureConfigurationHash(input: {
+  reportSha256: string;
+  reportParserVersion: string;
+  extractionVersion: string;
+  checkVersion: string;
+  model: FrozenModel | null;
+}) {
+  return createContentHash({
+    reportSha256: input.reportSha256,
+    reportParserVersion: input.reportParserVersion,
+    extractionVersion: input.extractionVersion,
+    checkVersion: input.checkVersion,
+    model: input.model,
+  });
+}
+
+export async function loadReportInputs(caseId: string) {
+  const [report] = await db
+    .select({
+      caseDocumentId: disclosureCaseDocuments.id,
+      recognitionStatus: disclosureCaseDocuments.recognitionStatus,
+      recognitionVersion: disclosureCaseDocuments.recognitionVersion,
+      policyVersionId: policyVersions.id,
+      parseStatus: policyVersions.parseStatus,
+      sha256: policyVersions.sha256,
+      parserVersion: policyVersions.parserVersion,
+    })
+    .from(disclosureCaseDocuments)
+    .innerJoin(policyVersions, eq(policyVersions.id, disclosureCaseDocuments.policyVersionId))
+    .where(
+      and(eq(disclosureCaseDocuments.caseId, caseId), eq(disclosureCaseDocuments.role, "report")),
+    )
+    .limit(1);
+  if (!report) throw new DisclosureRunError("DISCLOSURE_REPORT_MISSING");
+  if (
+    report.parseStatus !== "ready" ||
+    !report.sha256 ||
+    !report.parserVersion ||
+    report.recognitionStatus !== "ready" ||
+    !report.recognitionVersion
+  ) {
+    throw new DisclosureRunError("DISCLOSURE_DOCUMENT_NOT_READY");
+  }
+  return {
+    caseDocumentId: report.caseDocumentId,
+    policyVersionId: report.policyVersionId,
+    sha256: report.sha256,
+    parserVersion: report.parserVersion,
+    // Eine ältere Erkennung bleibt gültig, sobald ein Lauf auf ihr beruht (read-plausibility).
+    extractionVersion: report.recognitionVersion,
+  };
+}
+
+/**
+ * Friert den Lauf ein und startet ihn. Idempotent: gibt es für die Prüfung einen
+ * offenen Lauf mit denselben eingefrorenen Eingaben, gilt er weiter; ein offener Lauf
+ * mit anderen Eingaben blockiert den Start, bis er endet oder gestoppt wird.
+ *
+ * `prepareModel` friert in Etappe 5 die Modellroute ein und legt den kurzlebigen
+ * Schlüssel an; ohne Modellwahl bleibt er ungenutzt.
+ */
+export async function startDisclosureRun(
+  caseId: string,
+  untrustedInput: DisclosureRunStartInput,
+  options: {
+    prepareModel?: (
+      input: DisclosureRunStartInput,
+      runId: string,
+    ) => Promise<{
+      model: FrozenModel;
+      credentialId: string;
+      deadline: Date;
+      discard: () => Promise<void>;
+    } | null>;
+  } = {},
+): Promise<StartDisclosureRunResult> {
+  const input = disclosureRunStartSchema.parse(untrustedInput);
+  if (!isDatabaseConfigured) throw new DisclosureRunError("DATABASE_UNAVAILABLE");
+  const actor = requirePreparer(await resolveDisclosureActor());
+  const found = await ownedCase(caseId, actor.organizationId);
+  if (!found) throw new DisclosureRunError("DISCLOSURE_CASE_NOT_FOUND");
+  const report = await loadReportInputs(found.id);
+
+  const runId = randomUUID();
+  const prepared =
+    input.modelProfileId && options.prepareModel ? await options.prepareModel(input, runId) : null;
+  const configurationHash = disclosureConfigurationHash({
+    reportSha256: report.sha256,
+    reportParserVersion: report.parserVersion,
+    extractionVersion: report.extractionVersion,
+    checkVersion: checkEngineVersion,
+    model: prepared?.model ?? null,
+  });
+
+  let result: StartDisclosureRunResult;
+  try {
+    result = await db.transaction(async (transaction) => {
+      await transaction.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`disclosure-run:${found.id}`}, 0))`,
+      );
+      const open = await findOpenRun(transaction, found.id);
+      if (open) {
+        if (open.configurationHash !== configurationHash) {
+          throw new DisclosureRunError("DISCLOSURE_RUN_IN_PROGRESS");
+        }
+        return { runId: open.runId, status: open.status, reused: true };
+      }
+      const [run] = await transaction
+        .insert(disclosureRuns)
+        .values({
+          id: runId,
+          caseId: found.id,
+          organizationId: found.organizationId,
+          ownerUserId: actor.userId,
+          kind: "plausibility",
+          reportCaseDocumentId: report.caseDocumentId,
+          reportPolicyVersionId: report.policyVersionId,
+          reportSha256: report.sha256,
+          reportParserVersion: report.parserVersion,
+          extractionVersion: report.extractionVersion,
+          checkVersion: checkEngineVersion,
+          configurationHash,
+          routeProvider: prepared?.model.routeProvider ?? null,
+          providerModelId: prepared?.model.providerModelId ?? null,
+          modelProfileId: prepared?.model.modelProfileId ?? null,
+          modelCatalogueVersion: prepared?.model.modelCatalogueVersion ?? null,
+          promptVersion: prepared?.model.promptVersion ?? null,
+          aiCredentialId: prepared?.credentialId ?? null,
+          credentialDeadlineAt: prepared?.deadline ?? null,
+        })
+        .returning({ id: disclosureRuns.id, status: disclosureRuns.status });
+      if (!run) throw new DisclosureRunError("DISCLOSURE_RUN_NOT_CREATED");
+      await appendAuditEvent(transaction, {
+        organizationId: found.organizationId,
+        actorUserId: actor.userId,
+        action: "disclosure.run_queued",
+        targetType: "disclosure_run",
+        targetId: run.id,
+        metadata: {
+          caseId: found.id,
+          checkVersion: checkEngineVersion,
+          modelProfileId: prepared?.model.modelProfileId ?? null,
+        },
+      });
+      return { runId: run.id, status: run.status, reused: false };
+    });
+  } catch (error) {
+    await prepared?.discard();
+    throw error;
+  }
+  if (result.reused) await prepared?.discard();
+  if (result.status === "queued") await launchDisclosurePlausibilityWorkflow(result.runId);
+  return result;
+}

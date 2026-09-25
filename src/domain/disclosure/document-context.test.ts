@@ -94,4 +94,33 @@ describe("deriveDocumentContext", () => {
     });
     expect(total.rowLabel).toBe("Provisionsaufwendungen");
   });
+
+  it("lets a split balance sheet table inherit the columns of the table before it", () => {
+    const first = [
+      cell("31.12.2025 in EUR", 0, 1, true),
+      cell("31.12.2024 in EUR", 0, 2, true),
+      cell("4. Forderungen an Kunden", 1, 0),
+      cell("402.688.268,51", 1, 1),
+      cell("395.356.783,11", 1, 2),
+    ];
+    const second = [
+      {
+        ...cell("12. Sonstige Vermögensgegenstände", 0, 0),
+        cell: { table: 1, row: 0, column: 0, header: false },
+      },
+      { ...cell("774.491,78", 0, 1), cell: { table: 1, row: 0, column: 1, header: false } },
+      { ...cell("110.310,00", 0, 2), cell: { table: 1, row: 0, column: 2, header: false } },
+    ];
+    const { contexts } = deriveDocumentContext([
+      block("Jahresabschluss zum 31. Dezember 2025"),
+      ...first,
+      block("darunter:"),
+      ...second,
+    ]);
+    expect(contexts.get(second[1]!.id)!.table!.columnInfo).toMatchObject({
+      unit: "EUR",
+      period: "current",
+    });
+    expect(contexts.get(second[2]!.id)!.table!.columnInfo).toMatchObject({ period: "prior" });
+  });
 });

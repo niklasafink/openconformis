@@ -6,7 +6,7 @@ import { microPerUnit } from "./arithmetic";
  * normalisiert sie exakt (`bigint`). Datumsangaben, Jahreszahlen, Normzitate,
  * Randziffern und Seitenzahlen sind keine Zahlen im Sinne der Prüfung.
  */
-export const figureExtractionVersion = "disclosure-figures-v1";
+export const figureExtractionVersion = "disclosure-figures-v2";
 
 export type FigureUnit = "EUR" | "percent" | "count" | "unknown";
 export type PeriodHint = "current" | "prior" | "other";
@@ -54,6 +54,10 @@ const candidatePattern =
 /** Wörter vor einer Zahl, nach denen sie ein Verweis und kein Betrag ist. */
 const referencePrefix =
   /(?:§§?|Abs\.|Absatz|Nr\.|Art\.|Artikel|Satz|S\.|Ziffer|Z|Tz\.?|Teil|Titel|Kapitel|Punkt|Anlage|Beilage|Seite|Seiten|Posten|Aktivposten|Passivposten|HRB|HRA|UR-Nr\.|PS|ISA|IFRS|IAS|IDW|CRR|Verordnung \(EU\)|\(EU\)|Richtlinie|Mandant|Buchungskreis|Tel\.:?|Fax:?|Anhang S\.|Stufe)\s*$/u;
+
+/** Wörter, nach denen ein abgesetzter Strich ein Minuszeichen ist („Steuern von - 380 TEUR“). */
+const signPrefix =
+  /(?:\b(?:von|auf|um|mit|bei|beträgt|betrug|betragen|betrugen|Höhe|ca\.|rund|knapp|Vorjahr|Vj\.)|:|\()\s*$/u;
 
 /** Einheiten direkt vor der Zahl. */
 const prefixUnits: Array<{ pattern: RegExp; unit: FigureUnit; scale: 1 | 1_000 | 1_000_000 }> = [
@@ -155,7 +159,9 @@ function periodFromText(text: string, start: number, reportYear: number | null |
   }
   if (
     /(?:Vorjahr(?:es)?(?:wert)?|Vj\.?|i\.\s?Vj\.?|VJ)\s*:?\s*(?:[A-Z€]{1,4}\s*)?$/u.test(before) ||
-    /(?:Vorjahr|Vj\.?)\s+[\p{L}-]+\s*(?:[A-Z€]{1,4}\s*)?$/u.test(before)
+    /(?:Vorjahr|Vj\.?)\s+(?!(?:um|auf|von|nach|gegenüber|mit|bei)\s)[\p{L}-]+\s*(?:[A-Z€]{1,4}\s*)?$/u.test(
+      before,
+    )
   ) {
     return "prior";
   }
@@ -163,7 +169,8 @@ function periodFromText(text: string, start: number, reportYear: number | null |
 }
 
 function unitAround(text: string, start: number, end: number) {
-  const before = text.slice(Math.max(0, start - 12), start);
+  // „TEUR -3.430“: die Einheit steht vor dem Vorzeichen.
+  const before = text.slice(Math.max(0, start - 14), start).replace(/[-–−]\s?$/u, "");
   const after = text.slice(end, end + 16);
   for (const entry of suffixUnits) {
     const match = entry.pattern.exec(after);
@@ -201,9 +208,12 @@ export function recognizeFigures(text: string, context: FigureContext): Recogniz
     const end = start + match[0].length;
     const numberStart = start + signText.length;
     const trimmedNumber = numberText.trim();
-    // Minus nur, wenn es nicht als Gedankenstrich zwischen Wörtern steht.
+    // Minus nur, wenn es nicht als Gedankenstrich zwischen Wörtern steht. Nach
+    // „von“, „auf“, „um“ oder einem Doppelpunkt ist „- 380“ ein Vorzeichen.
     const precededByWord = /[\p{L}\d]\s?$/u.test(text.slice(Math.max(0, start - 2), start));
-    const negative = signText !== "" && !(precededByWord && /\s/u.test(text[start + 1] ?? ""));
+    const signWord = signPrefix.test(text.slice(Math.max(0, start - 24), start));
+    const negative =
+      signText !== "" && (signWord || !(precededByWord && /\s/u.test(text[start + 1] ?? "")));
     if (isExcludedContext(text, numberStart, end, trimmedNumber)) continue;
     // Randziffern und Gliederungsnummern am Blockanfang („62 Insgesamt …“, „1. Umsatzerlöse“).
     if (

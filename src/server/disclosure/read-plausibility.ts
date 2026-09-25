@@ -7,10 +7,12 @@ import {
   disclosureBlockContext,
   disclosureCaseDocuments,
   disclosureFigures,
+  disclosureRuns,
   disclosureStatements,
 } from "@/server/db/schema/disclosure";
 
 import { startRecognition } from "./manage-case";
+import { recognitionVersion } from "./recognize";
 
 /** Kontext eines Blocks für die Dokumentansicht (serialisierbar). */
 export type ViewBlockContext = {
@@ -58,6 +60,7 @@ export async function readRecognition(caseDocumentId: string) {
       status: disclosureCaseDocuments.recognitionStatus,
       workflowRunId: disclosureCaseDocuments.recognitionWorkflowRunId,
       errorCode: disclosureCaseDocuments.recognitionErrorCode,
+      version: disclosureCaseDocuments.recognitionVersion,
       reportYear: disclosureCaseDocuments.reportYear,
       tableStructure: disclosureCaseDocuments.tableStructure,
       createdAt: disclosureCaseDocuments.createdAt,
@@ -72,6 +75,16 @@ export async function readRecognition(caseDocumentId: string) {
     Date.now() - document.createdAt.getTime() > 30_000
   ) {
     await startRecognition(caseDocumentId);
+  }
+  // Eine neue Erkennungsversion erkennt den Bericht erneut; bis dahin gilt das alte
+  // Ergebnis. Hat der Bericht schon einen Lauf, bleibt dessen eingefrorene Erkennung.
+  if (document.status === "ready" && document.version !== recognitionVersion) {
+    const [run] = await db
+      .select({ id: disclosureRuns.id })
+      .from(disclosureRuns)
+      .where(eq(disclosureRuns.reportCaseDocumentId, caseDocumentId))
+      .limit(1);
+    if (!run) await startRecognition(caseDocumentId);
   }
   if (document.status !== "ready") {
     return {

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import mammoth from "mammoth";
 
 import {
@@ -51,6 +51,35 @@ function alignCells(stored: readonly StoredBlock[], html: string) {
   return { cells, aligned: true };
 }
 
+async function storedCells(caseDocumentId: string) {
+  const rows = await db
+    .select({
+      documentBlockId: disclosureBlockContext.documentBlockId,
+      table: disclosureBlockContext.tableIndex,
+      row: disclosureBlockContext.rowIndex,
+      column: disclosureBlockContext.columnIndex,
+      header: disclosureBlockContext.isHeader,
+    })
+    .from(disclosureBlockContext)
+    .where(
+      and(
+        eq(disclosureBlockContext.caseDocumentId, caseDocumentId),
+        isNotNull(disclosureBlockContext.tableIndex),
+      ),
+    );
+  const cells = new Map<string, NonNullable<ContextInputBlock["cell"]>>();
+  for (const row of rows) {
+    cells.set(row.documentBlockId, {
+      table: row.table!,
+      row: row.row ?? 0,
+      column: row.column ?? 0,
+      // Kopfzeilen des Originals; abgeleitete Kopfzeilen bestimmt die Ableitung ohnehin gleich.
+      header: row.header,
+    });
+  }
+  return cells;
+}
+
 async function readOriginalHtml(objectKey: string) {
   const bytes = await createPrivateObjectStore().getObjectBytes(objectKey, maximumPolicyBytes);
   const result = await mammoth.convertToHtml(
@@ -76,8 +105,14 @@ export async function recognizeCaseDocument(caseDocumentId: string, workflowRunI
       and(
         eq(disclosureCaseDocuments.id, caseDocumentId),
         or(
-          inArray(disclosureCaseDocuments.recognitionStatus, ["pending", "failed"]),
-          eq(disclosureCaseDocuments.recognitionStatus, "running"),
+          inArray(disclosureCaseDocuments.recognitionStatus, ["pending", "failed", "running"]),
+          and(
+            eq(disclosureCaseDocuments.recognitionStatus, "ready"),
+            or(
+              isNull(disclosureCaseDocuments.recognitionVersion),
+              ne(disclosureCaseDocuments.recognitionVersion, recognitionVersion),
+            ),
+          ),
         ),
       ),
     )
@@ -112,6 +147,15 @@ export async function recognizeCaseDocument(caseDocumentId: string, workflowRunI
       tableStructure = aligned.aligned;
     } catch {
       // Ohne Original (gelöscht oder nicht lesbar) gibt es Zahlen, aber keine Tabellenlage.
+    }
+  }
+  if (!tableStructure) {
+    // Eine neue Erkennungsversion nach der 24-h-Löschung des Originals übernimmt die
+    // Tabellenlage der früheren Erkennung; sie stammt aus demselben Original.
+    const stored = await storedCells(caseDocumentId);
+    if (stored.size > 0) {
+      cells = stored;
+      tableStructure = true;
     }
   }
 

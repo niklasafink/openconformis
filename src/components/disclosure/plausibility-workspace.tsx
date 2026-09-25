@@ -1,12 +1,27 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleDashed, LoaderCircle } from "lucide-react";
+import {
+  CircleCheck,
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  CircleDashed,
+  CircleX,
+  LoaderCircle,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import {
@@ -31,6 +46,29 @@ export type FigureMark = {
   issue: string | null;
 };
 
+/** Eine Prüfung im Popover, bereits formatiert. */
+export type MarkCheck = Readonly<{
+  id: string;
+  kind: string;
+  status: "match" | "mismatch" | "uncertain";
+  actual: string | null;
+  expected: string | null;
+  source: string;
+  comment: string;
+  model: boolean;
+}>;
+
+export type WorkspaceFinding = Readonly<{
+  id: string;
+  subjectId: string;
+  title: string;
+  severity: "mismatch" | "uncertain";
+  page: number | null;
+  tz: string | null;
+}>;
+
+export type WorkspaceSummary = Readonly<{ checked: number; red: number; orange: number }>;
+
 export type BlockSource = Readonly<{
   page: number | null;
   tz: string | null;
@@ -47,7 +85,33 @@ type PlausibilityWorkspaceProps = Readonly<{
   recognition: "pending" | "running" | "ready" | "failed";
   /** Linke Spalte über der Liste, etwa Modellwahl und Start. */
   controls?: ReactNode;
+  checksBySubject?: Readonly<Record<string, readonly MarkCheck[]>>;
+  findings?: readonly WorkspaceFinding[];
+  /** Zusammenfassung nach einem Lauf; ohne Lauf nur die erkannten Zahlen. */
+  summary?: WorkspaceSummary | null;
+  /** Ein Lauf rechnet noch: die Seite lädt still nach. */
+  live?: boolean;
+  /** Ein Lauf ist beendet: ungeprüfte Zahlen haben keine Prüfbeziehung. */
+  checked?: boolean;
 }>;
+
+type Filter = "all" | "mismatch" | "uncertain";
+
+const statusIcon = {
+  pending: CircleDashed,
+  unassigned: CircleDashed,
+  match: CircleCheck,
+  mismatch: CircleX,
+  uncertain: CircleAlert,
+} as const;
+
+const statusTone = {
+  pending: "text-muted-foreground",
+  unassigned: "text-muted-foreground",
+  match: "text-[var(--status-met)]",
+  mismatch: "text-[var(--status-not-met)]",
+  uncertain: "text-[var(--status-partial)]",
+} as const;
 
 const scrollContext = 96;
 
@@ -77,6 +141,11 @@ export function PlausibilityWorkspace({
   marks,
   recognition,
   controls,
+  checksBySubject = {},
+  findings = [],
+  summary: runSummary = null,
+  live = false,
+  checked = false,
 }: PlausibilityWorkspaceProps) {
   const t = useTranslations("Disclosure.plausibility");
   const documentT = useTranslations("Disclosure.document");
@@ -86,12 +155,15 @@ export function PlausibilityWorkspace({
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLElement | null>(null);
 
-  // Während der Erkennung lädt die Seite still nach, bis die Marken da sind.
+  const [filter, setFilter] = useState<Filter>("all");
+
+  // Während Erkennung oder Lauf lädt die Seite still nach; gespeicherte Prüfungen färben
+  // die Marken, sobald sie da sind.
   useEffect(() => {
-    if (recognition !== "pending" && recognition !== "running") return;
+    if (recognition !== "pending" && recognition !== "running" && !live) return;
     const timer = setInterval(() => router.refresh(), 3_000);
     return () => clearInterval(timer);
-  }, [recognition, router]);
+  }, [recognition, live, router]);
 
   const marksByBlock = useMemo(() => {
     const map = new Map<string, FigureMark[]>();
@@ -112,16 +184,27 @@ export function PlausibilityWorkspace({
     return order;
   }, [documents, blocksByDocument]);
 
-  const annotations = useMemo(
+  const markById = useMemo(() => new Map(marks.map((mark) => [mark.id, mark])), [marks]);
+
+  // Feststellungen in Dokumentreihenfolge; der Filter gilt für Liste und Navigation.
+  const visibleFindings = useMemo(
     () =>
-      marks
-        .filter((mark) => mark.status === "mismatch" || mark.status === "uncertain")
-        .sort(
-          (a, b) =>
-            (documentOrder.get(a.blockId) ?? 0) - (documentOrder.get(b.blockId) ?? 0) ||
-            a.start - b.start,
-        ),
-    [marks, documentOrder],
+      findings
+        .filter((finding) => filter === "all" || finding.severity === filter)
+        .filter((finding) => markById.has(finding.subjectId))
+        .sort((a, b) => {
+          const left = markById.get(a.subjectId)!;
+          const right = markById.get(b.subjectId)!;
+          return (
+            (documentOrder.get(left.blockId) ?? 0) - (documentOrder.get(right.blockId) ?? 0) ||
+            left.start - right.start
+          );
+        }),
+    [findings, filter, markById, documentOrder],
+  );
+  const annotations = useMemo(
+    () => visibleFindings.map((finding) => markById.get(finding.subjectId)!),
+    [visibleFindings, markById],
   );
   const activeMark = marks.find((mark) => mark.id === activeId) ?? null;
   const annotationIndex = activeMark ? annotations.findIndex((mark) => mark.id === activeId) : -1;
@@ -134,7 +217,8 @@ export function PlausibilityWorkspace({
         element.getBoundingClientRect().top -
         container.getBoundingClientRect().top +
         container.scrollTop;
-      container.scrollTo({ top: Math.max(0, top - scrollContext), behavior: "smooth" });
+      // Sofort, nicht weich: das Popover hängt an der Marke und misst sie beim Öffnen.
+      container.scrollTo({ top: Math.max(0, top - scrollContext), behavior: "auto" });
       element.focus({ preventScroll: true });
     }
     anchorRef.current = element;
@@ -204,15 +288,24 @@ export function PlausibilityWorkspace({
   const statements = marks.length - figures;
   const unreadable = marks.filter((mark) => mark.issue).length;
   const summary =
-    recognition === "ready"
-      ? [
-          t("summary.figures", { count: figures }),
-          t("summary.statements", { count: statements }),
-          unreadable > 0 ? t("summary.unreadable", { count: unreadable }) : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : null;
+    recognition !== "ready"
+      ? null
+      : runSummary
+        ? [
+            t("summary.figures", { count: figures }),
+            t("summaryChecked", { count: runSummary.checked }),
+            t("summaryRed", { count: runSummary.red }),
+            t("summaryOrange", { count: runSummary.orange }),
+          ].join(" · ")
+        : [
+            t("summary.figures", { count: figures }),
+            t("summary.statements", { count: statements }),
+            unreadable > 0 ? t("summary.unreadable", { count: unreadable }) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+  const activeChecks = activeMark ? (checksBySubject[activeMark.id] ?? []) : [];
+  const ActiveIcon = activeMark ? statusIcon[activeMark.status] : CircleDashed;
 
   const source = activeMark ? contexts[activeMark.blockId] : undefined;
   const sourceText = source
@@ -269,11 +362,72 @@ export function PlausibilityWorkspace({
         aria-label={t("findings.label")}
       >
         {controls ? <div className="border-b border-border p-3">{controls}</div> : null}
-        <div className="flex h-10 shrink-0 items-center border-b border-border px-3">
+        <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border pr-2 pl-3">
           <h2 className="text-control font-medium">{t("findings.title")}</h2>
+          {checked || findings.length > 0 ? (
+            <Select value={filter} onValueChange={(value) => setFilter(value as Filter)}>
+              <SelectTrigger
+                size="sm"
+                className="h-7 w-auto gap-1.5 px-2 text-meta"
+                aria-label={t("filter.label")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="all">{t("filter.all")}</SelectItem>
+                <SelectItem value="mismatch">{t("filter.mismatch")}</SelectItem>
+                <SelectItem value="uncertain">{t("filter.uncertain")}</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <p className="text-meta text-muted-foreground">{t("findings.empty")}</p>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {visibleFindings.length === 0 ? (
+            <p className="p-3 text-meta text-muted-foreground">
+              {live && findings.length === 0
+                ? t("findingsRunning")
+                : !checked && findings.length === 0
+                  ? t("findings.empty")
+                  : filter === "all"
+                    ? t("findingsNone")
+                    : t("findingsFiltered")}
+            </p>
+          ) : (
+            <ol className="divide-y divide-border" aria-label={t("findings.label")}>
+              {visibleFindings.map((finding) => {
+                const Icon = statusIcon[finding.severity];
+                const mark = markById.get(finding.subjectId)!;
+                const context = contexts[mark.blockId];
+                const page = finding.page ?? context?.page ?? null;
+                const tz = finding.tz ?? context?.tz ?? null;
+                const meta = [
+                  page ? t("source.page", { page }) : null,
+                  tz ? t("source.tz", { tz }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <li key={finding.id}>
+                    <button
+                      type="button"
+                      className="grid w-full grid-cols-[1rem_1fr] gap-x-2 gap-y-0.5 px-3 py-2.5 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none data-[active=true]:bg-muted"
+                      data-active={finding.subjectId === activeId}
+                      onClick={() => focusMark(finding.subjectId)}
+                    >
+                      <Icon
+                        aria-hidden="true"
+                        className={`mt-0.5 size-4 ${statusTone[finding.severity]}`}
+                      />
+                      <span className="text-control leading-snug">{finding.title}</span>
+                      <span className="col-start-2 text-meta text-muted-foreground">
+                        {[t(`severity.${finding.severity}`), meta].filter(Boolean).join(" · ")}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </div>
       </aside>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -334,7 +488,10 @@ export function PlausibilityWorkspace({
               onCloseAutoFocus={(event) => event.preventDefault()}
             >
               <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-                <CircleDashed aria-hidden="true" className="size-4 text-muted-foreground" />
+                <ActiveIcon
+                  aria-hidden="true"
+                  className={`size-4 ${statusTone[activeMark.status]}`}
+                />
                 <span className="text-control font-medium">{t(`status.${activeMark.status}`)}</span>
               </div>
               <dl className="grid gap-1.5 px-3 py-2.5 text-meta">
@@ -346,14 +503,62 @@ export function PlausibilityWorkspace({
                 </div>
                 {sourceText ? (
                   <div className="grid grid-cols-[4.5rem_1fr] gap-2">
-                    <dt className="text-muted-foreground">{t("popover.source")}</dt>
+                    <dt className="text-muted-foreground">{t("popover.location")}</dt>
                     <dd>{sourceText}</dd>
                   </div>
                 ) : null}
               </dl>
-              <p className="border-t border-border px-3 py-2 text-meta text-muted-foreground">
-                {activeMark.issue ? t("popover.unreadable") : t("popover.notChecked")}
-              </p>
+              {activeChecks.length > 0 ? (
+                <ol className="max-h-72 divide-y divide-border overflow-y-auto border-t border-border">
+                  {activeChecks.map((check) => {
+                    const CheckIcon = statusIcon[check.status];
+                    return (
+                      <li key={check.id} className="grid gap-1 px-3 py-2 text-meta">
+                        <div className="flex items-center gap-1.5">
+                          <CheckIcon
+                            aria-hidden="true"
+                            className={`size-3.5 ${statusTone[check.status]}`}
+                          />
+                          <span className="font-medium">{t(`kind.${check.kind}`)}</span>
+                          <span className="text-muted-foreground">
+                            · {t(`status.${check.status}`)}
+                          </span>
+                        </div>
+                        {check.actual || check.expected ? (
+                          <dl className="grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-0.5">
+                            {check.actual ? (
+                              <>
+                                <dt className="text-muted-foreground">{t("check.actual")}</dt>
+                                <dd className="tabular-nums">{check.actual}</dd>
+                              </>
+                            ) : null}
+                            {check.expected ? (
+                              <>
+                                <dt className="text-muted-foreground">{t("check.expected")}</dt>
+                                <dd className="tabular-nums">{check.expected}</dd>
+                              </>
+                            ) : null}
+                            <dt className="text-muted-foreground">{t("check.source")}</dt>
+                            <dd>{check.source}</dd>
+                          </dl>
+                        ) : null}
+                        <p className="text-muted-foreground">
+                          {check.comment}
+                          {check.model ? ` · ${t("check.model")}` : ""}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p className="border-t border-border px-3 py-2 text-meta text-muted-foreground">
+                  {activeMark.issue
+                    ? t("popover.unreadable")
+                    : checked
+                      ? t("noRelation")
+                      : t("popover.notChecked")}
+                </p>
+              )}
             </PopoverContent>
           ) : null}
         </Popover>

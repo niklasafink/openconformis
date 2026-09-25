@@ -235,3 +235,40 @@ describe("recognizeFigures exclusions", () => {
     ]);
   });
 });
+
+describe("recognizeFigures v2 corrections", () => {
+  it("reads a detached minus after von as a sign (gbs Lagebericht, Tz 8)", () => {
+    const taxes = recognizeFigures(
+      "Nach Berücksichtigung des Zinsergebnisses von 2 TEUR (Vorjahr -7 TEUR) und Steuern von - 380 TEUR (Vorjahr 739 TEUR) wurde ein Jahresfehlbetrag erzielt.",
+      paragraph,
+    );
+    expect(taxes.map((figure) => [figure.raw, figure.micro])).toEqual([
+      ["2", 2_000n * million],
+      ["-7", -7_000n * million],
+      ["- 380", -380_000n * million],
+      ["739", 739_000n * million],
+    ]);
+    const plan = recognizeFigures(
+      "würde die gbs in 2022 einen Jahresfehlbetrag von - 2,9 Mio. EUR erzielen",
+      paragraph,
+    );
+    expect(plan[0]!.micro).toBe(-2_900_000n * million);
+  });
+
+  it("keeps a dash between two words a dash", () => {
+    expect(
+      recognizeFigures("Nutzungsdauer von 3 - 5 Jahren", paragraph).map((figure) => figure.micro),
+    ).toEqual([3n * million, 5n * million]);
+  });
+
+  it("finds the unit in front of a signed amount (gbs Tz 62 and 78)", () => {
+    const figures = recognizeFigures(
+      "Insgesamt ist das Betriebsergebnis gegenüber dem Vorjahr um TEUR -6.066 auf TEUR -3.811,9 gesunken.",
+      paragraph,
+    );
+    expect(figures.map((figure) => [figure.unit, figure.micro, figure.periodHint])).toEqual([
+      ["EUR", -6_066_000n * million, null],
+      ["EUR", -3_811_900n * million, null],
+    ]);
+  });
+});

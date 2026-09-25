@@ -794,12 +794,74 @@
         "statement": "Aussage",
         "source": "Quelle",
         "notChecked": "Noch nicht geprüft.",
-        "unreadable": "Zahlenformat nicht lesbar."
+        "unreadable": "Zahlenformat nicht lesbar.",
+        "location": "Fundstelle"
       },
       "source": {
         "page": "Seite {page}",
         "tz": "Tz {tz}"
-      }
+      },
+      "run": {
+        "start": "Prüfung starten",
+        "starting": "Wird gestartet …",
+        "restart": "Erneut prüfen",
+        "preparing": "Prüfungen werden vorbereitet …",
+        "progress": "{stored} von {planned} Prüfungen",
+        "completed": "Geprüft",
+        "completedWithGaps": "Geprüft, mit Lücken",
+        "failed": "Lauf fehlgeschlagen ({code}). Ein neuer Start ist möglich.",
+        "cancelled": "Lauf gestoppt. Gespeicherte Prüfungen bleiben sichtbar.",
+        "notReady": "Die Zahlen des Berichts werden noch erkannt.",
+        "deterministic": "Rechnet ohne Modell: Summen, Satzrechnungen, Richtungswörter und Querverweise.",
+        "startFailed": "Start fehlgeschlagen.",
+        "stop": "Analyse stoppen",
+        "stopping": "Wird gestoppt …",
+        "stopFailed": "Stoppen fehlgeschlagen."
+      },
+      "filter": {
+        "label": "Feststellungen filtern",
+        "all": "Alle",
+        "mismatch": "Rot",
+        "uncertain": "Orange"
+      },
+      "severity": {
+        "mismatch": "Abweichung",
+        "uncertain": "Unsicher"
+      },
+      "findingsNone": "Keine Feststellungen.",
+      "findingsFiltered": "Keine Feststellungen in diesem Filter.",
+      "summaryChecked": "{count} geprüft",
+      "summaryRed": "{count} rot",
+      "summaryOrange": "{count} orange",
+      "kind": {
+        "sentence_arithmetic": "Satzrechnung",
+        "direction": "Richtung",
+        "table_sum": "Summe",
+        "balance": "Aktiva = Passiva",
+        "horizontal_sum": "Gesamtspalte",
+        "change_column": "Veränderung",
+        "cross_reference": "Querverweis",
+        "prior_year": "Vorjahr",
+        "derived": "Formel",
+        "ratio": "Quote"
+      },
+      "check": {
+        "actual": "Ist",
+        "expected": "Soll",
+        "source": "Quelle",
+        "model": "Zuordnung über das Modell"
+      },
+      "noRelation": "Keine Prüfbeziehung gefunden.",
+      "errors": {
+        "DISCLOSURE_RUN_IN_PROGRESS": "Es läuft bereits eine Prüfung mit anderen Einstellungen.",
+        "DISCLOSURE_DOCUMENT_NOT_READY": "Der Bericht ist noch nicht vollständig erkannt.",
+        "DISCLOSURE_REPORT_MISSING": "Die Prüfung hat noch keinen Bericht.",
+        "DISCLOSURE_FORBIDDEN": "Deine Rolle erlaubt diese Aktion nicht.",
+        "DISCLOSURE_RUN_NOT_FOUND": "Der Lauf wurde nicht gefunden.",
+        "DISCLOSURE_RECOGNITION_CHANGED": "Die Erkennung des Berichts hat sich geändert. Bitte neu starten.",
+        "NETWORK_ERROR": "Keine Verbindung zum Server."
+      },
+      "findingsRunning": "Feststellungen erscheinen, sobald die Prüfungen gespeichert sind."
     }
   }
 }

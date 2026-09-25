@@ -5,6 +5,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -233,5 +234,288 @@ export const disclosureStatements = pgTable(
       table.startOffset,
     ),
     index("disclosure_statements_case_document_idx").on(table.caseDocumentId),
+  ],
+);
+
+/*
+ * Plausicheck-Läufe (Etappe 4). Ein Lauf friert Bericht, Erkennungs- und Prüfversion
+ * ein; Modellroute, Prompt-Version und Schlüssel sind nullable und werden erst mit der
+ * Einordnung über das Nutzermodell (Etappe 5) bzw. Jev (Etappe 6) gesetzt.
+ */
+
+export const disclosureRunKind = pgEnum("disclosure_run_kind", ["plausibility", "completeness"]);
+
+export const disclosureRunStatus = pgEnum("disclosure_run_status", [
+  "queued",
+  "running",
+  "completed",
+  "completed_with_gaps",
+  "failed",
+  "cancelled",
+]);
+
+export const disclosureCheckKind = pgEnum("disclosure_check_kind", [
+  "sentence_arithmetic",
+  "direction",
+  "table_sum",
+  "balance",
+  "horizontal_sum",
+  "change_column",
+  "cross_reference",
+  "prior_year",
+  "derived",
+  "ratio",
+]);
+
+export const disclosureCheckStatus = pgEnum("disclosure_check_status", [
+  "match",
+  "mismatch",
+  "uncertain",
+]);
+
+export const disclosureCheckSourceKind = pgEnum("disclosure_check_source_kind", [
+  "table",
+  "text",
+  "formula",
+  "evidence",
+]);
+
+export const disclosureAssignmentSource = pgEnum("disclosure_assignment_source", [
+  "rule",
+  "jev",
+  "model",
+]);
+
+export const disclosureReviewStatus = pgEnum("disclosure_review_status", [
+  "open",
+  "prepared",
+  "reviewed",
+]);
+
+export const disclosureInvocationProvider = pgEnum("disclosure_invocation_provider", [
+  "model",
+  "jev",
+]);
+
+export const disclosureInvocationStatus = pgEnum("disclosure_invocation_status", [
+  "started",
+  "succeeded",
+  "failed",
+]);
+
+export const disclosureRuns = pgTable(
+  "disclosure_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => disclosureCases.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    kind: disclosureRunKind("kind").default("plausibility").notNull(),
+    status: disclosureRunStatus("status").default("queued").notNull(),
+    stage: text("stage").default("queued").notNull(),
+    // Eingefrorene Eingaben.
+    reportCaseDocumentId: uuid("report_case_document_id")
+      .notNull()
+      .references(() => disclosureCaseDocuments.id, { onDelete: "cascade" }),
+    reportPolicyVersionId: uuid("report_policy_version_id")
+      .notNull()
+      .references(() => policyVersions.id, { onDelete: "restrict" }),
+    reportSha256: text("report_sha256").notNull(),
+    reportParserVersion: text("report_parser_version").notNull(),
+    extractionVersion: text("extraction_version").notNull(),
+    checkVersion: text("check_version").notNull(),
+    configurationHash: text("configuration_hash").notNull(),
+    // Einordnung über das Nutzermodell (Etappe 5) und Jev (Etappe 6).
+    routeProvider: text("route_provider"),
+    providerModelId: text("provider_model_id"),
+    modelProfileId: text("model_profile_id"),
+    modelCatalogueVersion: text("model_catalogue_version"),
+    promptVersion: text("prompt_version"),
+    aiCredentialId: uuid("ai_credential_id"),
+    assistCredentialId: uuid("assist_credential_id"),
+    credentialDeadlineAt: timestamp("credential_deadline_at", { withTimezone: true }),
+    workflowRunId: text("workflow_run_id"),
+    // Zähler: `plannedCheckCount` steht nach den deterministischen Prüfungen fest.
+    figureCount: integer("figure_count").default(0).notNull(),
+    plannedCheckCount: integer("planned_check_count"),
+    assignmentBatchCount: integer("assignment_batch_count").default(0).notNull(),
+    failedBatchCount: integer("failed_batch_count").default(0).notNull(),
+    mismatchCount: integer("mismatch_count").default(0).notNull(),
+    uncertainCount: integer("uncertain_count").default(0).notNull(),
+    failureCode: text("failure_code"),
+    failureDetail: text("failure_detail"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("disclosure_runs_case_created_idx").on(table.caseId, table.createdAt),
+    uniqueIndex("disclosure_runs_workflow_run_uidx")
+      .on(table.workflowRunId)
+      .where(sql`${table.workflowRunId} IS NOT NULL`),
+    // Höchstens ein offener Lauf je Prüfung und Art: die Idempotenz des Starts.
+    uniqueIndex("disclosure_runs_one_open_uidx")
+      .on(table.caseId, table.kind)
+      .where(sql`${table.status} IN ('queued', 'running')`),
+    check(
+      "disclosure_runs_model_check",
+      sql`(${table.routeProvider} IS NULL) = (${table.providerModelId} IS NULL)
+        AND (${table.routeProvider} IS NULL OR ${table.promptVersion} IS NOT NULL)`,
+    ),
+    check("disclosure_runs_failure_detail_check", sql`length(${table.failureDetail}) <= 700`),
+  ],
+);
+
+/**
+ * Eine Prüfung: Ist gegen Soll mit Toleranz, Quelle und Kommentar aus einer Code-Vorlage.
+ * `(run_id, kind, subject_key, source_key)` ist eindeutig und damit der
+ * Idempotenzschlüssel jeder Wiederholung.
+ */
+export const disclosureChecks = pgTable(
+  "disclosure_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => disclosureRuns.id, { onDelete: "cascade" }),
+    kind: disclosureCheckKind("kind").notNull(),
+    status: disclosureCheckStatus("status").notNull(),
+    subjectKey: text("subject_key").notNull(),
+    subjectFigureId: uuid("subject_figure_id").references(() => disclosureFigures.id, {
+      onDelete: "cascade",
+    }),
+    statementId: uuid("statement_id").references(() => disclosureStatements.id, {
+      onDelete: "cascade",
+    }),
+    actualMicro: bigint("actual_micro", { mode: "bigint" }),
+    expectedMicro: bigint("expected_micro", { mode: "bigint" }),
+    toleranceMicro: bigint("tolerance_micro", { mode: "bigint" }),
+    rounded: boolean("rounded").default(false).notNull(),
+    sourceKind: disclosureCheckSourceKind("source_kind").notNull(),
+    sourceFigureIds: uuid("source_figure_ids")
+      .array()
+      .default(sql`'{}'::uuid[]`)
+      .notNull(),
+    sourceBlockIds: uuid("source_block_ids")
+      .array()
+      .default(sql`'{}'::uuid[]`)
+      .notNull(),
+    sourceAccountIds: uuid("source_account_ids")
+      .array()
+      .default(sql`'{}'::uuid[]`)
+      .notNull(),
+    sourceLabel: text("source_label").notNull(),
+    /** Posten oder Zeile des Gegenstands, für den Titel einer Feststellung. */
+    subjectLabel: text("subject_label"),
+    commentCode: text("comment_code").notNull(),
+    commentParams: jsonb("comment_params").$type<Record<string, string>>().default({}).notNull(),
+    comment: text("comment").notNull(),
+    sourceKey: text("source_key").notNull(),
+    assignmentSource: disclosureAssignmentSource("assignment_source").default("rule").notNull(),
+    confidenceBp: integer("confidence_bp"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("disclosure_checks_run_subject_uidx").on(
+      table.runId,
+      table.kind,
+      table.subjectKey,
+      table.sourceKey,
+    ),
+    index("disclosure_checks_run_figure_idx").on(table.runId, table.subjectFigureId),
+    check(
+      "disclosure_checks_subject_check",
+      sql`(${table.subjectFigureId} IS NOT NULL) <> (${table.statementId} IS NOT NULL)`,
+    ),
+    check("disclosure_checks_comment_check", sql`length(${table.comment}) BETWEEN 1 AND 160`),
+    check(
+      "disclosure_checks_confidence_check",
+      sql`${table.confidenceBp} IS NULL OR ${table.confidenceBp} BETWEEN 0 AND 10000`,
+    ),
+  ],
+);
+
+/**
+ * Eine Feststellung je roter oder oranger Marke; sie verweist auf die schlechteste
+ * Prüfung und trägt die Freigabefelder des Vier-Augen-Prinzips (Etappe 8).
+ */
+export const disclosureFindings = pgTable(
+  "disclosure_findings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => disclosureRuns.id, { onDelete: "cascade" }),
+    checkId: uuid("check_id")
+      .notNull()
+      .references(() => disclosureChecks.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    title: text("title").notNull(),
+    severity: disclosureCheckStatus("severity").notNull(),
+    pageNumber: integer("page_number"),
+    tz: text("tz"),
+    reviewStatus: disclosureReviewStatus("review_status").default("open").notNull(),
+    preparedByUserId: text("prepared_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    preparedAt: timestamp("prepared_at", { withTimezone: true }),
+    reviewedByUserId: text("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("disclosure_findings_run_check_uidx").on(table.runId, table.checkId),
+    uniqueIndex("disclosure_findings_run_ordinal_uidx").on(table.runId, table.ordinal),
+    check("disclosure_findings_title_check", sql`length(${table.title}) BETWEEN 1 AND 60`),
+    check("disclosure_findings_severity_check", sql`${table.severity} <> 'match'`),
+    check(
+      "disclosure_findings_four_eyes_check",
+      sql`${table.reviewedByUserId} IS NULL OR ${table.preparedByUserId} IS NULL OR ${table.reviewedByUserId} <> ${table.preparedByUserId}`,
+    ),
+  ],
+);
+
+/**
+ * Ein bezahlter Aufruf zur Einordnung (Modell oder Jev). Die Antwort enthält nur IDs,
+ * Posten-Keys, Perioden, Konfidenzen und einen kurzen Kommentar — nie Berichtstext oder
+ * Schlüssel. `(run_id, batch_key)` ist eindeutig: eine Wiederholung liest die Antwort.
+ */
+export const disclosureModelInvocations = pgTable(
+  "disclosure_model_invocations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => disclosureRuns.id, { onDelete: "cascade" }),
+    batchKey: text("batch_key").notNull(),
+    provider: disclosureInvocationProvider("provider").notNull(),
+    routeProvider: text("route_provider").notNull(),
+    modelId: text("model_id").notNull(),
+    itemCount: integer("item_count").notNull(),
+    status: disclosureInvocationStatus("status").default("started").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    costMicrounits: integer("cost_microunits"),
+    latencyMilliseconds: integer("latency_milliseconds"),
+    errorCode: text("error_code"),
+    response: jsonb("response").$type<unknown>(),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("disclosure_model_invocations_batch_uidx").on(table.runId, table.batchKey),
+    check(
+      "disclosure_model_invocations_batch_key_check",
+      sql`${table.batchKey} ~ '^[0-9a-f]{64}$' AND ${table.itemCount} > 0`,
+    ),
   ],
 );

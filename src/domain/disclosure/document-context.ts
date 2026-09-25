@@ -67,7 +67,8 @@ export function cleanLabel(label: string) {
 }
 
 function unitOfHeader(text: string): Pick<ColumnInfo, "unit" | "scale"> {
-  if (/\bT(?:EUR|€)\b|\bTsd\.?\s?€|in TEUR/u.test(text)) return { unit: "EUR", scale: 1_000 };
+  if (/(?:^|[^A-Za-z])T(?:EUR|€)\b|\bTsd\.?\s?€|in TEUR/u.test(text))
+    return { unit: "EUR", scale: 1_000 };
   if (/Mio\.?\s?(?:EUR|€)/u.test(text)) return { unit: "EUR", scale: 1_000_000 };
   if (/\bEUR\b|€/u.test(text)) return { unit: "EUR", scale: 1 };
   if (/%/u.test(text)) return { unit: "percent", scale: 1 };
@@ -101,8 +102,20 @@ function tableColumns(cells: readonly Cell[], reportYear: number | null) {
   }
   const width = Math.max(0, ...cells.map((cell) => cell.position.column)) + 1;
   const headerRows: number[] = [];
+  let labelUnit: Pick<ColumnInfo, "unit" | "scale"> = { unit: null, scale: null };
   for (const row of [...rows.keys()].sort((a, b) => a - b)) {
     const values = rows.get(row)!.filter((cell) => cell.position.column > 0);
+    // Zeilen nur mit einem Text in der ersten Spalte („Fristigkeit (Restlaufzeit)“,
+    // „__TEUR“) beenden die Kopfzeilen nicht; eine Einheit darin gilt für die Tabelle.
+    if (values.length === 0) {
+      if (headerRows.length < 4) {
+        const label = rows.get(row)!.find((cell) => cell.position.column === 0)?.block.text ?? "";
+        const unit = unitOfHeader(label);
+        if (unit.unit && label.length <= 40) labelUnit = unit;
+        continue;
+      }
+      break;
+    }
     const isHeader =
       values.length > 0 &&
       values.every(
@@ -154,8 +167,8 @@ function tableColumns(cells: readonly Cell[], reportYear: number | null) {
     }
   }
   // Einheit aus einer Tabellenkopfzeile „EUR | EUR | EUR“ gilt für alle Spalten ohne eigene.
-  const tableUnit = columns.find((column) => column.unit)?.unit ?? null;
-  const tableScale = columns.find((column) => column.unit)?.scale ?? null;
+  const tableUnit = columns.find((column) => column.unit)?.unit ?? labelUnit.unit;
+  const tableScale = columns.find((column) => column.unit)?.scale ?? labelUnit.scale;
   for (const column of columns) {
     if (!column.unit && tableUnit) {
       column.unit = tableUnit;
@@ -170,12 +183,14 @@ export function deriveDocumentContext(blocks: readonly ContextInputBlock[]) {
   const contexts = new Map<string, BlockContext>();
   const tables = new Map<number, Cell[]>();
   const captions = new Map<number, string>();
+  /** Lage jeder Tabelle in der Blockfolge und ihre PDF-Seite, für Fortsetzungstabellen. */
+  const spans = new Map<number, { first: number; last: number; page: number | null }>();
   let page: number | null = null;
   let tz: string | null = null;
   let lastHeading: string | null = null;
   let lastParagraph: string | null = null;
 
-  for (const block of blocks) {
+  for (const [position, block] of blocks.entries()) {
     const text = block.text.trim();
     const marker = pageMarkerPattern.exec(text);
     if (marker) page = Number(marker[1]);
@@ -195,6 +210,12 @@ export function deriveDocumentContext(blocks: readonly ContextInputBlock[]) {
       const list = tables.get(block.cell.table) ?? [];
       list.push({ block, position: block.cell });
       tables.set(block.cell.table, list);
+      const span = spans.get(block.cell.table);
+      spans.set(block.cell.table, {
+        first: span?.first ?? position,
+        last: position,
+        page: span?.page ?? page,
+      });
       // Überschrift der Tabelle: der kurze Satz direkt davor oder die letzte Gliederung.
       if (!captions.has(block.cell.table)) {
         const caption = lastParagraph && lastParagraph.length <= 140 ? lastParagraph : lastHeading;
@@ -206,8 +227,48 @@ export function deriveDocumentContext(blocks: readonly ContextInputBlock[]) {
     contexts.set(block.id, { blockId: block.id, pageNumber: page, tz, technical, table: null });
   }
 
+  // Eine Tabelle ohne eigene Kopfzeile direkt nach einer gleich breiten Tabelle derselben
+  // Seite setzt diese fort: der Konverter trennt Bilanzen an „darunter:“-Zeilen.
+  const columnsByTable = new Map<number, ColumnInfo[]>();
+  for (const index of [...tables.keys()].sort((a, b) => a - b)) {
+    const cells = tables.get(index)!;
+    const layout = tableColumns(cells, reportYear);
+    const previous = columnsByTable.get(index - 1);
+    const span = spans.get(index);
+    const previousSpan = spans.get(index - 1);
+    const width = layout.columns.length;
+    const adjacent =
+      layout.headerRows.size === 0 &&
+      previous !== undefined &&
+      span !== undefined &&
+      previousSpan !== undefined &&
+      span.page === previousSpan.page &&
+      span.first - previousSpan.last <= 5 &&
+      previous.slice(1).some((column) => column.period !== null || column.unit !== null);
+    let columns = layout.columns;
+    let continues = false;
+    if (adjacent && previous.length === width) {
+      columns = previous;
+      continues = true;
+    } else if (adjacent && width - 1 === (previous.length - 1) * 2) {
+      // Fortsetzung mit Einzel- und Summenspalte je Jahr (ICBC-GuV): je zwei Spalten
+      // gehören zu einer Kopfspalte.
+      columns = [previous[0]!, ...previous.slice(1).flatMap((column) => [column, column])];
+      continues = true;
+    } else if (adjacent && (width - 1) * 2 === previous.length - 1) {
+      // Zurück zu einer Spalte je Jahr: es gilt die Summenspalte.
+      columns = [previous[0]!, ...previous.slice(1).filter((_, index) => index % 2 === 1)];
+      continues = true;
+    }
+    columnsByTable.set(index, columns);
+    if (continues && captions.has(index - 1)) {
+      captions.set(index, captions.get(index - 1)!);
+    }
+  }
+
   for (const [index, cells] of tables) {
-    const { columns, headerRows, rows } = tableColumns(cells, reportYear);
+    const { headerRows, rows } = tableColumns(cells, reportYear);
+    const columns = columnsByTable.get(index)!;
     // Steht der Titel in der ersten Spalte einer Kopfzeile, ist er die Überschrift.
     const headerTitle = cells.find(
       (cell) => headerRows.has(cell.position.row) && cell.position.column === 0,

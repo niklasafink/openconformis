@@ -794,12 +794,74 @@
         "statement": "Statement",
         "source": "Source",
         "notChecked": "Not checked yet.",
-        "unreadable": "Number format not readable."
+        "unreadable": "Number format not readable.",
+        "location": "Location"
       },
       "source": {
         "page": "Page {page}",
         "tz": "para. {tz}"
-      }
+      },
+      "run": {
+        "start": "Start check",
+        "starting": "Starting …",
+        "restart": "Check again",
+        "preparing": "Preparing checks …",
+        "progress": "{stored} of {planned} checks",
+        "completed": "Checked",
+        "completedWithGaps": "Checked, with gaps",
+        "failed": "Run failed ({code}). You can start again.",
+        "cancelled": "Run stopped. Stored checks stay visible.",
+        "notReady": "The report's figures are still being recognized.",
+        "deterministic": "Computes without a model: sums, sentence arithmetic, direction words and cross-references.",
+        "startFailed": "Start failed.",
+        "stop": "Stop analysis",
+        "stopping": "Stopping …",
+        "stopFailed": "Stopping failed."
+      },
+      "filter": {
+        "label": "Filter findings",
+        "all": "All",
+        "mismatch": "Red",
+        "uncertain": "Orange"
+      },
+      "severity": {
+        "mismatch": "Mismatch",
+        "uncertain": "Uncertain"
+      },
+      "findingsNone": "No findings.",
+      "findingsFiltered": "No findings in this filter.",
+      "summaryChecked": "{count} checked",
+      "summaryRed": "{count} red",
+      "summaryOrange": "{count} orange",
+      "kind": {
+        "sentence_arithmetic": "Sentence arithmetic",
+        "direction": "Direction",
+        "table_sum": "Sum",
+        "balance": "Assets = liabilities",
+        "horizontal_sum": "Total column",
+        "change_column": "Change",
+        "cross_reference": "Cross-reference",
+        "prior_year": "Prior year",
+        "derived": "Formula",
+        "ratio": "Ratio"
+      },
+      "check": {
+        "actual": "Actual",
+        "expected": "Expected",
+        "source": "Source",
+        "model": "Assigned by the model"
+      },
+      "noRelation": "No check relation found.",
+      "errors": {
+        "DISCLOSURE_RUN_IN_PROGRESS": "A check with different settings is already running.",
+        "DISCLOSURE_DOCUMENT_NOT_READY": "The report has not been fully recognized yet.",
+        "DISCLOSURE_REPORT_MISSING": "This review has no report yet.",
+        "DISCLOSURE_FORBIDDEN": "Your role does not allow this action.",
+        "DISCLOSURE_RUN_NOT_FOUND": "The run was not found.",
+        "DISCLOSURE_RECOGNITION_CHANGED": "The report's recognition has changed. Please start again.",
+        "NETWORK_ERROR": "No connection to the server."
+      },
+      "findingsRunning": "Findings appear as soon as the checks are stored."
     }
   }
 }
