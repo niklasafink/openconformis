@@ -31,6 +31,13 @@ changes.
   source, reuse rules and applicable law continue to govern them.
 - Dependency code and fonts retain their own licences. The release workflow emits a
   machine-readable dependency licence inventory from the pinned lockfile.
+- The local tool `pnpm disclosure:pdf-to-docx` writes Word files with `docx` (MIT,
+  development dependency, pinned) and reads PDFs with the already listed `pdfjs-dist`
+  (Apache-2.0) and `tesseract.js` (Apache-2.0). It runs only on the operator's machine
+  and is not part of the deployed application.
+- Real audit reports used for development (`docs/Prüfungsberichte/`) are confidential
+  third-party documents; they and the Word files converted from them stay local and are
+  never committed.
 - Product names, logos and other marks are not licensed; see `TRADEMARKS.md`.
 - User-uploaded policies, AI-provider output and user data are never covered by the
   repository licences.

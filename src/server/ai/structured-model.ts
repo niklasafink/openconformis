@@ -38,6 +38,17 @@ export type StructuredModelResponse<T> = {
   costMicrounits?: number;
 };
 
+/** Was ein Aufruf beim Anbieter verbraucht hat — auch wenn seine Antwort unbrauchbar war. */
+export type ProviderUsage = Pick<
+  StructuredModelResponse<unknown>,
+  | "providerRequestId"
+  | "inputTokens"
+  | "cachedInputTokens"
+  | "outputTokens"
+  | "reasoningTokens"
+  | "costMicrounits"
+>;
+
 export type ModelProviderErrorCode =
   | "INVALID_PROVIDER_ROUTE"
   | "PROVIDER_HTTP_ERROR"
@@ -80,6 +91,26 @@ export class ModelProviderError extends Error {
 
   /** Immer gesetzt: entweder die Meldung des Anbieters oder die Erklärung zum Code. */
   public readonly detail: string;
+
+  /**
+   * Gesetzt, wenn der Anbieter geantwortet und damit abgerechnet hat, die Antwort
+   * aber verworfen wurde — etwa abgeschnitten oder schemawidrig. Ohne sie wies
+   * ein Lauf nur die Kosten seiner erfolgreichen Aufrufe aus.
+   */
+  public usage?: ProviderUsage;
+}
+
+/**
+ * Führt die Auswertung einer abgerechneten Antwort aus. Scheitert sie, trägt der
+ * Fehler den Verbrauch weiter, damit der Aufruf mit seinen Kosten gespeichert wird.
+ */
+export function withBilledUsage<T>(usage: ProviderUsage, evaluate: () => T): T {
+  try {
+    return evaluate();
+  } catch (error) {
+    if (error instanceof ModelProviderError) error.usage ??= usage;
+    throw error;
+  }
 }
 
 /**
@@ -163,11 +194,13 @@ export function invalidProviderResponse(reason: string, retryable = true) {
  */
 export function withProviderErrorContext(error: unknown, context: string) {
   if (!(error instanceof ModelProviderError)) return error;
-  return new ModelProviderError(
+  const contextual = new ModelProviderError(
     error.code,
     error.retryable,
     `${context}: ${error.detail} [${error.code}]`,
   );
+  contextual.usage = error.usage;
+  return contextual;
 }
 
 export function assertStructuredRequest(request: { apiKey: string; maxOutputTokens: number }) {

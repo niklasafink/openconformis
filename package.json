@@ -37,6 +37,7 @@
     "db:seed:catalogue": "node --env-file-if-exists=.env.local --import tsx scripts/seed-catalogue.ts",
     "db:seed:catalogue:local": "DATABASE_URL=postgresql://conformis:conformis@127.0.0.1:5432/conformis DATABASE_URL_UNPOOLED=postgresql://conformis:conformis@127.0.0.1:5432/conformis node --import tsx scripts/seed-catalogue.ts",
     "sample:generate": "node --import tsx scripts/generate-sample-policy.ts",
+    "disclosure:pdf-to-docx": "node --import tsx scripts/disclosure-pdf-to-docx.ts",
     "production:check": "node --import tsx scripts/check-production-config.ts",
     "license:inventory": "node --import tsx scripts/generate-license-inventory.ts",
     "audit:production": "pnpm audit --prod --audit-level high",
