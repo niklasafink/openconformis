@@ -655,3 +655,95 @@ describe("model assignment", () => {
     expect(unsure).toMatchObject({ status: "uncertain", comment: { code: "model_unsure" } });
   });
 });
+
+describe("Beleg-Abgleich mit der SuSa", () => {
+  const balance: Spec = {
+    table: 3,
+    header: 1,
+    cells: [
+      [null, "31.12.2021 EUR", "31.12.2020 EUR"],
+      ["Forderungen aus Lieferungen und Leistungen", "932.929,51", "1.012.340,10"],
+      ["Guthaben bei Kreditinstituten", "4.858.728,78", "8.410.915,02"],
+    ],
+  };
+  const cents = (value: string) => BigInt(value.replace(/[.,]/gu, "")) * 10_000n;
+  const susa = [
+    {
+      id: "susa",
+      accounts: [
+        // Bewusst um 1.000,00 EUR daneben: die rote Markierung der Abnahme.
+        {
+          id: "a1200",
+          accountNumber: "1200",
+          label: "Forderungen aus Lieferungen und Leistungen",
+          closing: cents("933.929,51"),
+        },
+        { id: "a1800", accountNumber: "1800", label: "Bank", closing: cents("4.000.000,00") },
+        {
+          id: "a1810",
+          accountNumber: "1810",
+          label: "Bank Festgeld",
+          closing: cents("858.728,78"),
+        },
+        // Haben-Saldo einer Verbindlichkeit ohne Tabellenzeile: kein Abgleich.
+        {
+          id: "a3300",
+          accountNumber: "3300",
+          label: "Verbindlichkeiten aus Lieferungen und Leistungen",
+          closing: -cents("228.104,76"),
+        },
+      ],
+    },
+  ];
+
+  function evidenceOf(specs: Spec[]) {
+    const document = buildDocument(specs);
+    const raw = new Map(document.figures.map((figure) => [figure.id, figure.raw]));
+    return runDeterministicChecks(document, susa)
+      .drafts.filter((draft) => draft.kind === "evidence")
+      .map((draft) => ({ ...draft, subject: raw.get(draft.subjectFigureId!)! }));
+  }
+
+  it("rot bei abweichendem Kontensaldo, mit Konto, Bezeichnung und Saldo als Quelle", () => {
+    const checks = evidenceOf([balance]);
+    const receivables = checks.find((check) => check.subject === "932.929,51")!;
+    expect(receivables).toMatchObject({
+      status: "mismatch",
+      sourceKind: "evidence",
+      sourceAccountIds: ["a1200"],
+      expected: cents("933.929,51"),
+    });
+    expect(receivables.sourceLabel).toBe(
+      "SuSa Konto 1200 · Forderungen aus Lieferungen und Leistungen · 933.929,51 EUR",
+    );
+    expect(renderComment(receivables.comment)).toBe(
+      "Weicht um 1.000,00 EUR von SuSa Konto 1200 (933.929,51 EUR) ab.",
+    );
+    expect(renderFindingTitle(receivables.comment, receivables.subjectLabel ?? null)).toBe(
+      "Abweichung zur SuSa: Forderungen aus Lieferungen und Leistu…",
+    );
+  });
+
+  it("grün, wenn die Summe mehrerer Bankkonten den Bilanzwert exakt trifft", () => {
+    const checks = evidenceOf([balance]);
+    expect(checks.find((check) => check.subject === "4.858.728,78")).toMatchObject({
+      status: "match",
+      rounded: false,
+      sourceAccountIds: ["a1800", "a1810"],
+      sourceLabel: "SuSa Konten 1800, 1810 · Liquide Mittel · 4.858.728,78 EUR",
+    });
+  });
+
+  it("grün mit Vermerk „gerundet“ gegen die TEUR-Tabelle", () => {
+    const checks = evidenceOf([gbsAssets]);
+    expect(checks.find((check) => check.subject === "4.858,7")).toMatchObject({
+      status: "match",
+      rounded: true,
+    });
+  });
+
+  it("ohne Belegdatei gibt es keinen Abgleich", () => {
+    const { drafts } = runDeterministicChecks(buildDocument([balance]));
+    expect(drafts.some((draft) => draft.kind === "evidence")).toBe(false);
+  });
+});

@@ -11,6 +11,7 @@ import { VerifiedEmailRequiredError } from "@/server/auth/session-user";
 import { requestProtectionResponse } from "@/server/security/request-protection";
 
 import { DisclosureAccessError } from "./actor";
+import { DisclosureEvidenceError } from "./evidence";
 import { DisclosureRunError } from "./start-run";
 
 export const disclosureNoStore = { "cache-control": "private, no-store" } as const;
@@ -28,6 +29,13 @@ const statusByCode: Record<string, number> = {
   DISCLOSURE_FORBIDDEN: 403,
   MEMBERSHIP_REQUIRED: 403,
   VERIFIED_EMAIL_REQUIRED: 403,
+  DISCLOSURE_EVIDENCE_XLSX_ONLY: 400,
+  DISCLOSURE_EVIDENCE_NOT_FOUND: 404,
+  DISCLOSURE_EVIDENCE_NOT_ACTIVE: 409,
+  DISCLOSURE_EVIDENCE_EXPIRED: 410,
+  DISCLOSURE_EVIDENCE_PATH_MISMATCH: 400,
+  DISCLOSURE_EVIDENCE_OBJECT_MISSING: 409,
+  DISCLOSURE_EVIDENCE_METADATA_MISMATCH: 400,
 };
 
 export function disclosureFailure(code: string, status?: number) {
@@ -47,6 +55,7 @@ export function disclosureErrorResponse(error: unknown, logTag: string) {
     return disclosureFailure("VERIFIED_EMAIL_REQUIRED", 403);
   if (error instanceof DisclosureAccessError) return disclosureFailure(error.code);
   if (error instanceof DisclosureRunError) return disclosureFailure(error.code);
+  if (error instanceof DisclosureEvidenceError) return disclosureFailure(error.code);
   if (error instanceof CredentialValidationError || error instanceof TemporaryCredentialError) {
     return credentialErrorResponse(error, logTag);
   }

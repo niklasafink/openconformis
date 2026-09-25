@@ -843,13 +843,15 @@
         "cross_reference": "Querverweis",
         "prior_year": "Vorjahr",
         "derived": "Formel",
-        "ratio": "Quote"
+        "ratio": "Quote",
+        "evidence": "Beleg"
       },
       "check": {
         "actual": "Ist",
         "expected": "Soll",
         "source": "Quelle",
-        "model": "Zuordnung über das Modell"
+        "model": "Zuordnung über das Modell",
+        "showEvidence": "In Belegen zeigen"
       },
       "noRelation": "Keine Prüfbeziehung gefunden.",
       "errors": {
@@ -889,7 +891,36 @@
         "keyRemove": "TypeSafe-Schlüssel entfernen",
         "keyHint": "Jev ordnet Fundstellen günstiger ein. Ohne Schlüssel übernimmt das gewählte Modell.",
         "keyFailed": "Der TypeSafe-Schlüssel konnte nicht bestätigt werden."
-      }
+      },
+      "evidenceTab": "Belege"
+    },
+    "evidence": {
+      "empty": "Noch keine Belege. Laden Sie die Summen- und Saldenliste hoch, um die Zahlen des Berichts gegen die Konten abzugleichen.",
+      "dropzone": "SuSa hierher ziehen oder auswählen",
+      "hint": "Nur Excel (.xlsx), höchstens 10 MB. Erstes Blatt mit Kopfzeile: Konto, Bezeichnung und Saldo (oder Soll und Haben). Der Abgleich gilt ab dem nächsten Start.",
+      "uploading": "Wird hochgeladen …",
+      "parsing": "Wird gelesen …",
+      "parseFailed": "Die Datei konnte nicht gelesen werden.",
+      "failed": "Upload fehlgeschlagen.",
+      "xlsxOnly": "Nur Excel-Dateien (.xlsx).",
+      "tooLarge": "Die Datei ist größer als 10 MB.",
+      "accounts": "{count, plural, one {# Konto} other {# Konten}}",
+      "account": "Konto",
+      "label": "Bezeichnung",
+      "balance": "Saldo EUR",
+      "posten": "Posten",
+      "unassigned": "nicht zugeordnet"
+    },
+    "evidenceErrors": {
+      "DISCLOSURE_EVIDENCE_XLSX_ONLY": "Nur Excel-Dateien (.xlsx).",
+      "DISCLOSURE_CASE_NOT_FOUND": "Die Prüfung wurde nicht gefunden.",
+      "DISCLOSURE_FORBIDDEN": "Ihre Rolle darf keine Belege hinzufügen.",
+      "DISCLOSURE_EVIDENCE_EXPIRED": "Der Upload hat zu lange gedauert. Bitte erneut versuchen.",
+      "DISCLOSURE_EVIDENCE_METADATA_MISMATCH": "Die Datei entspricht nicht der angekündigten Größe oder Art.",
+      "SUSA_NOT_XLSX": "Die Datei ist keine Excel-Arbeitsmappe.",
+      "SUSA_UNREADABLE": "Die Excel-Datei konnte nicht gelesen werden.",
+      "SUSA_HEADER_NOT_FOUND": "Keine Kopfzeile mit Konto, Bezeichnung und Saldo gefunden.",
+      "SUSA_NO_ACCOUNTS": "Keine Kontozeilen gefunden."
     }
   }
 }

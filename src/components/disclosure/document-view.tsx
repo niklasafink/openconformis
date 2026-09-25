@@ -35,6 +35,11 @@ type DocumentViewProps = Readonly<{
   /** Rechts in der Reiterzeile, etwa die Zusammenfassung. */
   toolbar?: ReactNode;
   registerScrollContainer?: (node: HTMLDivElement | null) => void;
+  /** Weitere Reiter nach den Dokumenten, etwa „Belege“; ihr Inhalt ersetzt den Text. */
+  extraTabs?: ReadonlyArray<{ id: string; label: string; icon?: ReactNode; content: ReactNode }>;
+  /** Gesteuerter Reiter; ohne Angabe merkt sich die Ansicht ihn selbst. */
+  activeId?: string;
+  onActiveIdChange?: (id: string) => void;
 }>;
 
 /** Überschrift nach Tiefe der Gliederung, wie in der Textansicht der Gap-Analyse. */
@@ -135,8 +140,17 @@ export function DocumentView({
   renderText,
   toolbar,
   registerScrollContainer,
+  extraTabs = [],
+  activeId: controlledId,
+  onActiveIdChange,
 }: DocumentViewProps) {
-  const [activeId, setActiveId] = useState(documents[0]?.id ?? "");
+  const [ownId, setOwnId] = useState(documents[0]?.id ?? "");
+  const activeId = controlledId ?? ownId;
+  const setActiveId = (id: string) => {
+    setOwnId(id);
+    onActiveIdChange?.(id);
+  };
+  const extra = extraTabs.find((tab) => tab.id === activeId);
   const blocks = blocksByDocument[activeId] ?? [];
   const text = renderText ?? ((block: ViewBlock) => block.canonicalText);
 
@@ -161,6 +175,16 @@ export function DocumentView({
                 <span className="truncate">{document.displayName}</span>
               </TabsTrigger>
             ))}
+            {extraTabs.map((tab) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="h-7 max-w-64 flex-none gap-1.5 px-2 text-meta data-active:bg-muted data-active:shadow-none"
+              >
+                {tab.icon}
+                <span className="truncate">{tab.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
         {toolbar ? <div className="ml-auto flex min-w-0 items-center gap-2">{toolbar}</div> : null}
@@ -170,7 +194,9 @@ export function DocumentView({
         className="min-h-0 flex-1 overflow-y-auto bg-muted/30 px-4 py-6"
         data-document-scroll
       >
-        {blocks.length === 0 ? (
+        {extra ? (
+          extra.content
+        ) : blocks.length === 0 ? (
           <p className="mx-auto max-w-xl text-body text-muted-foreground">{labels.empty}</p>
         ) : (
           <article className="result-text-document disclosure-document">

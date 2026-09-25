@@ -20,6 +20,7 @@ import {
 } from "@/server/db/schema/disclosure";
 
 import { loadEngineDocument } from "./engine-document";
+import { loadEvidenceInputs } from "./evidence";
 import { disclosureJevActive } from "./jev-route";
 
 /**
@@ -122,6 +123,7 @@ function rowOf(runId: string, draft: CheckDraft): typeof disclosureChecks.$infer
     sourceKind: draft.sourceKind,
     sourceFigureIds: draft.sourceFigureIds,
     sourceBlockIds: draft.sourceBlockIds,
+    sourceAccountIds: draft.sourceAccountIds ?? [],
     sourceLabel: draft.sourceLabel.slice(0, 300),
     subjectLabel: draft.subjectLabel?.slice(0, 200) ?? null,
     commentCode: draft.comment.code,
@@ -171,7 +173,8 @@ export async function runDeterministicStage(runId: string) {
     throw new Error("DISCLOSURE_RECOGNITION_CHANGED");
   const engineDocument = await loadEngineDocument(run.reportCaseDocumentId);
   if (!engineDocument) throw new Error("DISCLOSURE_REPORT_MISSING");
-  const { drafts, pending } = runDeterministicChecks(engineDocument);
+  const evidence = await loadEvidenceInputs(run.evidenceFileIds);
+  const { drafts, pending } = runDeterministicChecks(engineDocument, evidence);
   await storeChecks(runId, drafts);
   const planned = drafts.length + (run.routeProvider ? pending.length : 0);
   await db

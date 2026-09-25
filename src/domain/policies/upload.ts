@@ -63,7 +63,16 @@ export function hasSupportedFileSignature(bytes: Uint8Array, mimeType: string) {
 }
 
 export function hasDocxPackageEntries(bytes: Uint8Array) {
-  const required = new Set(["[Content_Types].xml", "_rels/.rels", "word/document.xml"]);
+  return hasZipEntries(bytes, ["[Content_Types].xml", "_rels/.rels", "word/document.xml"]);
+}
+
+/**
+ * Enthält das ZIP-Paket alle genannten Einträge? Liest nur das Zentralverzeichnis,
+ * entpackt nichts. Word (`word/document.xml`) und Excel (`xl/workbook.xml`) teilen den
+ * Weg; maßgeblich ist der Inhalt, nicht die Endung.
+ */
+export function hasZipEntries(bytes: Uint8Array, names: readonly string[]) {
+  const required = new Set(names);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 0;
 

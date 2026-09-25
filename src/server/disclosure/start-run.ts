@@ -15,6 +15,7 @@ import { policyVersions } from "@/server/db/schema/documents";
 import { launchDisclosurePlausibilityWorkflow } from "@/server/workflows/launch";
 
 import { requirePreparer, resolveDisclosureActor } from "./actor";
+import { readyEvidenceOf } from "./evidence";
 import { ownedCase } from "./manage-case";
 
 export class DisclosureRunError extends Error {
@@ -81,6 +82,8 @@ export function disclosureConfigurationHash(input: {
   model: FrozenModel | null;
   /** Nur bei Jev `on`; bei `off` bleibt der Hash wie vor der Einordnung durch Jev. */
   jev?: { modelId: string; promptVersion: string } | null;
+  /** Prüfsummen der eingefrorenen Belegdateien; ohne Belege bleibt der Hash unverändert. */
+  evidence?: readonly string[];
 }) {
   return createContentHash({
     reportSha256: input.reportSha256,
@@ -89,6 +92,7 @@ export function disclosureConfigurationHash(input: {
     checkVersion: input.checkVersion,
     model: input.model,
     ...(input.jev ? { jev: input.jev } : {}),
+    ...(input.evidence?.length ? { evidence: input.evidence } : {}),
   });
 }
 
@@ -167,6 +171,7 @@ export async function startDisclosureRun(
   const found = await ownedCase(caseId, actor.organizationId);
   if (!found) throw new DisclosureRunError("DISCLOSURE_CASE_NOT_FOUND");
   const report = await loadReportInputs(found.id);
+  const evidence = await readyEvidenceOf(found.id);
 
   const runId = randomUUID();
   const prepared =
@@ -189,6 +194,7 @@ export async function startDisclosureRun(
     checkVersion: checkEngineVersion,
     model: prepared?.model ?? null,
     jev: jev ? { modelId: jev.modelId, promptVersion: disclosureJevPromptVersion } : null,
+    evidence: evidence.map((file) => `${file.id}:${file.sha256 ?? ""}`),
   });
 
   let result: StartDisclosureRunResult;
@@ -219,6 +225,7 @@ export async function startDisclosureRun(
           extractionVersion: report.extractionVersion,
           checkVersion: checkEngineVersion,
           configurationHash,
+          evidenceFileIds: evidence.map((file) => file.id),
           routeProvider: prepared?.model.routeProvider ?? null,
           providerModelId: prepared?.model.providerModelId ?? null,
           modelProfileId: prepared?.model.modelProfileId ?? null,

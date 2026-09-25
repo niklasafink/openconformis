@@ -843,13 +843,15 @@
         "cross_reference": "Cross-reference",
         "prior_year": "Prior year",
         "derived": "Formula",
-        "ratio": "Ratio"
+        "ratio": "Ratio",
+        "evidence": "Evidence"
       },
       "check": {
         "actual": "Actual",
         "expected": "Expected",
         "source": "Source",
-        "model": "Assigned by the model"
+        "model": "Assigned by the model",
+        "showEvidence": "Show in evidence"
       },
       "noRelation": "No check relation found.",
       "errors": {
@@ -889,7 +891,36 @@
         "keyRemove": "Remove TypeSafe key",
         "keyHint": "Jev classifies findings at lower cost. Without a key, the selected model does it.",
         "keyFailed": "The TypeSafe key could not be confirmed."
-      }
+      },
+      "evidenceTab": "Evidence"
+    },
+    "evidence": {
+      "empty": "No evidence yet. Upload the trial balance to reconcile the report figures with the accounts.",
+      "dropzone": "Drop the trial balance here or select it",
+      "hint": "Excel only (.xlsx), at most 10 MB. First sheet with a header row: account, description and balance (or debit and credit). The reconciliation applies from the next start.",
+      "uploading": "Uploading …",
+      "parsing": "Reading …",
+      "parseFailed": "The file could not be read.",
+      "failed": "Upload failed.",
+      "xlsxOnly": "Excel files only (.xlsx).",
+      "tooLarge": "The file is larger than 10 MB.",
+      "accounts": "{count, plural, one {# account} other {# accounts}}",
+      "account": "Account",
+      "label": "Description",
+      "balance": "Balance EUR",
+      "posten": "Line item",
+      "unassigned": "not assigned"
+    },
+    "evidenceErrors": {
+      "DISCLOSURE_EVIDENCE_XLSX_ONLY": "Excel files only (.xlsx).",
+      "DISCLOSURE_CASE_NOT_FOUND": "The case was not found.",
+      "DISCLOSURE_FORBIDDEN": "Your role may not add evidence.",
+      "DISCLOSURE_EVIDENCE_EXPIRED": "The upload took too long. Please try again.",
+      "DISCLOSURE_EVIDENCE_METADATA_MISMATCH": "The file does not match the announced size or type.",
+      "SUSA_NOT_XLSX": "The file is not an Excel workbook.",
+      "SUSA_UNREADABLE": "The Excel file could not be read.",
+      "SUSA_HEADER_NOT_FOUND": "No header row with account, description and balance found.",
+      "SUSA_NO_ACCOUNTS": "No account rows found."
     }
   }
 }

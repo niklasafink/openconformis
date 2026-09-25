@@ -70,7 +70,8 @@ export type CheckKind =
   | "cross_reference"
   | "prior_year"
   | "derived"
-  | "ratio";
+  | "ratio"
+  | "evidence";
 
 export const checkKinds: readonly CheckKind[] = [
   "sentence_arithmetic",
@@ -83,6 +84,7 @@ export const checkKinds: readonly CheckKind[] = [
   "prior_year",
   "derived",
   "ratio",
+  "evidence",
 ];
 
 export type CheckStatus = "match" | "mismatch" | "uncertain";
@@ -115,7 +117,9 @@ export type CommentCode =
   | "derived_differs"
   | "ratio_matches"
   | "ratio_differs"
-  | "model_unsure";
+  | "model_unsure"
+  | "evidence_matches"
+  | "evidence_differs";
 
 export type CheckComment = Readonly<{
   code: CommentCode;
@@ -132,9 +136,11 @@ export type CheckDraft = {
   expected: bigint | null;
   tolerance: bigint | null;
   rounded: boolean;
-  sourceKind: "table" | "text" | "formula";
+  sourceKind: "table" | "text" | "formula" | "evidence";
   sourceFigureIds: string[];
   sourceBlockIds: string[];
+  /** Konten einer Belegdatei (SuSa), gegen die geprüft wurde. */
+  sourceAccountIds?: string[];
   /** Menschlich lesbare Quelle: „Seite 25 · Sonstige Vermögensgegenstände · Summe“. */
   sourceLabel: string;
   comment: CheckComment;

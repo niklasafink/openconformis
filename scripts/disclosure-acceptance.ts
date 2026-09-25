@@ -11,12 +11,17 @@
  *
  * `DISCLOSURE_ACCEPTANCE_JEV=on|off` wertet nur Läufe aus, die mit diesem Jev-Wert
  * eingefroren wurden (docs/DISCLOSURE_JEV_ACCEPTANCE.md); ohne Angabe den jüngsten.
+ * Die SuSa-Fälle gelten gegen den jüngsten Lauf mit eingefrorener SuSa (lokal:
+ * `docs/Prüfungsberichte/SuSa gbs 2021 synthetisch.xlsx`). Fehlt so ein Lauf, werden
+ * die SuSa-Fälle übersprungen und genannt.
  */
 
 import postgres from "postgres";
 
 type Expected = {
   report: "gbs" | "icbc";
+  /** Nur gegen einen Lauf mit eingefrorener SuSa (Etappe 7). */
+  evidence?: boolean;
   /** Erkannter Text der Zahl bzw. des Richtungsworts. */
   raw: string;
   page: number;
@@ -130,6 +135,22 @@ const expectations: Expected[] = [
     note: "Tz 66 um TEUR 113 auf TEUR 228, gerechnet 115 (echter Fehler)",
   },
   {
+    report: "gbs",
+    raw: "932.929,51",
+    page: 24,
+    status: "mismatch",
+    evidence: true,
+    note: "SuSa Konto 1200 Forderungen L+L 933.929,51 (synthetisch)",
+  },
+  {
+    report: "gbs",
+    raw: "4.858.728,78",
+    page: 24,
+    status: "match",
+    evidence: true,
+    note: "SuSa Konto 1800 Guthaben bei Kreditinstituten",
+  },
+  {
     report: "icbc",
     raw: "17.811,66",
     page: 23,
@@ -201,7 +222,7 @@ if (jevFilter && jevFilter !== "on" && jevFilter !== "off") {
   throw new Error("DISCLOSURE_ACCEPTANCE_JEV must be on or off.");
 }
 
-async function latestRun(report: Expected["report"]) {
+async function latestRun(report: Expected["report"], evidence: boolean) {
   const pattern = report === "gbs" ? "%117-gbs%" : "%icbc%";
   const [run] = await sql<{ id: string; case_document_id: string; jev_assist: string }[]>`
     select r.id, r.report_case_document_id as case_document_id, r.jev_assist
@@ -209,6 +230,7 @@ async function latestRun(report: Expected["report"]) {
     join disclosure_case_documents d on d.id = r.report_case_document_id
     where d.display_name ilike ${pattern} and r.status in ('completed', 'completed_with_gaps')
       and (${jevFilter} = '' or r.jev_assist::text = ${jevFilter})
+      and (not ${evidence} or cardinality(r.evidence_file_ids) > 0)
     order by r.completed_at desc limit 1`;
   return run;
 }
@@ -235,16 +257,29 @@ async function subjects(runId: string, caseDocumentId: string) {
 }
 
 let failures = 0;
-for (const report of ["gbs", "icbc"] as const) {
-  const run = await latestRun(report);
+for (const [report, evidence] of [
+  ["gbs", false],
+  ["icbc", false],
+  ["gbs", true],
+] as const) {
+  const cases = expectations.filter(
+    (entry) => entry.report === report && Boolean(entry.evidence) === evidence,
+  );
+  const run = await latestRun(report, evidence);
   if (!run) {
+    if (evidence) {
+      console.log(`${report}: kein Lauf mit SuSa, ${cases.length} SuSa-Fälle übersprungen`);
+      continue;
+    }
     console.log(`${report}: kein abgeschlossener Lauf gefunden`);
-    failures += expectations.filter((entry) => entry.report === report).length;
+    failures += cases.length;
     continue;
   }
-  console.log(`${report}: Lauf ${run.id.slice(0, 8)}, Jev ${run.jev_assist}`);
+  console.log(
+    `${report}${evidence ? " (SuSa)" : ""}: Lauf ${run.id.slice(0, 8)}, Jev ${run.jev_assist}`,
+  );
   const rows = await subjects(run.id, run.case_document_id);
-  for (const expected of expectations.filter((entry) => entry.report === report)) {
+  for (const expected of cases) {
     const matching = rows.filter(
       (row) => row.raw === expected.raw && row.page === expected.page && !row.silent,
     );

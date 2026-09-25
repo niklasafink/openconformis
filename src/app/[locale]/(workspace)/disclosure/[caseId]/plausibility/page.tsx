@@ -15,6 +15,7 @@ import { markStatuses } from "@/domain/disclosure/checks/findings";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { readDocumentBlocks } from "@/server/disclosure/read-case";
+import { readCaseEvidence } from "@/server/disclosure/evidence";
 import { readRecognition, type ViewFigure } from "@/server/disclosure/read-plausibility";
 import { readLatestRun, type ViewCheck } from "@/server/disclosure/read-run";
 import { disclosureJevAssist } from "@/server/environment";
@@ -54,6 +55,7 @@ function formatCheck(check: ViewCheck, figure: ViewFigure | undefined): MarkChec
     source: check.sourceLabel,
     comment: check.comment,
     model: check.assignment !== "rule",
+    accountIds: check.sourceAccountIds,
   };
 }
 
@@ -64,17 +66,22 @@ export default async function PlausibilityPage({ params }: PageProps) {
   const plausibilityT = await getTranslations("Disclosure.plausibility");
   const resultsT = await getTranslations("ResultsPreview");
   const report = found.documents.find((document) => document.role === "report");
-  const [blocks, recognition, latest, catalogue, savedCredentials] = await Promise.all([
-    readDocumentBlocks(
-      found.documents.flatMap((document) =>
-        document.policyVersionId ? [document.policyVersionId] : [],
+  const [blocks, recognition, latest, catalogue, savedCredentials, evidenceFiles] =
+    await Promise.all([
+      readDocumentBlocks(
+        found.documents.flatMap((document) =>
+          document.policyVersionId ? [document.policyVersionId] : [],
+        ),
       ),
-    ),
-    report ? readRecognition(report.id) : Promise.resolve(undefined),
-    report ? readLatestRun(found.id, locale) : Promise.resolve(null),
-    getAnalysisModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
-    listSavedCredentials().catch(() => []),
-  ]);
+      report ? readRecognition(report.id) : Promise.resolve(undefined),
+      report ? readLatestRun(found.id, locale) : Promise.resolve(null),
+      getAnalysisModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
+      listSavedCredentials().catch(() => []),
+      readCaseEvidence(found.id),
+    ]);
+  const evidenceBusy = evidenceFiles.some(
+    (file) => file.status === "uploaded" || file.status === "parsing",
+  );
 
   const run = latest?.run ?? null;
   const open = run?.status === "queued" || run?.status === "running";
@@ -173,8 +180,14 @@ export default async function PlausibilityPage({ params }: PageProps) {
           checksBySubject={checksBySubject}
           findings={findings}
           summary={summary}
-          live={open}
+          live={open || evidenceBusy}
           checked={finished}
+          evidence={{
+            caseId,
+            files: evidenceFiles,
+            canUpload: found.permissions.canPrepare,
+            errorMessages: t.raw("evidenceErrors") as Record<string, string>,
+          }}
           controls={
             <RunControls
               caseId={caseId}

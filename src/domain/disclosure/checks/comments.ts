@@ -124,6 +124,14 @@ const templates: Record<CommentCode, Record<Locale, string>> = {
     de: "Zuordnung zu „{label}“ unsicher.",
     en: "Assignment to “{label}” uncertain.",
   },
+  evidence_matches: {
+    de: "Stimmt mit {source} überein{rounded}.",
+    en: "Agrees with {source}{rounded}.",
+  },
+  evidence_differs: {
+    de: "Weicht um {difference} von {source} ({expected}) ab.",
+    en: "Differs by {difference} from {source} ({expected}).",
+  },
 };
 
 const roundedSuffix: Record<Locale, string> = { de: ", gerundet", en: ", rounded" };
@@ -161,6 +169,7 @@ const titles: Partial<Record<CommentCode, Record<Locale, string>>> = {
   ratio_differs: { de: "Quote weicht ab", en: "Ratio differs" },
   sum_ambiguous: { de: "Summe nicht eindeutig", en: "Sum not conclusive" },
   model_unsure: { de: "Zuordnung unsicher", en: "Assignment uncertain" },
+  evidence_differs: { de: "Abweichung zur SuSa", en: "Differs from trial balance" },
 };
 
 /** Titel einer Feststellung: Art der Abweichung und der Posten, höchstens 60 Zeichen. */

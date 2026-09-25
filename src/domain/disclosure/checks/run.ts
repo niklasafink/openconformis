@@ -7,6 +7,7 @@ import {
   type Fact,
 } from "./facts";
 import { formatAmount, formatDifference } from "./comments";
+import { evidenceChecks, type EvidenceFileInput } from "./evidence";
 import { normalizeLabel, postenByKey } from "./posten";
 import {
   balanceChecks,
@@ -25,7 +26,11 @@ import type { CheckDraft, EngineDocument } from "./types";
  * erkannten Zahlen ergeben dieselben Prüfungen in derselben Reihenfolge. Doppelte
  * Prüfungen (gleiche Art, gleicher Gegenstand, gleiche Quelle) werden zusammengelegt.
  */
-export function runDeterministicChecks(document: EngineDocument) {
+export function runDeterministicChecks(
+  document: EngineDocument,
+  /** Belegdateien des Laufs (SuSa); ohne sie gibt es keinen Beleg-Abgleich. */
+  evidence: readonly EvidenceFileInput[] = [],
+) {
   const tables = buildTables(document);
   const tableDrafts: CheckDraft[] = [];
   for (const table of tables) {
@@ -51,6 +56,7 @@ export function runDeterministicChecks(document: EngineDocument) {
   const referenceDrafts = [
     ...tableReferenceChecks(index.byPosten),
     ...derivedRowChecks(index.facts, resolver),
+    ...evidenceChecks(tables, evidence),
   ];
   const factLabels = uniqueLabels(index.facts);
   const text = textChecks(document, resolver, factLabels);

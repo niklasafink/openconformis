@@ -237,6 +237,90 @@ export const disclosureStatements = pgTable(
   ],
 );
 
+/** Stand einer Belegdatei vom Upload bis zu den gelesenen Konten. */
+export const disclosureEvidenceStatus = pgEnum("disclosure_evidence_status", [
+  "awaiting_upload",
+  "uploaded",
+  "parsing",
+  "ready",
+  "failed",
+]);
+
+/**
+ * Eine Belegdatei einer Prüfung, derzeit nur die Summen- und Saldenliste als `.xlsx`.
+ * Sie trägt ihre eigene Upload-Absicht (Pfad, erklärte Größe, Frist); nach dem Lesen
+ * wird das Original gelöscht, die Konten bleiben.
+ */
+export const disclosureEvidenceFiles = pgTable(
+  "disclosure_evidence_files",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => disclosureCases.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    uploadedByUserId: text("uploaded_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    kind: text("kind").default("susa_xlsx").notNull(),
+    filename: text("filename").notNull(),
+    objectKey: text("object_key").notNull(),
+    declaredByteSize: integer("declared_byte_size").notNull(),
+    sha256: text("sha256"),
+    status: disclosureEvidenceStatus("status").default("awaiting_upload").notNull(),
+    parserVersion: text("parser_version"),
+    errorCode: text("error_code"),
+    accountCount: integer("account_count").default(0).notNull(),
+    uploadExpiresAt: timestamp("upload_expires_at", { withTimezone: true }).notNull(),
+    deleteAfter: timestamp("delete_after", { withTimezone: true }).notNull(),
+    originalDeletedAt: timestamp("original_deleted_at", { withTimezone: true }),
+    parsedAt: timestamp("parsed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("disclosure_evidence_files_object_uidx").on(table.objectKey),
+    index("disclosure_evidence_files_case_idx").on(table.caseId, table.createdAt),
+    check("disclosure_evidence_files_kind_check", sql`${table.kind} = 'susa_xlsx'`),
+    check(
+      "disclosure_evidence_files_filename_check",
+      sql`length(btrim(${table.filename})) between 1 and 255`,
+    ),
+    check(
+      "disclosure_evidence_files_size_check",
+      sql`${table.declaredByteSize} between 1 and 10485760`,
+    ),
+  ],
+);
+
+/** Ein Konto der SuSa; Beträge exakt in Millionstel EUR wie die erkannten Zahlen. */
+export const disclosureEvidenceAccounts = pgTable(
+  "disclosure_evidence_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    evidenceFileId: uuid("evidence_file_id")
+      .notNull()
+      .references(() => disclosureEvidenceFiles.id, { onDelete: "cascade" }),
+    rowNumber: integer("row_number").notNull(),
+    accountNumber: text("account_number").notNull(),
+    label: text("label").notNull(),
+    openingMicro: bigint("opening_micro", { mode: "bigint" }),
+    debitMicro: bigint("debit_micro", { mode: "bigint" }),
+    creditMicro: bigint("credit_micro", { mode: "bigint" }),
+    closingMicro: bigint("closing_micro", { mode: "bigint" }).notNull(),
+    /** Posten des Code-Katalogs aus der Bezeichnung; `null` heißt nicht zugeordnet. */
+    postenKey: text("posten_key"),
+  },
+  (table) => [
+    uniqueIndex("disclosure_evidence_accounts_row_uidx").on(table.evidenceFileId, table.rowNumber),
+    check(
+      "disclosure_evidence_accounts_number_check",
+      sql`${table.accountNumber} ~ '^[0-9]{3,9}$'`,
+    ),
+  ],
+);
+
 /*
  * Plausicheck-Läufe (Etappe 4). Ein Lauf friert Bericht, Erkennungs- und Prüfversion
  * ein; Modellroute, Prompt-Version und Schlüssel sind nullable und werden erst mit der
@@ -265,6 +349,7 @@ export const disclosureCheckKind = pgEnum("disclosure_check_kind", [
   "prior_year",
   "derived",
   "ratio",
+  "evidence",
 ]);
 
 export const disclosureCheckStatus = pgEnum("disclosure_check_status", [
@@ -338,6 +423,11 @@ export const disclosureRuns = pgTable(
     extractionVersion: text("extraction_version").notNull(),
     checkVersion: text("check_version").notNull(),
     configurationHash: text("configuration_hash").notNull(),
+    /** Eingefrorene Belegdateien (SuSa), gelesen und bereit beim Start. */
+    evidenceFileIds: uuid("evidence_file_ids")
+      .array()
+      .default(sql`'{}'::uuid[]`)
+      .notNull(),
     // Einordnung über das Nutzermodell (Etappe 5) und Jev (Etappe 6).
     routeProvider: text("route_provider"),
     providerModelId: text("provider_model_id"),

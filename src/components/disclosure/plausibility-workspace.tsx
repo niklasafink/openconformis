@@ -8,6 +8,7 @@ import {
   CircleDashed,
   CircleX,
   LoaderCircle,
+  Paperclip,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+import { EvidencePanel, type EvidenceFileView } from "./evidence-panel";
 import {
   DocumentView,
   type DocumentBlockContext,
@@ -56,6 +58,8 @@ export type MarkCheck = Readonly<{
   source: string;
   comment: string;
   model: boolean;
+  /** Konten einer Belegdatei, gegen die geprüft wurde (SuSa). */
+  accountIds: readonly string[];
 }>;
 
 export type WorkspaceFinding = Readonly<{
@@ -93,6 +97,13 @@ type PlausibilityWorkspaceProps = Readonly<{
   live?: boolean;
   /** Ein Lauf ist beendet: ungeprüfte Zahlen haben keine Prüfbeziehung. */
   checked?: boolean;
+  /** Der Reiter „Belege“ mit den Belegdateien der Prüfung. */
+  evidence?: Readonly<{
+    caseId: string;
+    files: readonly EvidenceFileView[];
+    canUpload: boolean;
+    errorMessages: Readonly<Record<string, string>>;
+  }>;
 }>;
 
 type Filter = "all" | "mismatch" | "uncertain";
@@ -146,6 +157,7 @@ export function PlausibilityWorkspace({
   summary: runSummary = null,
   live = false,
   checked = false,
+  evidence,
 }: PlausibilityWorkspaceProps) {
   const t = useTranslations("Disclosure.plausibility");
   const documentT = useTranslations("Disclosure.document");
@@ -156,6 +168,34 @@ export function PlausibilityWorkspace({
   const anchorRef = useRef<HTMLElement | null>(null);
 
   const [filter, setFilter] = useState<Filter>("all");
+  const textDocuments = useMemo(
+    () => documents.filter((document) => document.role !== "evidence"),
+    [documents],
+  );
+  const [documentTab, setDocumentTab] = useState(textDocuments[0]?.id ?? "");
+  const [highlightedAccounts, setHighlightedAccounts] = useState<readonly string[]>([]);
+  // Eine Marke in einem anderen Reiter: erst wechseln, dann nach dem Rendern fokussieren.
+  const pendingFocus = useRef<string | null>(null);
+  const blockDocument = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const document of textDocuments) {
+      for (const block of blocksByDocument[document.id] ?? []) map.set(block.id, document.id);
+    }
+    return map;
+  }, [textDocuments, blocksByDocument]);
+  const accountStatus = useMemo(() => {
+    const rank = { match: 0, uncertain: 1, mismatch: 2 } as const;
+    const map: Record<string, "match" | "mismatch" | "uncertain"> = {};
+    for (const checks of Object.values(checksBySubject)) {
+      for (const check of checks) {
+        for (const id of check.accountIds) {
+          const current = map[id];
+          if (!current || rank[check.status] > rank[current]) map[id] = check.status;
+        }
+      }
+    }
+    return map;
+  }, [checksBySubject]);
 
   // Während Erkennung oder Lauf lädt die Seite still nach; gespeicherte Prüfungen färben
   // die Marken, sobald sie da sind.
@@ -209,21 +249,46 @@ export function PlausibilityWorkspace({
   const activeMark = marks.find((mark) => mark.id === activeId) ?? null;
   const annotationIndex = activeMark ? annotations.findIndex((mark) => mark.id === activeId) : -1;
 
-  const focusMark = useCallback((id: string, openPopover = true) => {
-    const element = document.querySelector<HTMLElement>(`[data-mark-id="${id}"]`);
-    const container = scrollRef.current;
-    if (element && container) {
-      const top =
-        element.getBoundingClientRect().top -
-        container.getBoundingClientRect().top +
-        container.scrollTop;
-      // Sofort, nicht weich: das Popover hängt an der Marke und misst sie beim Öffnen.
-      container.scrollTo({ top: Math.max(0, top - scrollContext), behavior: "auto" });
-      element.focus({ preventScroll: true });
-    }
-    anchorRef.current = element;
-    setActiveId(id);
-    setOpen(openPopover);
+  const focusMark = useCallback(
+    (id: string, openPopover = true) => {
+      // Steht die Marke in einem anderen Reiter (etwa aus „Belege“), erst dorthin wechseln.
+      const mark = markById.get(id);
+      const target = mark ? blockDocument.get(mark.blockId) : undefined;
+      if (target && target !== documentTab) {
+        pendingFocus.current = id;
+        setDocumentTab(target);
+        return;
+      }
+      const element = document.querySelector<HTMLElement>(`[data-mark-id="${id}"]`);
+      const container = scrollRef.current;
+      if (element && container) {
+        const top =
+          element.getBoundingClientRect().top -
+          container.getBoundingClientRect().top +
+          container.scrollTop;
+        // Sofort, nicht weich: das Popover hängt an der Marke und misst sie beim Öffnen.
+        container.scrollTo({ top: Math.max(0, top - scrollContext), behavior: "auto" });
+        element.focus({ preventScroll: true });
+      }
+      anchorRef.current = element;
+      setActiveId(id);
+      setOpen(openPopover);
+    },
+    [markById, blockDocument, documentTab],
+  );
+
+  useEffect(() => {
+    const id = pendingFocus.current;
+    if (!id) return;
+    pendingFocus.current = null;
+    const frame = requestAnimationFrame(() => focusMark(id));
+    return () => cancelAnimationFrame(frame);
+  }, [documentTab, focusMark]);
+
+  const showInEvidence = useCallback((accountIds: readonly string[]) => {
+    setHighlightedAccounts(accountIds);
+    setOpen(false);
+    setDocumentTab("evidence");
   }, []);
 
   const step = useCallback(
@@ -456,7 +521,30 @@ export function PlausibilityWorkspace({
             }}
           />
           <DocumentView
-            documents={documents}
+            documents={textDocuments}
+            activeId={documentTab}
+            onActiveIdChange={setDocumentTab}
+            extraTabs={
+              evidence
+                ? [
+                    {
+                      id: "evidence",
+                      label: t("evidenceTab"),
+                      icon: <Paperclip aria-hidden="true" className="size-3.5" />,
+                      content: (
+                        <EvidencePanel
+                          caseId={evidence.caseId}
+                          files={evidence.files}
+                          canUpload={evidence.canUpload}
+                          accountStatus={accountStatus}
+                          highlighted={highlightedAccounts}
+                          errorMessages={evidence.errorMessages}
+                        />
+                      ),
+                    },
+                  ]
+                : []
+            }
             blocksByDocument={blocksByDocument}
             contexts={contexts}
             labels={{
@@ -539,7 +627,20 @@ export function PlausibilityWorkspace({
                               </>
                             ) : null}
                             <dt className="text-muted-foreground">{t("check.source")}</dt>
-                            <dd>{check.source}</dd>
+                            <dd>
+                              {check.source}
+                              {check.accountIds.length > 0 && evidence ? (
+                                <Button
+                                  type="button"
+                                  variant="link"
+                                  size="sm"
+                                  className="ml-1 h-auto p-0 text-meta"
+                                  onClick={() => showInEvidence(check.accountIds)}
+                                >
+                                  {t("check.showEvidence")}
+                                </Button>
+                              ) : null}
+                            </dd>
                           </dl>
                         ) : null}
                         <p className="text-muted-foreground">

@@ -39,6 +39,7 @@ export type ViewCheck = {
   rounded: boolean;
   sourceLabel: string;
   sourceFigureIds: string[];
+  sourceAccountIds: string[];
   comment: string;
   assignment: "rule" | "jev" | "model";
   /** Ohne Feststellung und ohne Farbe (Summe nicht eindeutig, Rundung). */
@@ -100,6 +101,7 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
       rounded: check.rounded,
       sourceLabel: check.sourceLabel,
       sourceFigureIds: check.sourceFigureIds,
+      sourceAccountIds: check.sourceAccountIds,
       comment: locale === "de" ? check.comment : renderComment(comment, locale),
       assignment: check.assignmentSource,
       silent: isSilent({ ...check, subjectStatementId: check.statementId, comment }),
