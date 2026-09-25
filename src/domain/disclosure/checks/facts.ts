@@ -60,6 +60,20 @@ function captionPosten(table: TableModel) {
   );
 }
 
+/**
+ * Eine Spaltengruppe, die nur Einheit oder Stichtag nennt („EUR“ über einer Vorspalte,
+ * „31.12.2021“), ist keine Gliederung wie eine Region: Vorspalte und Hauptspalte einer
+ * Bilanz zeigen verschiedene Posten derselben Periode.
+ */
+function isBreakdownGroup(group: string) {
+  const text = group.trim();
+  if (!text) return false;
+  if (/^(?:in\s+)?(?:T?EUR|€|T\s?€|Tsd\.?\s?(?:EUR|€)|Mio\.?\s?(?:EUR|€)|%)$/iu.test(text))
+    return false;
+  if (/^(?:\d{1,2}\.\s?\d{1,2}\.\s?)?\d{4}$/u.test(text)) return false;
+  return true;
+}
+
 export function buildFacts(
   tables: readonly TableModel[],
   confirmed: ReadonlyMap<string, number>,
@@ -76,7 +90,8 @@ export function buildFacts(
     );
     const groupsByPeriod = new Map<string, Set<string>>();
     for (const column of table.columns.values()) {
-      if (!column.period || column.change || column.percent || !column.group) continue;
+      if (!column.period || column.change || column.percent || !isBreakdownGroup(column.group))
+        continue;
       const set = groupsByPeriod.get(column.period) ?? new Set<string>();
       set.add(column.group);
       groupsByPeriod.set(column.period, set);

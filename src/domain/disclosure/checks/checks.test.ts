@@ -395,6 +395,36 @@ describe("tables", () => {
     expect(checks.filter((check) => check.status === "mismatch")).toEqual([]);
   });
 
+  it("gbs Bilanz mit Vorspalte „EUR“ ist keine regionale Gliederung: ihre Werte stehen für Querverweise bereit", () => {
+    const checks = checksOf(
+      buildDocument([
+        {
+          table: 1,
+          header: 2,
+          cells: [
+            [null, null, "31.12.2021", "31.12.2020"],
+            [null, "EUR", "EUR", "EUR"],
+            ["C. Verbindlichkeiten", null, null, null],
+            [
+              "1. Verbindlichkeiten aus Lieferungen und Leistungen",
+              "422.390,35",
+              null,
+              "406.595,13",
+            ],
+            ["2. Sonstige Verbindlichkeiten", "15.000,00", null, "1.000,00"],
+            [null, null, "437.390,35", "407.595,13"],
+          ],
+        },
+        {
+          text: "Die Verbindlichkeiten aus Lieferungen und Leistungen betragen TEUR 422 (Vorjahr: TEUR 407).",
+        },
+      ]),
+    );
+    const reference = find(checks, "422").find((check) => check.kind === "cross_reference");
+    expect(reference).toMatchObject({ status: "match", rounded: true });
+    expect(reference?.sourceLabel).toContain("Verbindlichkeiten aus Lieferungen und Leistungen");
+  });
+
   it("ICBC: Sonstige Vermögensgegenstände 774.491,78 in der Bilanz, 774.391,78 als Anhang-Summe (rot)", () => {
     const checks = checksOf(
       buildDocument(
