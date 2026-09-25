@@ -28,7 +28,7 @@ Vercel invokes the maintenance route with `Authorization: Bearer $CRON_SECRET`. 
 
 ## Disclosure review: a second person for the four-eyes release
 
-The plausibility check needs two different people: a preparer accepts or confirms a
+The plausibility check and the completeness check need two different people: a preparer accepts or confirms a
 finding, a manager (owner or admin) releases it. There is no invitation screen yet. To
 put a second account into the workspace of a first one:
 
@@ -45,3 +45,54 @@ put a second account into the workspace of a first one:
 
 3. To undo it, run the same command with `--remove`; the second account returns to its
    own workspace.
+
+## Disclosure review: checklist templates
+
+The completeness check assesses a report against a checklist. Templates are versioned
+master data; only catalogue administrators create them. Users choose a published
+template directly or derive their own editable checklist from it.
+
+### Demo template
+
+`HGB-Anhang und Lagebericht Kapitalgesellschaft (Demo)` (14 items, marked `demo`) is the
+only template until the first real import. The seed is idempotent; changed content
+becomes a new version.
+
+```bash
+pnpm disclosure:seed-checklist:local   # local database
+pnpm disclosure:seed-checklist         # database from .env.local (production)
+```
+
+### Excel import format
+
+One worksheet, the first row is the header. Column names are matched in German or
+English, case-insensitive; the order of the columns does not matter.
+
+| Column (DE / EN)              | Required | Content                                                      |
+| ----------------------------- | -------- | ------------------------------------------------------------ |
+| `Schlüssel` / `Key`           | yes      | Unique within the file: letters, digits, `. _ - /`, up to 80 |
+| `Referenz` / `Reference`      | yes      | Legal reference, e.g. `§ 285 Nr. 17 HGB`                     |
+| `Titel` / `Title`             | yes      | Short title, up to 300 characters                            |
+| `Anforderung` / `Requirement` | yes      | The disclosure obligation, up to 6,000 characters            |
+| `Prüfaspekte` / `Aspects`     | no       | Aspects separated by `;`                                     |
+| `Übergeordnet` / `Parent`     | no       | Key of the parent item; at most three levels                 |
+| `Reihenfolge` / `Order`       | no       | Whole number among siblings; empty keeps the row order       |
+
+Validation rejects the whole file and lists each problem with its row: missing header
+columns, duplicate keys (also in different case), empty reference, title or requirement,
+unknown or circular parents, more than three levels, a non-numeric order and more than
+500 items. The example `assets/samples/checklisten-vorlage-beispiel.xlsx` is the demo
+template in this format.
+
+### Importing, publishing and archiving
+
+1. Open `Administration` → tab `Checklisten-Vorlagen`.
+2. Under `Vorlage`, choose an existing template (new version) or `Neue Vorlage` and
+   enter its title.
+3. Choose the `.xlsx` file and click `Hochladen und prüfen`. The file goes directly to
+   private Blob storage, is read once and deleted immediately.
+4. Errors appear as a table with row, key and problem; nothing is saved. Otherwise a
+   draft with preview appears.
+5. Click `Veröffentlichen` to make the version selectable, or `Verwerfen` to delete the
+   draft. `Archivieren` removes a published version from the choice; runs and derived
+   checklists that used it keep their copy.

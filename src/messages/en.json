@@ -85,7 +85,43 @@
     "status": "Status",
     "ready": "Ready",
     "stale": "Unavailable",
-    "managed": "Managed"
+    "managed": "Managed",
+    "checklists": "Checklist templates",
+    "checklistTemplates": {
+      "title": "Checklist templates",
+      "description": "Templates of the completeness check. An Excel import becomes a draft with preview first.",
+      "import": "Import Excel",
+      "file": "Excel file (.xlsx)",
+      "target": "Template",
+      "newTemplate": "New template",
+      "newTitle": "Title of the new template",
+      "upload": "Upload and validate",
+      "uploading": "Validating …",
+      "issues": "The file contains errors. Nothing was saved.",
+      "row": "Row",
+      "key": "Key",
+      "problem": "Problem",
+      "preview": "Preview: version {version}, {count} items",
+      "publish": "Publish",
+      "discard": "Discard",
+      "archive": "Archive",
+      "version": "Version {version}",
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "archived": "Archived"
+      },
+      "source": {
+        "seed": "Demo seed",
+        "excel_import": "Excel import"
+      },
+      "items": "{count} items",
+      "demo": "Demo",
+      "empty": "No template yet. Run the demo seed or import an Excel file.",
+      "format": "Format: Key | Reference | Title | Requirement | Aspects (;) | Parent | Order",
+      "failed": "The action failed.",
+      "xlsxOnly": ".xlsx files only."
+    }
   },
   "Topbar": {
     "framework": "Framework",
@@ -745,7 +781,95 @@
       "empty": "The report contains no readable text."
     },
     "completeness": {
-      "empty": "The completeness check becomes available once a report is uploaded."
+      "empty": "The completeness check follows once a report is uploaded.",
+      "uploadFirst": "Upload the audit report in the “Plausibility check” tab first.",
+      "items": {
+        "title": "Items",
+        "label": "Checklist items",
+        "empty": "No check yet. Choose a checklist and start.",
+        "running": "Assessing the items …"
+      },
+      "checklist": {
+        "label": "Checklist",
+        "choose": "Choose checklist",
+        "change": "Change",
+        "none": "No checklist chosen",
+        "dialogTitle": "Choose checklist",
+        "dialogDescription": "Published templates and your workspace's own checklists.",
+        "templates": "Templates",
+        "own": "Own checklists",
+        "version": "Version {version}",
+        "items": "{count} items",
+        "demo": "Demo",
+        "useTemplate": "Use template",
+        "derive": "Create own checklist from it",
+        "use": "Use",
+        "edit": "Edit",
+        "origin": "from template {title}, version {version}",
+        "newer": "newer template available (version {version})",
+        "selected": "Selected",
+        "noTemplates": "No template has been published yet.",
+        "noOwn": "No own checklist yet.",
+        "deriveFailed": "The checklist could not be created."
+      },
+      "run": {
+        "start": "Start check",
+        "restart": "Check again",
+        "starting": "Starting …",
+        "preparing": "Preparing …",
+        "progress": "{stored} of {planned} items assessed",
+        "completed": "Checked: {count} items",
+        "completedWithGaps": "Checked with gaps: {stored} of {planned} items assessed",
+        "failed": "Failed ({code})",
+        "cancelled": "Stopped",
+        "needChecklist": "Choose a checklist.",
+        "needKey": "Save a key for the model under “API key”.",
+        "ready": "Assessment with {model}",
+        "startFailed": "The check could not be started.",
+        "source": "{title}"
+      },
+      "status": {
+        "fulfilled": "Fulfilled",
+        "partially_fulfilled": "Partially fulfilled",
+        "not_fulfilled": "Not fulfilled",
+        "not_applicable": "Not applicable",
+        "no_assessment_possible": "No assessment possible",
+        "pending": "Not yet assessed"
+      },
+      "detail": {
+        "empty": "Choose an item on the left.",
+        "requirement": "Requirement",
+        "aspects": "Aspects",
+        "assessment": "Assessment",
+        "explanation": "Rationale",
+        "notApplicableReason": "Reason for “not applicable”",
+        "missing": "Open points",
+        "evidence": "Evidence",
+        "noEvidence": "No passage found in the report.",
+        "withoutModel": "Assessed without a model call: the report contains no matching passage.",
+        "confidence": "Confidence {value} %",
+        "override": "Overridden by {name}: {reason}",
+        "aiStatus": "AI assessment: {status}",
+        "page": "p. {page}",
+        "pending": "This item has not been assessed yet.",
+        "gap": "This item could not be assessed.",
+        "support": {
+          "supports": "supports",
+          "contradicts": "contradicts",
+          "context": "context"
+        }
+      },
+      "errors": {
+        "DISCLOSURE_MODEL_KEY_REQUIRED": "No key is saved for the selected model.",
+        "CHECKLIST_NOT_FOUND": "The checklist is no longer available.",
+        "DISCLOSURE_RUN_IN_PROGRESS": "Another check is still running. Stop it or wait.",
+        "DISCLOSURE_DOCUMENT_NOT_READY": "The report is still being prepared.",
+        "DISCLOSURE_REPORT_MISSING": "No report has been uploaded yet.",
+        "MODEL_SELECTION_NOT_FOUND": "The selected model is no longer available.",
+        "BYOK_ROUTE_NOT_EXECUTABLE": "The model's route is locked.",
+        "DISCLOSURE_FORBIDDEN": "Your role does not allow starting.",
+        "NETWORK_ERROR": "No connection. Please try again."
+      }
     },
     "errors": {
       "DISCLOSURE_INPUT_INVALID": "Enter a name with at most 200 characters.",
@@ -944,7 +1068,9 @@
         "confirmed": "confirmed the actual value",
         "released": "released",
         "rejected": "rejected",
-        "comment": "commented"
+        "comment": "commented",
+        "overridden": "set the status to “{value}”",
+        "confirmedAssessment": "confirmed the assessment"
       },
       "reviewed": "Reviewed",
       "accept": "Accept",
@@ -960,7 +1086,8 @@
         "accept": "Accept",
         "confirm": "Confirm",
         "reject": "Reject",
-        "idle": "Send"
+        "idle": "Send",
+        "override": "Override"
       },
       "secondPersonRequired": "Confirmation by a second person required",
       "managerRequired": "Waiting for release by a manager",
@@ -980,8 +1107,79 @@
         "DISCLOSURE_VALUE_NOT_AVAILABLE": "There is no value to accept here.",
         "DISCLOSURE_REASON_REQUIRED": "Please give a reason.",
         "DISCLOSURE_MENTION_INVALID": "Only members can be mentioned.",
-        "DISCLOSURE_FINDING_NOT_FOUND": "The finding was not found."
+        "DISCLOSURE_FINDING_NOT_FOUND": "The finding was not found.",
+        "DISCLOSURE_ITEM_NOT_FOUND": "The item was not found.",
+        "DISCLOSURE_ITEM_NOT_PREPARED": "The item has not been prepared yet.",
+        "DISCLOSURE_ITEM_REVIEWED": "The item has already been reviewed."
+      },
+      "override": "Override",
+      "overrideStatus": "New status",
+      "reasonOverride": "Reason (required, at least 8 characters)"
+    },
+    "checklists": {
+      "eyebrow": "Disclosure review · Own checklist",
+      "back": "Back to the review",
+      "origin": "from template {title}, version {version}",
+      "newer": "Newer template available (version {version}). Your checklist stays unchanged.",
+      "add": "Add item",
+      "edit": "Edit",
+      "remove": "Remove",
+      "removeConfirm": "Remove “{title}” and its sub-items?",
+      "up": "Move up",
+      "down": "Move down",
+      "rename": "Rename",
+      "name": "Checklist name",
+      "save": "Save",
+      "saving": "Saving …",
+      "cancel": "Cancel",
+      "readOnly": "Only preparers can edit this checklist.",
+      "notFound": "The checklist was not found.",
+      "count": "{count} items",
+      "failed": "The change failed.",
+      "columns": {
+        "reference": "Reference",
+        "title": "Title",
+        "requirement": "Requirement",
+        "aspects": "Aspects",
+        "parent": "Parent",
+        "actions": "Actions"
+      },
+      "dialog": {
+        "addTitle": "Add item",
+        "editTitle": "Edit item",
+        "description": "Changes apply to this checklist only, never to the template.",
+        "key": "Key",
+        "reference": "Reference",
+        "title": "Title",
+        "requirement": "Requirement",
+        "aspects": "Aspects",
+        "aspectsHint": "Separated by semicolons",
+        "parent": "Parent item",
+        "noParent": "None (top level)"
+      },
+      "errors": {
+        "CHECKLIST_LAST_ITEM": "The last item cannot be removed.",
+        "CHECKLIST_NOT_FOUND": "The checklist was not found.",
+        "CHECKLIST_ITEM_NOT_FOUND": "The item was not found.",
+        "DISCLOSURE_FORBIDDEN": "Your role does not allow changes.",
+        "INVALID_DISCLOSURE_REQUEST": "Please fill in all required fields."
       }
+    },
+    "checklistIssues": {
+      "missing_header": "Header row lacks required columns (Key, Reference, Title, Requirement)",
+      "no_items": "No items found",
+      "too_many_items": "More than 500 items",
+      "invalid_key": "Invalid key (letters, digits, . _ - /)",
+      "duplicate_key": "Duplicate key",
+      "empty_reference": "Reference missing",
+      "empty_title": "Title missing",
+      "empty_requirement": "Requirement missing",
+      "text_too_long": "Text too long",
+      "unknown_parent": "Unknown parent item",
+      "self_parent": "Item refers to itself",
+      "parent_cycle": "Circular parent reference",
+      "too_deep": "More than three levels",
+      "invalid_order": "Order is not a whole number"
     }
   }
 }

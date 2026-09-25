@@ -1,5 +1,5 @@
 import { hasLocale } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { AdminWorkspace } from "@/components/admin/admin-workspace";
@@ -8,6 +8,7 @@ import { LanguageMenu } from "@/components/shell/language-menu";
 import { routing } from "@/i18n/routing";
 import { listAnalysisInstructions } from "@/server/ai/analysis-instruction-service";
 import { listAdminCatalogue } from "@/server/catalogue/admin-query";
+import { listAdminChecklistTemplates } from "@/server/disclosure/checklist-templates";
 import { getAdminOperationsSnapshot } from "@/server/operations/monitoring";
 
 type AdministrationPageProps = Readonly<{ params: Promise<{ locale: string }> }>;
@@ -19,10 +20,11 @@ export default async function AdministrationPage({ params }: AdministrationPageP
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  const [catalogue, instructions, operations] = await Promise.all([
+  const [catalogue, instructions, operations, checklistTemplates] = await Promise.all([
     listAdminCatalogue().catch(() => null),
     listAnalysisInstructions().catch(() => null),
     getAdminOperationsSnapshot().catch(() => null),
+    listAdminChecklistTemplates().catch(() => []),
   ]);
   if (!catalogue || !instructions || !operations) notFound();
 
@@ -34,6 +36,10 @@ export default async function AdministrationPage({ params }: AdministrationPageP
           initialCatalogue={JSON.parse(JSON.stringify(catalogue))}
           initialInstructions={JSON.parse(JSON.stringify(instructions))}
           initialOperations={JSON.parse(JSON.stringify(operations))}
+          initialChecklistTemplates={checklistTemplates}
+          checklistIssueLabels={
+            (await getTranslations("Disclosure")).raw("checklistIssues") as Record<string, string>
+          }
         />
       </div>
     </>

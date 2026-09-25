@@ -439,6 +439,11 @@ export const disclosureRuns = pgTable(
     jevAssist: disclosureJevAssist("jev_assist").default("off").notNull(),
     jevModelId: text("jev_model_id"),
     credentialDeadlineAt: timestamp("credential_deadline_at", { withTimezone: true }),
+    // Vollständigkeitsprüfung (Etappe 9): die eingefrorene Checkliste — eine Vorlage direkt
+    // oder eine eigene Checkliste, dazu der Hash des Schnappschusses.
+    checklistTemplateReleaseId: uuid("checklist_template_release_id"),
+    checklistId: uuid("checklist_id"),
+    checklistHash: text("checklist_hash"),
     workflowRunId: text("workflow_run_id"),
     // Zähler: `plannedCheckCount` steht nach den deterministischen Prüfungen fest.
     figureCount: integer("figure_count").default(0).notNull(),
@@ -469,6 +474,10 @@ export const disclosureRuns = pgTable(
         AND (${table.routeProvider} IS NULL OR ${table.promptVersion} IS NOT NULL)`,
     ),
     check("disclosure_runs_failure_detail_check", sql`length(${table.failureDetail}) <= 700`),
+    check(
+      "disclosure_runs_checklist_check",
+      sql`${table.kind} <> 'completeness' OR ((${table.checklistTemplateReleaseId} IS NOT NULL) <> (${table.checklistId} IS NOT NULL) AND ${table.checklistHash} IS NOT NULL)`,
+    ),
     check(
       "disclosure_runs_jev_frozen_check",
       sql`${table.jevAssist} = 'off' OR (${table.jevModelId} IS NOT NULL AND ${table.assistCredentialId} IS NOT NULL AND ${table.routeProvider} IS NOT NULL)`,

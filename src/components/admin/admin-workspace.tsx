@@ -4,6 +4,8 @@ import { Archive, Check, FileLock2, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
+import { ChecklistTemplateAdmin, type AdminTemplate } from "./checklist-templates";
+
 type CatalogueItem = {
   id: string;
   externalKey: string;
@@ -69,13 +71,19 @@ export function AdminWorkspace({
   initialCatalogue,
   initialInstructions,
   initialOperations,
+  initialChecklistTemplates,
+  checklistIssueLabels,
 }: {
   initialCatalogue: Framework[];
   initialInstructions: Instruction[];
   initialOperations: OperationsSnapshot;
+  initialChecklistTemplates: AdminTemplate[];
+  checklistIssueLabels: Record<string, string>;
 }) {
   const t = useTranslations("Administration");
-  const [tab, setTab] = useState<"catalogue" | "instructions" | "operations">("catalogue");
+  const [tab, setTab] = useState<"catalogue" | "instructions" | "checklists" | "operations">(
+    "catalogue",
+  );
   const [catalogue, setCatalogue] = useState(initialCatalogue);
   const [instructions, setInstructions] = useState(initialInstructions);
   const [frameworkId, setFrameworkId] = useState(initialCatalogue[0]?.id ?? "");
@@ -129,6 +137,14 @@ export function AdminWorkspace({
             onClick={() => setTab("instructions")}
           >
             {t("instructions")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "checklists"}
+            onClick={() => setTab("checklists")}
+          >
+            {t("checklists")}
           </button>
           <button
             type="button"
@@ -354,6 +370,11 @@ export function AdminWorkspace({
         </div>
       ) : tab === "instructions" ? (
         <InstructionWorkspace instructions={instructions} busy={busy} run={run} />
+      ) : tab === "checklists" ? (
+        <ChecklistTemplateAdmin
+          initialTemplates={initialChecklistTemplates}
+          issueLabels={checklistIssueLabels}
+        />
       ) : (
         <OperationsWorkspace snapshot={initialOperations} />
       )}

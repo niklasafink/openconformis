@@ -85,7 +85,43 @@
     "status": "Status",
     "ready": "Bereit",
     "stale": "Nicht erreichbar",
-    "managed": "Verwaltet"
+    "managed": "Verwaltet",
+    "checklists": "Checklisten-Vorlagen",
+    "checklistTemplates": {
+      "title": "Checklisten-Vorlagen",
+      "description": "Vorlagen der Vollständigkeitsprüfung. Ein Excel-Import wird zuerst ein Entwurf mit Vorschau.",
+      "import": "Excel importieren",
+      "file": "Excel-Datei (.xlsx)",
+      "target": "Vorlage",
+      "newTemplate": "Neue Vorlage",
+      "newTitle": "Titel der neuen Vorlage",
+      "upload": "Hochladen und prüfen",
+      "uploading": "Wird geprüft …",
+      "issues": "Die Datei enthält Fehler. Nichts wurde gespeichert.",
+      "row": "Zeile",
+      "key": "Schlüssel",
+      "problem": "Problem",
+      "preview": "Vorschau: Version {version}, {count} Positionen",
+      "publish": "Veröffentlichen",
+      "discard": "Verwerfen",
+      "archive": "Archivieren",
+      "version": "Version {version}",
+      "status": {
+        "draft": "Entwurf",
+        "published": "Veröffentlicht",
+        "archived": "Archiviert"
+      },
+      "source": {
+        "seed": "Demo-Seed",
+        "excel_import": "Excel-Import"
+      },
+      "items": "{count} Positionen",
+      "demo": "Demo",
+      "empty": "Noch keine Vorlage. Führen Sie den Demo-Seed aus oder importieren Sie eine Excel-Datei.",
+      "format": "Format: Schlüssel | Referenz | Titel | Anforderung | Prüfaspekte (;) | Übergeordnet | Reihenfolge",
+      "failed": "Die Aktion ist fehlgeschlagen.",
+      "xlsxOnly": "Nur .xlsx-Dateien."
+    }
   },
   "Topbar": {
     "framework": "Rahmenwerk",
@@ -745,7 +781,95 @@
       "empty": "Der Bericht enthält keinen lesbaren Text."
     },
     "completeness": {
-      "empty": "Die Vollständigkeitsprüfung folgt, sobald ein Bericht hochgeladen ist."
+      "empty": "Die Vollständigkeitsprüfung folgt, sobald ein Bericht hochgeladen ist.",
+      "uploadFirst": "Laden Sie den Prüfungsbericht zuerst im Reiter „Plausicheck“ hoch.",
+      "items": {
+        "title": "Positionen",
+        "label": "Checklistenpositionen",
+        "empty": "Noch keine Prüfung. Wählen Sie eine Checkliste und starten Sie.",
+        "running": "Die Positionen werden bewertet …"
+      },
+      "checklist": {
+        "label": "Checkliste",
+        "choose": "Checkliste wählen",
+        "change": "Ändern",
+        "none": "Keine Checkliste gewählt",
+        "dialogTitle": "Checkliste wählen",
+        "dialogDescription": "Veröffentlichte Vorlagen und eigene Checklisten Ihres Arbeitsbereichs.",
+        "templates": "Vorlagen",
+        "own": "Eigene Checklisten",
+        "version": "Version {version}",
+        "items": "{count} Positionen",
+        "demo": "Demo",
+        "useTemplate": "Vorlage verwenden",
+        "derive": "Eigene Checkliste daraus anlegen",
+        "use": "Verwenden",
+        "edit": "Bearbeiten",
+        "origin": "aus Vorlage {title}, Version {version}",
+        "newer": "neuere Vorlage verfügbar (Version {version})",
+        "selected": "Gewählt",
+        "noTemplates": "Es ist noch keine Vorlage veröffentlicht.",
+        "noOwn": "Noch keine eigene Checkliste.",
+        "deriveFailed": "Die Checkliste konnte nicht angelegt werden."
+      },
+      "run": {
+        "start": "Prüfung starten",
+        "restart": "Erneut prüfen",
+        "starting": "Wird gestartet …",
+        "preparing": "Wird vorbereitet …",
+        "progress": "{stored} von {planned} Positionen bewertet",
+        "completed": "Geprüft: {count} Positionen",
+        "completedWithGaps": "Geprüft mit Lücken: {stored} von {planned} Positionen bewertet",
+        "failed": "Fehlgeschlagen ({code})",
+        "cancelled": "Gestoppt",
+        "needChecklist": "Wählen Sie eine Checkliste.",
+        "needKey": "Hinterlegen Sie unter „API-Key“ einen Schlüssel für das Modell.",
+        "ready": "Bewertung mit {model}",
+        "startFailed": "Die Prüfung konnte nicht gestartet werden.",
+        "source": "{title}"
+      },
+      "status": {
+        "fulfilled": "Erfüllt",
+        "partially_fulfilled": "Teilweise erfüllt",
+        "not_fulfilled": "Nicht erfüllt",
+        "not_applicable": "Nicht einschlägig",
+        "no_assessment_possible": "Keine Einschätzung möglich",
+        "pending": "Noch nicht bewertet"
+      },
+      "detail": {
+        "empty": "Wählen Sie links eine Position.",
+        "requirement": "Anforderung",
+        "aspects": "Prüfaspekte",
+        "assessment": "Bewertung",
+        "explanation": "Begründung",
+        "notApplicableReason": "Begründung für „nicht einschlägig“",
+        "missing": "Offene Punkte",
+        "evidence": "Belege",
+        "noEvidence": "Keine Belegstelle im Bericht gefunden.",
+        "withoutModel": "Ohne Modellaufruf bewertet: der Bericht enthält keine passende Stelle.",
+        "confidence": "Konfidenz {value} %",
+        "override": "Überschrieben von {name}: {reason}",
+        "aiStatus": "KI-Bewertung: {status}",
+        "page": "S. {page}",
+        "pending": "Diese Position ist noch nicht bewertet.",
+        "gap": "Diese Position konnte nicht bewertet werden.",
+        "support": {
+          "supports": "belegt",
+          "contradicts": "widerspricht",
+          "context": "Kontext"
+        }
+      },
+      "errors": {
+        "DISCLOSURE_MODEL_KEY_REQUIRED": "Für das gewählte Modell ist kein Schlüssel gespeichert.",
+        "CHECKLIST_NOT_FOUND": "Die Checkliste ist nicht mehr verfügbar.",
+        "DISCLOSURE_RUN_IN_PROGRESS": "Eine andere Prüfung läuft noch. Stoppen Sie sie oder warten Sie.",
+        "DISCLOSURE_DOCUMENT_NOT_READY": "Der Bericht wird noch aufbereitet.",
+        "DISCLOSURE_REPORT_MISSING": "Es ist noch kein Bericht hochgeladen.",
+        "MODEL_SELECTION_NOT_FOUND": "Das gewählte Modell ist nicht mehr verfügbar.",
+        "BYOK_ROUTE_NOT_EXECUTABLE": "Die Route des Modells ist gesperrt.",
+        "DISCLOSURE_FORBIDDEN": "Ihre Rolle erlaubt keinen Start.",
+        "NETWORK_ERROR": "Keine Verbindung. Bitte erneut versuchen."
+      }
     },
     "errors": {
       "DISCLOSURE_INPUT_INVALID": "Bitte einen Namen mit höchstens 200 Zeichen eingeben.",
@@ -944,7 +1068,9 @@
         "confirmed": "hat den Ist-Wert bestätigt",
         "released": "hat freigegeben",
         "rejected": "hat abgelehnt",
-        "comment": "hat kommentiert"
+        "comment": "hat kommentiert",
+        "overridden": "hat den Status auf „{value}“ gesetzt",
+        "confirmedAssessment": "hat die Bewertung bestätigt"
       },
       "reviewed": "Geprüft",
       "accept": "Übernehmen",
@@ -960,7 +1086,8 @@
         "accept": "Übernehmen",
         "confirm": "Bestätigen",
         "reject": "Ablehnen",
-        "idle": "Senden"
+        "idle": "Senden",
+        "override": "Überschreiben"
       },
       "secondPersonRequired": "Bestätigung durch eine zweite Person erforderlich",
       "managerRequired": "Wartet auf Freigabe durch einen Manager",
@@ -980,8 +1107,79 @@
         "DISCLOSURE_VALUE_NOT_AVAILABLE": "Hier gibt es keinen Wert zum Übernehmen.",
         "DISCLOSURE_REASON_REQUIRED": "Bitte eine Begründung angeben.",
         "DISCLOSURE_MENTION_INVALID": "Erwähnt werden können nur Mitglieder.",
-        "DISCLOSURE_FINDING_NOT_FOUND": "Die Feststellung wurde nicht gefunden."
+        "DISCLOSURE_FINDING_NOT_FOUND": "Die Feststellung wurde nicht gefunden.",
+        "DISCLOSURE_ITEM_NOT_FOUND": "Die Position wurde nicht gefunden.",
+        "DISCLOSURE_ITEM_NOT_PREPARED": "Die Position ist noch nicht vorbereitet.",
+        "DISCLOSURE_ITEM_REVIEWED": "Die Position ist bereits geprüft."
+      },
+      "override": "Überschreiben",
+      "overrideStatus": "Neuer Status",
+      "reasonOverride": "Begründung (Pflicht, mindestens 8 Zeichen)"
+    },
+    "checklists": {
+      "eyebrow": "Offenlegungspflicht · Eigene Checkliste",
+      "back": "Zurück zur Prüfung",
+      "origin": "aus Vorlage {title}, Version {version}",
+      "newer": "Neuere Vorlage verfügbar (Version {version}). Ihre Checkliste bleibt unverändert.",
+      "add": "Position hinzufügen",
+      "edit": "Bearbeiten",
+      "remove": "Entfernen",
+      "removeConfirm": "„{title}“ und ihre Unterpositionen entfernen?",
+      "up": "Nach oben",
+      "down": "Nach unten",
+      "rename": "Umbenennen",
+      "name": "Name der Checkliste",
+      "save": "Speichern",
+      "saving": "Wird gespeichert …",
+      "cancel": "Abbrechen",
+      "readOnly": "Nur Prüfer können diese Checkliste bearbeiten.",
+      "notFound": "Die Checkliste wurde nicht gefunden.",
+      "count": "{count} Positionen",
+      "failed": "Die Änderung ist fehlgeschlagen.",
+      "columns": {
+        "reference": "Referenz",
+        "title": "Titel",
+        "requirement": "Anforderung",
+        "aspects": "Prüfaspekte",
+        "parent": "Übergeordnet",
+        "actions": "Aktionen"
+      },
+      "dialog": {
+        "addTitle": "Position hinzufügen",
+        "editTitle": "Position bearbeiten",
+        "description": "Änderungen gelten nur für diese Checkliste, nie für die Vorlage.",
+        "key": "Schlüssel",
+        "reference": "Referenz",
+        "title": "Titel",
+        "requirement": "Anforderung",
+        "aspects": "Prüfaspekte",
+        "aspectsHint": "Durch Semikolon getrennt",
+        "parent": "Übergeordnete Position",
+        "noParent": "Keine (oberste Ebene)"
+      },
+      "errors": {
+        "CHECKLIST_LAST_ITEM": "Die letzte Position kann nicht entfernt werden.",
+        "CHECKLIST_NOT_FOUND": "Die Checkliste wurde nicht gefunden.",
+        "CHECKLIST_ITEM_NOT_FOUND": "Die Position wurde nicht gefunden.",
+        "DISCLOSURE_FORBIDDEN": "Ihre Rolle erlaubt keine Änderung.",
+        "INVALID_DISCLOSURE_REQUEST": "Bitte alle Pflichtfelder ausfüllen."
       }
+    },
+    "checklistIssues": {
+      "missing_header": "Kopfzeile ohne Pflichtspalten (Schlüssel, Referenz, Titel, Anforderung)",
+      "no_items": "Keine Positionen gefunden",
+      "too_many_items": "Mehr als 500 Positionen",
+      "invalid_key": "Ungültiger Schlüssel (Buchstaben, Ziffern, . _ - /)",
+      "duplicate_key": "Schlüssel doppelt vergeben",
+      "empty_reference": "Referenz fehlt",
+      "empty_title": "Titel fehlt",
+      "empty_requirement": "Anforderung fehlt",
+      "text_too_long": "Text zu lang",
+      "unknown_parent": "Übergeordnete Position unbekannt",
+      "self_parent": "Position verweist auf sich selbst",
+      "parent_cycle": "Zirkelbezug bei „Übergeordnet“",
+      "too_deep": "Mehr als drei Ebenen",
+      "invalid_order": "Reihenfolge ist keine ganze Zahl"
     }
   }
 }

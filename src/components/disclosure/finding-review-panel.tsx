@@ -8,6 +8,7 @@ import {
   Lock,
   MessageSquare,
   PenLine,
+  Replace,
   Undo2,
 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -17,11 +18,18 @@ import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 export type ReviewHistoryEntry = Readonly<{
   id: string;
-  kind: "comment" | "accepted" | "confirmed" | "released" | "rejected";
+  kind: "comment" | "accepted" | "confirmed" | "overridden" | "released" | "rejected";
   actorName: string;
   body: string | null;
   createdAt: string;
@@ -39,7 +47,33 @@ export type FindingReview = Readonly<{
 
 export type ReviewMember = Readonly<{ userId: string; name: string }>;
 
-type Mode = "idle" | "accept" | "confirm" | "reject";
+type Mode = "idle" | "accept" | "confirm" | "override" | "reject";
+
+/**
+ * Was Stufe 1 anbietet: im Plausicheck eine Zahl übernehmen oder den Ist-Wert bestätigen,
+ * in der Vollständigkeitsprüfung die Bewertung bestätigen oder ihren Status überschreiben.
+ */
+export type PreparerChoice =
+  | Readonly<{ kind: "figure"; proposal: string | null }>
+  | Readonly<{
+      kind: "assessment";
+      statuses: ReadonlyArray<{ value: string; label: string }>;
+      current: string;
+    }>;
+
+type ReviewPanelProps = Readonly<{
+  /** Adresse der Aktionen, etwa `/api/disclosure/findings/{id}/review`. */
+  endpoint: string;
+  status: FindingReview["status"];
+  release: FindingReview["release"];
+  history: readonly ReviewHistoryEntry[];
+  /** Der KI-Befund, erster Eintrag des Verlaufs. */
+  aiEntry: ReactNode;
+  preparer: PreparerChoice;
+  canPrepare: boolean;
+  members: readonly ReviewMember[];
+  errorMessages: Readonly<Record<string, string>>;
+}>;
 
 type FindingReviewPanelProps = Readonly<{
   review: FindingReview;
@@ -55,6 +89,7 @@ type FindingReviewPanelProps = Readonly<{
 const kindIcon = {
   accepted: PenLine,
   confirmed: CheckCheck,
+  overridden: Replace,
   released: CircleCheck,
   rejected: Undo2,
   comment: MessageSquare,
@@ -80,9 +115,7 @@ function withMentions(body: string, mentions: ReviewHistoryEntry["mentions"]): R
 
 /**
  * Verlauf und Aktionen einer Feststellung im Popover: KI-Befund → Prüfer (Übernehmen oder
- * Bestätigen) → Manager (Freigeben, Ablehnen als Ereignis) → geprüft. Kommentare mit
- * @Erwähnung eines Mitglieds, ohne Benachrichtigung. Fehlt die zweite Person, zeigt die
- * Manager-Stufe einen gesperrten Zustand statt eines Fehlers.
+ * Bestätigen) → Manager (Freigeben, Ablehnen als Ereignis) → geprüft.
  */
 export function FindingReviewPanel({
   review,
@@ -93,11 +126,66 @@ export function FindingReviewPanel({
   errorMessages,
 }: FindingReviewPanelProps) {
   const t = useTranslations("Disclosure.review");
+  return (
+    <ReviewPanel
+      endpoint={`/api/disclosure/findings/${review.findingId}/review`}
+      status={review.status}
+      release={review.release}
+      history={review.history}
+      aiEntry={
+        <>
+          <span className="text-muted-foreground">{aiFinding.comment}</span>
+          {aiFinding.actual || aiFinding.expected ? (
+            <span className="tabular-nums">
+              {aiFinding.actual ? (
+                <span className="rounded-sm bg-[var(--status-not-met-bg)] px-1">
+                  {t("actual")} {aiFinding.actual}
+                </span>
+              ) : null}{" "}
+              {aiFinding.expected ? (
+                <span className="rounded-sm bg-[var(--status-met-bg)] px-1">
+                  {t("expected")} {aiFinding.expected}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+        </>
+      }
+      preparer={{ kind: "figure", proposal }}
+      canPrepare={canPrepare}
+      members={members}
+      errorMessages={errorMessages}
+    />
+  );
+}
+
+/**
+ * Verlauf und Aktionen des Vier-Augen-Prinzips, gemeinsam für Feststellungen und
+ * Checklistenpositionen: KI-Befund → Prüfer → Manager (Freigeben, Ablehnen als Ereignis)
+ * → geprüft. Kommentare mit @Erwähnung eines Mitglieds, ohne Benachrichtigung. Fehlt die
+ * zweite Person, zeigt die Manager-Stufe einen gesperrten Zustand statt eines Fehlers.
+ */
+export function ReviewPanel({
+  endpoint,
+  status,
+  release,
+  history,
+  aiEntry,
+  preparer,
+  canPrepare,
+  members,
+  errorMessages,
+}: ReviewPanelProps) {
+  const t = useTranslations("Disclosure.review");
   const format = useFormatter();
   const router = useRouter();
   const id = useId();
+  const proposal = preparer.kind === "figure" ? preparer.proposal : null;
   const [mode, setMode] = useState<Mode>("idle");
   const [value, setValue] = useState(proposal ?? "");
+  const [overrideStatus, setOverrideStatus] = useState(
+    preparer.kind === "assessment" ? preparer.current : "",
+  );
   const [reason, setReason] = useState("");
   const [comment, setComment] = useState("");
   const [mentions, setMentions] = useState<ReviewMember[]>([]);
@@ -121,7 +209,7 @@ export function FindingReviewPanel({
     setPending(true);
     setError(null);
     try {
-      const response = await fetch(`/api/disclosure/findings/${review.findingId}/review`, {
+      const response = await fetch(endpoint, {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
@@ -165,37 +253,33 @@ export function FindingReviewPanel({
   const when = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: "short", timeStyle: "short" });
   const differs = mode === "accept" && proposal !== null && value.trim() !== proposal;
-  const preparerActions = canPrepare && review.status !== "reviewed";
+  const preparerActions = canPrepare && status !== "reviewed";
+  const statusLabel = (code: string | null) =>
+    preparer.kind === "assessment"
+      ? (preparer.statuses.find((entry) => entry.value === code)?.label ?? code ?? "")
+      : (code ?? "");
+  const reasonNeeded =
+    mode === "override"
+      ? reason.trim().length < 8
+      : (mode === "confirm" && preparer.kind === "figure") || differs
+        ? !reason.trim()
+        : false;
 
   return (
     <div className="grid gap-2 border-t border-border px-3 py-2.5 text-meta">
       <div className="flex items-center justify-between">
         <span className="font-medium">{t("history")}</span>
         <span className="text-muted-foreground" data-testid="disclosure-review-status">
-          {t(`status.${review.status}`)}
+          {t(`status.${status}`)}
         </span>
       </div>
       <ol className="grid gap-2 border-l border-border pl-3">
         <li className="relative grid gap-0.5">
           <Bot aria-hidden="true" className="absolute top-0.5 -left-[19px] size-3.5 bg-popover" />
           <span className="font-medium">{t("aiFinding")}</span>
-          <span className="text-muted-foreground">{aiFinding.comment}</span>
-          {aiFinding.actual || aiFinding.expected ? (
-            <span className="tabular-nums">
-              {aiFinding.actual ? (
-                <span className="rounded-sm bg-[var(--status-not-met-bg)] px-1">
-                  {t("actual")} {aiFinding.actual}
-                </span>
-              ) : null}{" "}
-              {aiFinding.expected ? (
-                <span className="rounded-sm bg-[var(--status-met-bg)] px-1">
-                  {t("expected")} {aiFinding.expected}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
+          {aiEntry}
         </li>
-        {review.history.map((entry) => {
+        {history.map((entry) => {
           const Icon = kindIcon[entry.kind];
           return (
             <li key={entry.id} className="relative grid gap-0.5">
@@ -206,8 +290,18 @@ export function FindingReviewPanel({
               <span>
                 <span className="font-medium">{entry.actorName}</span>{" "}
                 <span className="text-muted-foreground">
-                  {t(`event.${entry.kind}`, { value: entry.correction ?? "" })} ·{" "}
-                  {when(entry.createdAt)}
+                  {t(
+                    entry.kind === "confirmed" && preparer.kind === "assessment"
+                      ? "event.confirmedAssessment"
+                      : `event.${entry.kind}`,
+                    {
+                      value:
+                        entry.kind === "overridden"
+                          ? statusLabel(entry.correction)
+                          : (entry.correction ?? ""),
+                    },
+                  )}{" "}
+                  · {when(entry.createdAt)}
                 </span>
               </span>
               {entry.body ? (
@@ -218,7 +312,7 @@ export function FindingReviewPanel({
             </li>
           );
         })}
-        {review.status === "reviewed" ? (
+        {status === "reviewed" ? (
           <li className="relative font-medium text-[var(--status-met)]">
             <CircleCheck
               aria-hidden="true"
@@ -229,8 +323,25 @@ export function FindingReviewPanel({
         ) : null}
       </ol>
 
-      {mode === "accept" || mode === "confirm" || mode === "reject" ? (
+      {mode !== "idle" ? (
         <div className="grid gap-2 rounded-md border border-border p-2">
+          {mode === "override" && preparer.kind === "assessment" ? (
+            <div className="grid gap-1">
+              <Label htmlFor={`${id}-status`}>{t("overrideStatus")}</Label>
+              <Select value={overrideStatus} onValueChange={setOverrideStatus}>
+                <SelectTrigger id={`${id}-status`} size="sm" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {preparer.statuses.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           {mode === "accept" ? (
             <div className="grid gap-1">
               <Label htmlFor={`${id}-value`}>{t("value")}</Label>
@@ -247,9 +358,11 @@ export function FindingReviewPanel({
             <Label htmlFor={`${id}-reason`}>
               {mode === "reject"
                 ? t("rejectComment")
-                : mode === "confirm" || differs
-                  ? t("reasonRequired")
-                  : t("reasonOptional")}
+                : mode === "override"
+                  ? t("reasonOverride")
+                  : (mode === "confirm" && preparer.kind === "figure") || differs
+                    ? t("reasonRequired")
+                    : t("reasonOptional")}
             </Label>
             <Textarea
               id={`${id}-reason`}
@@ -266,7 +379,7 @@ export function FindingReviewPanel({
             <Button
               type="button"
               size="sm"
-              disabled={pending || ((mode === "confirm" || differs) && !reason.trim())}
+              disabled={pending || reasonNeeded}
               onClick={() =>
                 void send(
                   mode === "accept"
@@ -276,8 +389,13 @@ export function FindingReviewPanel({
                         ...(reason.trim() ? { reason: reason.trim() } : {}),
                       }
                     : mode === "confirm"
-                      ? { action: "confirm", reason: reason.trim() }
-                      : { action: "reject", ...(reason.trim() ? { comment: reason.trim() } : {}) },
+                      ? { action: "confirm", ...(reason.trim() ? { reason: reason.trim() } : {}) }
+                      : mode === "override"
+                        ? { action: "override", status: overrideStatus, reason: reason.trim() }
+                        : {
+                            action: "reject",
+                            ...(reason.trim() ? { comment: reason.trim() } : {}),
+                          },
                 )
               }
             >
@@ -298,10 +416,20 @@ export function FindingReviewPanel({
               <Button type="button" variant="outline" size="sm" onClick={() => setMode("confirm")}>
                 {t("confirm")}
               </Button>
+              {preparer.kind === "assessment" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMode("override")}
+                >
+                  {t("override")}
+                </Button>
+              ) : null}
             </div>
           ) : null}
-          {review.status === "prepared" ? (
-            review.release === "allowed" ? (
+          {status === "prepared" ? (
+            release === "allowed" ? (
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -321,7 +449,7 @@ export function FindingReviewPanel({
                 data-testid="disclosure-release-locked"
               >
                 <Lock aria-hidden="true" className="size-3.5 shrink-0" />
-                {review.release === "second_person_required"
+                {release === "second_person_required"
                   ? t("secondPersonRequired")
                   : t("managerRequired")}
               </p>

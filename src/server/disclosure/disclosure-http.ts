@@ -6,13 +6,19 @@ import { z } from "zod";
 import { credentialErrorResponse } from "@/server/ai/credential-error-response";
 import { CredentialValidationError } from "@/server/ai/credential-validation";
 import { TemporaryCredentialError } from "@/server/ai/temporary-credential-service";
-import { AuthenticationRequiredError } from "@/server/auth/session-principal";
+import {
+  AuthenticationRequiredError,
+  AuthorizationDeniedError,
+  MembershipRequiredError,
+} from "@/server/auth/session-principal";
 import { VerifiedEmailRequiredError } from "@/server/auth/session-user";
 import { requestProtectionResponse } from "@/server/security/request-protection";
 
 import { DisclosureAccessError } from "./actor";
+import { ChecklistTemplateError } from "./checklist-templates";
+import { ChecklistError } from "./checklists";
 import { DisclosureEvidenceError } from "./evidence";
-import { FindingReviewError } from "./finding-review";
+import { DisclosureReviewError } from "./review-core";
 import { DisclosureRunError } from "./start-run";
 
 export const disclosureNoStore = { "cache-control": "private, no-store" } as const;
@@ -37,6 +43,7 @@ const statusByCode: Record<string, number> = {
   DISCLOSURE_EVIDENCE_PATH_MISMATCH: 400,
   DISCLOSURE_EVIDENCE_OBJECT_MISSING: 409,
   DISCLOSURE_EVIDENCE_METADATA_MISMATCH: 400,
+  CHECKLIST_NOT_FOUND: 404,
 };
 
 export function disclosureFailure(code: string, status?: number) {
@@ -52,12 +59,21 @@ export function disclosureErrorResponse(error: unknown, logTag: string) {
   if (error instanceof z.ZodError) return disclosureFailure("INVALID_DISCLOSURE_REQUEST", 400);
   if (error instanceof AuthenticationRequiredError)
     return disclosureFailure("AUTHENTICATION_REQUIRED", 401);
+  if (error instanceof AuthorizationDeniedError || error instanceof MembershipRequiredError)
+    return disclosureFailure("ADMIN_REQUIRED", 403);
   if (error instanceof VerifiedEmailRequiredError)
     return disclosureFailure("VERIFIED_EMAIL_REQUIRED", 403);
   if (error instanceof DisclosureAccessError) return disclosureFailure(error.code);
   if (error instanceof DisclosureRunError) return disclosureFailure(error.code);
   if (error instanceof DisclosureEvidenceError) return disclosureFailure(error.code);
-  if (error instanceof FindingReviewError) return disclosureFailure(error.code, error.status);
+  if (error instanceof DisclosureReviewError) return disclosureFailure(error.code, error.status);
+  if (error instanceof ChecklistError) {
+    return NextResponse.json(
+      { code: error.code, issues: error.issues },
+      { status: error.status, headers: disclosureNoStore },
+    );
+  }
+  if (error instanceof ChecklistTemplateError) return disclosureFailure(error.code, error.status);
   if (error instanceof CredentialValidationError || error instanceof TemporaryCredentialError) {
     return credentialErrorResponse(error, logTag);
   }

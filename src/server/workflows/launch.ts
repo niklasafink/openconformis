@@ -3,6 +3,7 @@ import "server-only";
 import { start } from "workflow/api";
 
 import { analysisWorkflow } from "@/workflows/analysis";
+import { disclosureCompletenessWorkflow } from "@/workflows/disclosure-completeness";
 import { disclosureEvidenceWorkflow } from "@/workflows/disclosure-evidence";
 import { disclosurePlausibilityWorkflow } from "@/workflows/disclosure-plausibility";
 import { disclosureRecognitionWorkflow } from "@/workflows/disclosure-recognition";
@@ -41,6 +42,12 @@ export async function launchDisclosureRecognitionWorkflow(caseDocumentId: string
 /** Plausicheck-Lauf der Offenlegungspflicht; Argument ist nur die Lauf-ID. */
 export async function launchDisclosurePlausibilityWorkflow(runId: string) {
   const run = await start(disclosurePlausibilityWorkflow, [runId]);
+  return { runId: run.runId };
+}
+
+/** Vollständigkeitsprüfung der Offenlegungspflicht; Argument ist nur die Lauf-ID. */
+export async function launchDisclosureCompletenessWorkflow(runId: string) {
+  const run = await start(disclosureCompletenessWorkflow, [runId]);
   return { runId: run.runId };
 }
 

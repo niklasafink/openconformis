@@ -290,11 +290,17 @@ suite("disclosure plausibility runs against a real database", () => {
   });
 
   async function closeOpenRuns() {
-    const { inArray } = await import("drizzle-orm");
+    const { and, inArray } = await import("drizzle-orm");
+    // Nur die eigene Prüfung: andere DB-Tests laufen parallel auf derselben Datenbank.
     await db
       .update(schema.disclosureRuns)
       .set({ status: "cancelled" })
-      .where(inArray(schema.disclosureRuns.status, ["queued", "running"]));
+      .where(
+        and(
+          eq(schema.disclosureRuns.caseId, caseId),
+          inArray(schema.disclosureRuns.status, ["queued", "running"]),
+        ),
+      );
   }
 
   it("legt bei gleichzeitigen Starts mit denselben Eingaben genau einen Lauf an", async () => {

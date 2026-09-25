@@ -8,3 +8,4 @@ export * from "./documents";
 export * from "./jobs";
 export * from "./reviews";
 export * from "./disclosure";
+export * from "./disclosure-completeness";

@@ -1,9 +1,6 @@
 import { FatalError, getWorkflowMetadata } from "workflow";
 
 import { assignmentConcurrency } from "@/domain/disclosure/assignment-limits";
-import { ProviderRouteConfigurationError } from "@/server/ai/provider-routing";
-import { ModelProviderError } from "@/server/ai/structured-model";
-import { TemporaryCredentialError } from "@/server/ai/temporary-credential-service";
 import {
   assignDisclosureBatch,
   assignDisclosureJevBatch,
@@ -17,34 +14,9 @@ import {
   prepareDisclosureRun,
   runDeterministicStage,
 } from "@/server/disclosure/execute-run";
+import { terminalIfPermanent } from "@/server/disclosure/workflow-errors";
 
-/** Fehler, die eine Wiederholung nicht behebt, enden den Schritt sofort mit ihrer Ursache. */
-const permanentCodes = new Set([
-  "DISCLOSURE_RECOGNITION_CHANGED",
-  "DISCLOSURE_REPORT_MISSING",
-  "DISCLOSURE_CREDENTIAL_EXPIRED",
-]);
-
-/**
- * Ohne gültigen Schlüssel oder Route kann kein weiterer Batch gelingen: dann endet der
- * ganze Lauf mit dem Grund. Eine einzelne unbrauchbare Antwort ist dagegen eine Lücke.
- */
-const runEndingCodes =
-  /^(?:BYOK_|ANALYSIS_CREDENTIAL_MISSING|DISCLOSURE_CREDENTIAL_EXPIRED|PROVIDER_CREDENTIAL_INVALID|INVALID_PROVIDER_ROUTE|PROVIDER_ROUTE)/u;
-
-function terminalIfPermanent(error: unknown): never {
-  if (error instanceof TemporaryCredentialError) throw new FatalError(error.code);
-  if (error instanceof ProviderRouteConfigurationError) {
-    throw new FatalError("PROVIDER_ROUTE_INVALID");
-  }
-  if (error instanceof ModelProviderError && !error.retryable) {
-    throw new FatalError(`${error.code}: ${error.detail}`.slice(0, 700));
-  }
-  if (error instanceof Error && permanentCodes.has(error.message)) {
-    throw new FatalError(error.message);
-  }
-  throw error;
-}
+import { codeOf, runEndingCodes } from "./disclosure-errors";
 
 async function prepareStep(runId: string, workflowRunId: string) {
   "use step";
@@ -108,12 +80,6 @@ async function failStep(runId: string, code: string, detail?: string) {
   return failDisclosureRun(runId, { code, detail });
 }
 failStep.maxRetries = 3;
-
-function codeOf(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  const code = message.split(":")[0]!.trim();
-  return /^[A-Z_]+$/u.test(code) ? code : "DISCLOSURE_RUN_FAILED";
-}
 
 /**
  * Plausicheck-Lauf: Beanspruchen → deterministische Prüfungen → Einordnung durch Jev

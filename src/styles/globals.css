@@ -2348,6 +2348,36 @@ i[data-result-pending="true"] {
   outline-offset: 1px;
 }
 
+/* Vollständigkeitsprüfung: belegte Zitate wie in der Gap-Analyse, mit Belegnummer. Ein
+   widersprechendes Zitat trägt zusätzlich eine gepunktete Unterkante. */
+.disclosure-document .completeness-quote {
+  border-radius: 2px;
+  padding: 1px 0;
+  background: #fff0a8;
+  color: inherit;
+  box-decoration-break: clone;
+}
+
+.disclosure-document .completeness-quote[data-support="contradicts"] {
+  background: var(--status-not-met-bg);
+  text-decoration: underline dotted var(--status-not-met);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.disclosure-document .completeness-quote[data-active] {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.disclosure-document .completeness-quote-number {
+  margin-left: 1px;
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: super;
+  line-height: 0;
+}
+
 /* Übernommene Korrektur: der Ist-Wert bleibt sichtbar durchgestrichen, der Blocktext unverändert. */
 .disclosure-document .disclosure-mark[data-corrected] {
   text-decoration: line-through var(--status-not-met);
