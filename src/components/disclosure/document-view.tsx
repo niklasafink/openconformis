@@ -157,7 +157,7 @@ export function DocumentView({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-3">
-        <Tabs value={activeId} onValueChange={setActiveId} className="min-w-0 gap-0">
+        <Tabs value={activeId} onValueChange={setActiveId} className="min-w-0 shrink-0 gap-0">
           <TabsList
             aria-label={labels.documents}
             className="h-8 justify-start gap-1 bg-transparent p-0"

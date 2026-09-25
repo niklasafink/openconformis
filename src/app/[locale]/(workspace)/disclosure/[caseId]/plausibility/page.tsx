@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { CaseShell } from "@/components/disclosure/case-shell";
@@ -5,17 +6,21 @@ import {
   PlausibilityWorkspace,
   type FigureMark,
   type MarkCheck,
+  type SubjectReview,
   type WorkspaceFinding,
 } from "@/components/disclosure/plausibility-workspace";
 import { ReportUpload } from "@/components/disclosure/report-upload";
 import { RunControls } from "@/components/disclosure/run-controls";
 import { StopRunButton } from "@/components/disclosure/stop-run-button";
+import { Button } from "@/components/ui/button";
 import { formatAmount } from "@/domain/disclosure/checks/comments";
+import { editableValue } from "@/domain/disclosure/correction";
 import { markStatuses } from "@/domain/disclosure/checks/findings";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { readDocumentBlocks } from "@/server/disclosure/read-case";
 import { readCaseEvidence } from "@/server/disclosure/evidence";
+import { readFindingReviews } from "@/server/disclosure/finding-review";
 import { readRecognition, type ViewFigure } from "@/server/disclosure/read-plausibility";
 import { readLatestRun, type ViewCheck } from "@/server/disclosure/read-run";
 import { disclosureJevAssist } from "@/server/environment";
@@ -135,6 +140,31 @@ export default async function PlausibilityPage({ params }: PageProps) {
     })),
   ];
 
+  // Freigaben gibt es erst für gespeicherte Feststellungen eines beendeten Laufs.
+  const reviewData =
+    run && finished ? await readFindingReviews(run.id) : { reviews: {}, members: [] };
+  const checkById = new Map(checks.map((check) => [check.id, check]));
+  const reviews: Record<string, SubjectReview> = {};
+  for (const finding of latest?.findings ?? []) {
+    const review = reviewData.reviews[finding.id];
+    const check = checkById.get(finding.checkId);
+    if (!review || !check) continue;
+    const figure = figureById.get(check.subjectId);
+    const formatted = formatCheck(check, figure);
+    reviews[finding.subjectId] = {
+      review,
+      proposal:
+        figure && check.expectedMicro !== null && check.kind !== "direction"
+          ? editableValue(BigInt(check.expectedMicro), figure)
+          : null,
+      aiFinding: {
+        comment: check.comment,
+        actual: formatted.actual,
+        expected: formatted.expected,
+      },
+    };
+  }
+
   const findings: WorkspaceFinding[] = (latest?.findings ?? [])
     .filter((finding) => known(finding.subjectId))
     .map((finding) => ({
@@ -144,6 +174,7 @@ export default async function PlausibilityPage({ params }: PageProps) {
       severity: finding.severity,
       page: finding.page,
       tz: finding.tz,
+      reviewStatus: reviewData.reviews[finding.id]?.status ?? finding.reviewStatus,
     }));
   const summary = run
     ? {
@@ -154,6 +185,7 @@ export default async function PlausibilityPage({ params }: PageProps) {
         ).size,
         red: findings.filter((finding) => finding.severity === "mismatch").length,
         orange: findings.filter((finding) => finding.severity === "uncertain").length,
+        reviewed: findings.filter((finding) => finding.reviewStatus === "reviewed").length,
       }
     : null;
 
@@ -163,7 +195,18 @@ export default async function PlausibilityPage({ params }: PageProps) {
       caseId={caseId}
       title={found.title}
       area="plausibility"
-      actions={open && run ? <StopRunButton runId={run.id} /> : undefined}
+      actions={
+        open && run ? (
+          <StopRunButton runId={run.id} />
+        ) : finished && run && findings.length > 0 ? (
+          <Button asChild variant="outline" size="sm">
+            <a href={`/api/disclosure/runs/${run.id}/export?locale=${locale}`} download>
+              <Download aria-hidden="true" />
+              {plausibilityT("export")}
+            </a>
+          </Button>
+        ) : undefined
+      }
     >
       {report ? (
         <PlausibilityWorkspace
@@ -182,6 +225,15 @@ export default async function PlausibilityPage({ params }: PageProps) {
           summary={summary}
           live={open || evidenceBusy}
           checked={finished}
+          reviews={reviews}
+          members={reviewData.members.map((member) => ({
+            userId: member.userId,
+            name: member.name,
+          }))}
+          canPrepare={found.permissions.canPrepare}
+          reviewErrors={
+            (await getTranslations("Disclosure.review")).raw("errors") as Record<string, string>
+          }
           evidence={{
             caseId,
             files: evidenceFiles,

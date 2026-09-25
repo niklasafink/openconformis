@@ -2348,6 +2348,22 @@ i[data-result-pending="true"] {
   outline-offset: 1px;
 }
 
+/* Übernommene Korrektur: der Ist-Wert bleibt sichtbar durchgestrichen, der Blocktext unverändert. */
+.disclosure-document .disclosure-mark[data-corrected] {
+  text-decoration: line-through var(--status-not-met);
+  text-decoration-thickness: 1.5px;
+}
+
+.disclosure-document .disclosure-correction {
+  margin-left: 3px;
+  border-radius: 2px;
+  padding: 1px 2px;
+  background: var(--status-met-bg);
+  color: var(--status-met);
+  font-weight: 500;
+  text-decoration: none;
+}
+
 .disclosure-page-marker {
   display: flex;
   align-items: center;

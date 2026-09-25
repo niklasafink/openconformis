@@ -822,7 +822,10 @@
         "label": "Filter findings",
         "all": "All",
         "mismatch": "Red",
-        "uncertain": "Orange"
+        "uncertain": "Orange",
+        "open": "Open",
+        "prepared": "Prepared",
+        "reviewed": "Reviewed"
       },
       "severity": {
         "mismatch": "Mismatch",
@@ -892,7 +895,9 @@
         "keyHint": "Jev classifies findings at lower cost. Without a key, the selected model does it.",
         "keyFailed": "The TypeSafe key could not be confirmed."
       },
-      "evidenceTab": "Evidence"
+      "evidenceTab": "Evidence",
+      "summaryReviewed": "{count} released",
+      "export": "Excel export"
     },
     "evidence": {
       "empty": "No evidence yet. Upload the trial balance to reconcile the report figures with the accounts.",
@@ -921,6 +926,60 @@
       "SUSA_UNREADABLE": "The Excel file could not be read.",
       "SUSA_HEADER_NOT_FOUND": "No header row with account, description and balance found.",
       "SUSA_NO_ACCOUNTS": "No account rows found."
+    },
+    "review": {
+      "history": "History",
+      "status": {
+        "open": "open",
+        "prepared": "prepared",
+        "reviewed": "reviewed"
+      },
+      "aiFinding": "AI finding",
+      "actual": "Actual",
+      "expected": "Expected",
+      "event": {
+        "accepted": "accepted {value}",
+        "confirmed": "confirmed the actual value",
+        "released": "released",
+        "rejected": "rejected",
+        "comment": "commented"
+      },
+      "reviewed": "Reviewed",
+      "accept": "Accept",
+      "confirm": "Confirm",
+      "release": "Release",
+      "reject": "Reject",
+      "cancel": "Cancel",
+      "value": "Accepted value",
+      "reasonRequired": "Reason (required)",
+      "reasonOptional": "Reason (optional)",
+      "rejectComment": "Comment (optional)",
+      "submit": {
+        "accept": "Accept",
+        "confirm": "Confirm",
+        "reject": "Reject",
+        "idle": "Send"
+      },
+      "secondPersonRequired": "Confirmation by a second person required",
+      "managerRequired": "Waiting for release by a manager",
+      "comment": "Comment",
+      "commentPlaceholder": "Comment, @ mentions a member",
+      "commentSubmit": "Comment",
+      "members": "Members",
+      "failed": "The action failed.",
+      "correctionTitle": "accepted by {name} on {date}",
+      "errors": {
+        "DISCLOSURE_FORBIDDEN": "Your role does not allow this step.",
+        "DISCLOSURE_SAME_PERSON": "A second person must release.",
+        "DISCLOSURE_FINDING_NOT_PREPARED": "The finding is not prepared yet.",
+        "DISCLOSURE_FINDING_REVIEWED": "The finding is already reviewed.",
+        "DISCLOSURE_RUN_OPEN": "The run is still computing.",
+        "DISCLOSURE_VALUE_INVALID": "A number only, for example 933.929,51.",
+        "DISCLOSURE_VALUE_NOT_AVAILABLE": "There is no value to accept here.",
+        "DISCLOSURE_REASON_REQUIRED": "Please give a reason.",
+        "DISCLOSURE_MENTION_INVALID": "Only members can be mentioned.",
+        "DISCLOSURE_FINDING_NOT_FOUND": "The finding was not found."
+      }
     }
   }
 }

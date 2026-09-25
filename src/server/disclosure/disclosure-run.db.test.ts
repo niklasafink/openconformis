@@ -80,9 +80,12 @@ suite("disclosure plausibility runs against a real database", () => {
   let execute: typeof import("./execute-run");
   let assign: typeof import("./assign-run");
   let cancel: typeof import("./cancel-run");
+  let review: typeof import("./finding-review");
 
   const suffix = randomUUID().slice(0, 8);
   const userId = `user-${suffix}`;
+  const managerId = `manager-${suffix}`;
+  const viewerId = `viewer-${suffix}`;
   const organizationId = `org-${suffix}`;
   let caseId = "";
 
@@ -122,6 +125,25 @@ suite("disclosure plausibility runs against a real database", () => {
       role: "owner",
       createdAt: new Date(),
     });
+    // Zweite und dritte Person derselben Organisation: Manager und nur lesend.
+    for (const [id, role] of [
+      [managerId, "admin"],
+      [viewerId, "viewer"],
+    ] as const) {
+      await db.insert(authSchema.users).values({
+        id,
+        name: role === "admin" ? "Maria Manager" : "Viktor Viewer",
+        email: `${id}@example.invalid`,
+        emailVerified: true,
+      });
+      await db.insert(authSchema.members).values({
+        id: `member-${id}`,
+        organizationId,
+        userId: id,
+        role,
+        createdAt: new Date(),
+      });
+    }
     const [policy] = await db
       .insert(documents.policies)
       .values({ organizationId, ownerUserId: userId, displayName: "Bericht" })
@@ -163,6 +185,11 @@ suite("disclosure plausibility runs against a real database", () => {
       },
       {
         text: "Die Bilanzsumme ist im Berichtsjahr um 3.441 TEUR auf 6.828 TEUR gesunken.",
+        type: "paragraph",
+      },
+      // Eine falsche Satzrechnung wie gbs Tz 66: von 110 auf 54 sind 56, nicht 50.
+      {
+        text: "Die Wertberichtigungen sanken von TEUR 110 um TEUR 50 auf TEUR 54.",
         type: "paragraph",
       },
       // Die Richtungslüge wie gbs Tz 62: sie ist auf jedem Einordnungsweg rot.
@@ -243,6 +270,7 @@ suite("disclosure plausibility runs against a real database", () => {
     execute = await import("./execute-run");
     assign = await import("./assign-run");
     cancel = await import("./cancel-run");
+    review = await import("./finding-review");
     mocks.actor.mockImplementation(async () => ({
       userId,
       emailVerified: true,
@@ -545,6 +573,154 @@ suite("disclosure plausibility runs against a real database", () => {
       expect(mocks.deleteCredentials).toHaveBeenCalledWith(
         expect.objectContaining({ purpose, bindingId: run.runId }),
       );
+    }
+  });
+
+  const actAs = (id: string, roles: string[]) =>
+    mocks.actor.mockImplementation(async () => ({
+      userId: id,
+      emailVerified: true,
+      organizationId,
+      roles,
+    }));
+
+  it("verlangt zwei verschiedene Personen, und eine Ablehnung ist genau ein Ereignis", async () => {
+    mocks.model.mockImplementation(modelAnswer);
+    const { runId } = await runThrough({ jev: false });
+    const findings = await db
+      .select()
+      .from(schema.disclosureFindings)
+      .innerJoin(
+        schema.disclosureChecks,
+        eq(schema.disclosureChecks.id, schema.disclosureFindings.checkId),
+      )
+      .where(eq(schema.disclosureFindings.runId, runId));
+    const arithmetic = findings.find(
+      ({ disclosure_checks: check }) =>
+        check.kind === "sentence_arithmetic" && check.status === "mismatch",
+    )!.disclosure_findings;
+    const direction = findings.find(
+      ({ disclosure_checks: check }) => check.kind === "direction" && check.status === "mismatch",
+    )!.disclosure_findings;
+    const eventsOf = (findingId: string) =>
+      db
+        .select()
+        .from(schema.disclosureFindingEvents)
+        .where(eq(schema.disclosureFindingEvents.findingId, findingId));
+
+    try {
+      // Nur lesend: weder übernehmen noch freigeben.
+      actAs(viewerId, ["viewer"]);
+      await expect(review.reviewFinding(arithmetic.id, { action: "accept" })).rejects.toMatchObject(
+        { code: "DISCLOSURE_FORBIDDEN", status: 403 },
+      );
+
+      // Stufe 1: ein abweichender Wert braucht eine Begründung; Text ist kein Wert.
+      actAs(userId, ["owner"]);
+      await expect(
+        review.reviewFinding(arithmetic.id, { action: "accept", value: "61" }),
+      ).rejects.toMatchObject({ code: "DISCLOSURE_REASON_REQUIRED" });
+      await expect(
+        review.reviewFinding(arithmetic.id, {
+          action: "accept",
+          value: "sechzig",
+          reason: "Wort",
+        }),
+      ).rejects.toMatchObject({ code: "DISCLOSURE_VALUE_INVALID" });
+      expect(await review.reviewFinding(arithmetic.id, { action: "accept" })).toEqual({
+        status: "prepared",
+      });
+      const [correction] = await db
+        .select()
+        .from(schema.disclosureFindingCorrections)
+        .where(eq(schema.disclosureFindingCorrections.findingId, arithmetic.id));
+      expect(correction).toMatchObject({ acceptedRawText: "56 TEUR", supersededAt: null });
+
+      // Dieselbe Person darf nicht freigeben, auch als owner — und der Versuch steht im Audit.
+      await expect(
+        review.reviewFinding(arithmetic.id, { action: "release" }),
+      ).rejects.toMatchObject({ code: "DISCLOSURE_SAME_PERSON", status: 403 });
+      const [still] = await db
+        .select()
+        .from(schema.disclosureFindings)
+        .where(eq(schema.disclosureFindings.id, arithmetic.id));
+      expect(still).toMatchObject({ reviewStatus: "prepared", reviewedByUserId: null });
+      const { auditEvents } = await import("@/server/db/schema/application");
+      const { and } = await import("drizzle-orm");
+      const denied = await db
+        .select()
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.targetId, arithmetic.id),
+            eq(auditEvents.action, "disclosure.finding_review_denied"),
+          ),
+        )
+        .orderBy(auditEvents.createdAt);
+      // Der Versuch des Lesers und der des Prüfers, je mit Person und Code.
+      expect(denied.map((event) => [event.actorUserId, event.metadata])).toEqual([
+        [viewerId, { attempted: "accept", code: "DISCLOSURE_FORBIDDEN" }],
+        [userId, { attempted: "release", code: "DISCLOSURE_SAME_PERSON" }],
+      ]);
+
+      // Der Manager lehnt ab: genau ein Ereignis, kein Statuswechsel.
+      actAs(managerId, ["admin"]);
+      const before = (await eventsOf(arithmetic.id)).length;
+      expect(
+        await review.reviewFinding(arithmetic.id, { action: "reject", comment: "Bitte prüfen" }),
+      ).toEqual({ status: "prepared" });
+      const afterReject = await eventsOf(arithmetic.id);
+      expect(afterReject).toHaveLength(before + 1);
+      expect(afterReject.filter((event) => event.kind === "rejected")).toHaveLength(1);
+
+      // Und gibt danach frei; eine zweite Freigabe ist nicht mehr möglich.
+      expect(await review.reviewFinding(arithmetic.id, { action: "release" })).toEqual({
+        status: "reviewed",
+      });
+      await expect(
+        review.reviewFinding(arithmetic.id, { action: "release" }),
+      ).rejects.toMatchObject({ code: "DISCLOSURE_FINDING_REVIEWED" });
+
+      // Ein Richtungswort hat keinen Wert zum Übernehmen, nur Bestätigen mit Begründung.
+      actAs(userId, ["owner"]);
+      await expect(review.reviewFinding(direction.id, { action: "accept" })).rejects.toMatchObject({
+        code: "DISCLOSURE_VALUE_NOT_AVAILABLE",
+      });
+      await review.reviewFinding(direction.id, { action: "confirm", reason: "Text bleibt so." });
+
+      // Eine Erwähnung nur von Mitgliedern; die Leseseite zeigt den gesperrten Zustand.
+      await review.reviewFinding(direction.id, {
+        action: "comment",
+        body: "@Maria Manager bitte ansehen",
+        mentions: [managerId],
+      });
+      await expect(
+        review.reviewFinding(direction.id, {
+          action: "comment",
+          body: "@Fremd",
+          mentions: ["someone-else"],
+        }),
+      ).rejects.toMatchObject({ code: "DISCLOSURE_MENTION_INVALID" });
+      const { reviews } = await review.readFindingReviews(runId);
+      expect(reviews[direction.id]).toMatchObject({
+        status: "prepared",
+        release: "second_person_required",
+      });
+      expect(reviews[direction.id]!.history.at(-1)).toMatchObject({
+        kind: "comment",
+        mentions: [{ userId: managerId, name: "Maria Manager" }],
+      });
+      expect(reviews[arithmetic.id]).toMatchObject({
+        status: "reviewed",
+        release: "done",
+        correction: { value: "56 TEUR" },
+      });
+      actAs(managerId, ["admin"]);
+      expect((await review.readFindingReviews(runId)).reviews[direction.id]!.release).toBe(
+        "allowed",
+      );
+    } finally {
+      actAs(userId, ["owner"]);
     }
   });
 });

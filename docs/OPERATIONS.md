@@ -25,3 +25,22 @@ Alert on sustained queued analyses, any failed analysis, OCR review states, spon
 ## Scheduled recovery
 
 Vercel invokes the maintenance route with `Authorization: Bearer $CRON_SECRET`. A missing or invalid secret fails closed. The cron is a backstop, not the primary 24-hour deletion mechanism.
+
+## Disclosure review: a second person for the four-eyes release
+
+The plausibility check needs two different people: a preparer accepts or confirms a
+finding, a manager (owner or admin) releases it. There is no invitation screen yet. To
+put a second account into the workspace of a first one:
+
+1. Both people sign in once, so both accounts exist.
+2. Run, with the production database from `.env.local`:
+
+   ```bash
+   pnpm disclosure:add-member <second-account-email> <first-account-email> --role admin
+   ```
+
+   The new membership is placed before the second account's own workspace, so it opens
+   the first account's workspace after signing out and in again. Roles: `admin`
+   (manager), `analyst` or `reviewer` (preparer only), `viewer` (read-only).
+3. To undo it, run the same command with `--remove`; the second account returns to its
+   own workspace.

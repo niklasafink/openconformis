@@ -622,3 +622,108 @@ export const disclosureModelInvocations = pgTable(
     ),
   ],
 );
+
+/*
+ * Übernahme, Freigabe und Kommentare (Etappe 8, D-034). Die Dokumentblöcke bleiben
+ * unveränderlich; eine übernommene Zahl ist eine eigene Schicht mit Person, Zeitpunkt
+ * und Begründung. Übernommen werden nur Zahlen, nie Text.
+ */
+
+export const disclosureFindingEventKind = pgEnum("disclosure_finding_event_kind", [
+  "ai_finding",
+  "comment",
+  "accepted",
+  "confirmed",
+  "released",
+  "rejected",
+]);
+
+/**
+ * Ein übernommener Wert. Höchstens einer je Feststellung ist aktiv; eine erneute
+ * Übernahme oder Bestätigung ersetzt ihn, der alte bleibt mit `superseded_at` stehen.
+ */
+export const disclosureFindingCorrections = pgTable(
+  "disclosure_finding_corrections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    findingId: uuid("finding_id")
+      .notNull()
+      .references(() => disclosureFindings.id, { onDelete: "cascade" }),
+    acceptedValueMicro: bigint("accepted_value_micro", { mode: "bigint" }).notNull(),
+    /** Der Wert so, wie ihn das Dokument darstellen würde („933.929,51 EUR“). */
+    acceptedRawText: text("accepted_raw_text").notNull(),
+    /** Der Soll-Wert der Prüfung zum Zeitpunkt der Übernahme. */
+    proposedValueMicro: bigint("proposed_value_micro", { mode: "bigint" }),
+    reason: text("reason"),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("disclosure_finding_corrections_active_uidx")
+      .on(table.findingId)
+      .where(sql`${table.supersededAt} IS NULL`),
+    check(
+      "disclosure_finding_corrections_reason_check",
+      sql`${table.reason} IS NULL OR length(${table.reason}) BETWEEN 1 AND 2000`,
+    ),
+    check(
+      "disclosure_finding_corrections_raw_check",
+      sql`length(${table.acceptedRawText}) BETWEEN 1 AND 60`,
+    ),
+  ],
+);
+
+/**
+ * Der Verlauf einer Feststellung, nur anfügend. `rejected` ändert keinen Status; es gibt
+ * keinen Rücksprung und keine Benachrichtigung.
+ */
+export const disclosureFindingEvents = pgTable(
+  "disclosure_finding_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    findingId: uuid("finding_id")
+      .notNull()
+      .references(() => disclosureFindings.id, { onDelete: "cascade" }),
+    kind: disclosureFindingEventKind("kind").notNull(),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "restrict" }),
+    body: text("body"),
+    correctionId: uuid("correction_id").references(() => disclosureFindingCorrections.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("disclosure_finding_events_finding_idx").on(table.findingId, table.createdAt),
+    check(
+      "disclosure_finding_events_body_check",
+      sql`${table.body} IS NULL OR length(${table.body}) BETWEEN 1 AND 2000`,
+    ),
+    check(
+      "disclosure_finding_events_actor_check",
+      sql`${table.kind} = 'ai_finding' OR ${table.actorUserId} IS NOT NULL`,
+    ),
+  ],
+);
+
+/** Eine @Erwähnung in einem Ereignis; ohne Benachrichtigung. */
+export const disclosureFindingMentions = pgTable(
+  "disclosure_finding_mentions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => disclosureFindingEvents.id, { onDelete: "cascade" }),
+    mentionedUserId: text("mentioned_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    uniqueIndex("disclosure_finding_mentions_event_user_uidx").on(
+      table.eventId,
+      table.mentionedUserId,
+    ),
+  ],
+);

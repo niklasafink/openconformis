@@ -822,7 +822,10 @@
         "label": "Feststellungen filtern",
         "all": "Alle",
         "mismatch": "Rot",
-        "uncertain": "Orange"
+        "uncertain": "Orange",
+        "open": "Offen",
+        "prepared": "Vorbereitet",
+        "reviewed": "Geprüft"
       },
       "severity": {
         "mismatch": "Abweichung",
@@ -892,7 +895,9 @@
         "keyHint": "Jev ordnet Fundstellen günstiger ein. Ohne Schlüssel übernimmt das gewählte Modell.",
         "keyFailed": "Der TypeSafe-Schlüssel konnte nicht bestätigt werden."
       },
-      "evidenceTab": "Belege"
+      "evidenceTab": "Belege",
+      "summaryReviewed": "{count} freigegeben",
+      "export": "Excel-Export"
     },
     "evidence": {
       "empty": "Noch keine Belege. Laden Sie die Summen- und Saldenliste hoch, um die Zahlen des Berichts gegen die Konten abzugleichen.",
@@ -921,6 +926,60 @@
       "SUSA_UNREADABLE": "Die Excel-Datei konnte nicht gelesen werden.",
       "SUSA_HEADER_NOT_FOUND": "Keine Kopfzeile mit Konto, Bezeichnung und Saldo gefunden.",
       "SUSA_NO_ACCOUNTS": "Keine Kontozeilen gefunden."
+    },
+    "review": {
+      "history": "Verlauf",
+      "status": {
+        "open": "offen",
+        "prepared": "vorbereitet",
+        "reviewed": "geprüft"
+      },
+      "aiFinding": "KI-Befund",
+      "actual": "Ist",
+      "expected": "Soll",
+      "event": {
+        "accepted": "hat {value} übernommen",
+        "confirmed": "hat den Ist-Wert bestätigt",
+        "released": "hat freigegeben",
+        "rejected": "hat abgelehnt",
+        "comment": "hat kommentiert"
+      },
+      "reviewed": "Geprüft",
+      "accept": "Übernehmen",
+      "confirm": "Bestätigen",
+      "release": "Freigeben",
+      "reject": "Ablehnen",
+      "cancel": "Abbrechen",
+      "value": "Übernommener Wert",
+      "reasonRequired": "Begründung (Pflicht)",
+      "reasonOptional": "Begründung (optional)",
+      "rejectComment": "Kommentar (optional)",
+      "submit": {
+        "accept": "Übernehmen",
+        "confirm": "Bestätigen",
+        "reject": "Ablehnen",
+        "idle": "Senden"
+      },
+      "secondPersonRequired": "Bestätigung durch eine zweite Person erforderlich",
+      "managerRequired": "Wartet auf Freigabe durch einen Manager",
+      "comment": "Kommentar",
+      "commentPlaceholder": "Kommentar, @ erwähnt ein Mitglied",
+      "commentSubmit": "Kommentieren",
+      "members": "Mitglieder",
+      "failed": "Die Aktion ist fehlgeschlagen.",
+      "correctionTitle": "übernommen von {name} am {date}",
+      "errors": {
+        "DISCLOSURE_FORBIDDEN": "Ihre Rolle erlaubt diese Stufe nicht.",
+        "DISCLOSURE_SAME_PERSON": "Freigeben muss eine zweite Person.",
+        "DISCLOSURE_FINDING_NOT_PREPARED": "Die Feststellung ist noch nicht vorbereitet.",
+        "DISCLOSURE_FINDING_REVIEWED": "Die Feststellung ist bereits geprüft.",
+        "DISCLOSURE_RUN_OPEN": "Der Lauf rechnet noch.",
+        "DISCLOSURE_VALUE_INVALID": "Nur eine Zahl, etwa 933.929,51.",
+        "DISCLOSURE_VALUE_NOT_AVAILABLE": "Hier gibt es keinen Wert zum Übernehmen.",
+        "DISCLOSURE_REASON_REQUIRED": "Bitte eine Begründung angeben.",
+        "DISCLOSURE_MENTION_INVALID": "Erwähnt werden können nur Mitglieder.",
+        "DISCLOSURE_FINDING_NOT_FOUND": "Die Feststellung wurde nicht gefunden."
+      }
     }
   }
 }

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -26,6 +26,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { EvidencePanel, type EvidenceFileView } from "./evidence-panel";
+import { FindingReviewPanel, type FindingReview, type ReviewMember } from "./finding-review-panel";
 import {
   DocumentView,
   type DocumentBlockContext,
@@ -69,9 +70,22 @@ export type WorkspaceFinding = Readonly<{
   severity: "mismatch" | "uncertain";
   page: number | null;
   tz: string | null;
+  reviewStatus: "open" | "prepared" | "reviewed";
 }>;
 
-export type WorkspaceSummary = Readonly<{ checked: number; red: number; orange: number }>;
+export type WorkspaceSummary = Readonly<{
+  checked: number;
+  red: number;
+  orange: number;
+  reviewed: number;
+}>;
+
+/** Freigabe einer Feststellung, am Gegenstand (Zahl oder Richtungswort) aufgehängt. */
+export type SubjectReview = Readonly<{
+  review: FindingReview;
+  proposal: string | null;
+  aiFinding: Readonly<{ comment: string; actual: string | null; expected: string | null }>;
+}>;
 
 export type BlockSource = Readonly<{
   page: number | null;
@@ -97,6 +111,11 @@ type PlausibilityWorkspaceProps = Readonly<{
   live?: boolean;
   /** Ein Lauf ist beendet: ungeprüfte Zahlen haben keine Prüfbeziehung. */
   checked?: boolean;
+  /** Freigaben je Gegenstand (Etappe 8); ohne sie zeigt das Popover nur die Prüfungen. */
+  reviews?: Readonly<Record<string, SubjectReview>>;
+  members?: readonly ReviewMember[];
+  canPrepare?: boolean;
+  reviewErrors?: Readonly<Record<string, string>>;
   /** Der Reiter „Belege“ mit den Belegdateien der Prüfung. */
   evidence?: Readonly<{
     caseId: string;
@@ -106,7 +125,13 @@ type PlausibilityWorkspaceProps = Readonly<{
   }>;
 }>;
 
-type Filter = "all" | "mismatch" | "uncertain";
+type Filter = "all" | "mismatch" | "uncertain" | "open" | "prepared" | "reviewed";
+
+function matchesFilter(finding: WorkspaceFinding, filter: Filter) {
+  if (filter === "all") return true;
+  if (filter === "mismatch" || filter === "uncertain") return finding.severity === filter;
+  return finding.reviewStatus === filter;
+}
 
 const statusIcon = {
   pending: CircleDashed,
@@ -157,8 +182,13 @@ export function PlausibilityWorkspace({
   summary: runSummary = null,
   live = false,
   checked = false,
+  reviews = {},
+  members = [],
+  canPrepare = false,
+  reviewErrors = {},
   evidence,
 }: PlausibilityWorkspaceProps) {
+  const reviewT = useTranslations("Disclosure.review");
   const t = useTranslations("Disclosure.plausibility");
   const documentT = useTranslations("Disclosure.document");
   const router = useRouter();
@@ -230,7 +260,7 @@ export function PlausibilityWorkspace({
   const visibleFindings = useMemo(
     () =>
       findings
-        .filter((finding) => filter === "all" || finding.severity === filter)
+        .filter((finding) => matchesFilter(finding, filter))
         .filter((finding) => markById.has(finding.subjectId))
         .sort((a, b) => {
           const left = markById.get(a.subjectId)!;
@@ -321,32 +351,46 @@ export function PlausibilityWorkspace({
       if (!blockMarks?.length) return block.canonicalText;
       return segmentsOf(block.canonicalText, blockMarks).map((part, index) =>
         part.mark ? (
-          <mark
-            key={part.mark.id}
-            role="button"
-            tabIndex={0}
-            className="disclosure-mark"
-            data-mark-id={part.mark.id}
-            data-kind={part.mark.kind}
-            data-status={part.mark.status}
-            data-active={part.mark.id === activeId || undefined}
-            aria-label={`${part.mark.display} · ${t(`status.${part.mark.status}`)}`}
-            onClick={() => focusMark(part.mark!.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                focusMark(part.mark!.id);
-              }
-            }}
-          >
-            {part.text}
-          </mark>
+          <Fragment key={part.mark.id}>
+            <mark
+              key={part.mark.id}
+              role="button"
+              tabIndex={0}
+              className="disclosure-mark"
+              data-mark-id={part.mark.id}
+              data-kind={part.mark.kind}
+              data-status={part.mark.status}
+              data-active={part.mark.id === activeId || undefined}
+              data-corrected={reviews[part.mark.id]?.review.correction ? true : undefined}
+              aria-label={`${part.mark.display} · ${t(`status.${part.mark.status}`)}`}
+              onClick={() => focusMark(part.mark!.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  focusMark(part.mark!.id);
+                }
+              }}
+            >
+              {part.text}
+            </mark>
+            {reviews[part.mark.id]?.review.correction ? (
+              <ins
+                className="disclosure-correction"
+                title={reviewT("correctionTitle", {
+                  name: reviews[part.mark.id]!.review.correction!.by,
+                  date: new Date(reviews[part.mark.id]!.review.correction!.at).toLocaleDateString(),
+                })}
+              >
+                {reviews[part.mark.id]!.review.correction!.value}
+              </ins>
+            ) : null}
+          </Fragment>
         ) : (
           <span key={index}>{part.text}</span>
         ),
       );
     },
-    [marksByBlock, activeId, focusMark, t],
+    [marksByBlock, activeId, focusMark, t, reviews, reviewT],
   );
 
   const figures = marks.filter((mark) => mark.kind === "figure").length;
@@ -361,7 +405,10 @@ export function PlausibilityWorkspace({
             t("summaryChecked", { count: runSummary.checked }),
             t("summaryRed", { count: runSummary.red }),
             t("summaryOrange", { count: runSummary.orange }),
-          ].join(" · ")
+            runSummary.reviewed > 0 ? t("summaryReviewed", { count: runSummary.reviewed }) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
         : [
             t("summary.figures", { count: figures }),
             t("summary.statements", { count: statements }),
@@ -370,6 +417,7 @@ export function PlausibilityWorkspace({
             .filter(Boolean)
             .join(" · ");
   const activeChecks = activeMark ? (checksBySubject[activeMark.id] ?? []) : [];
+  const activeReview = activeMark ? reviews[activeMark.id] : undefined;
   const ActiveIcon = activeMark ? statusIcon[activeMark.status] : CircleDashed;
 
   const source = activeMark ? contexts[activeMark.blockId] : undefined;
@@ -386,7 +434,11 @@ export function PlausibilityWorkspace({
     : "";
 
   const navigation = (
-    <div className="flex items-center gap-1" aria-label={t("navigation.label")} role="group">
+    <div
+      className="flex shrink-0 items-center gap-1"
+      aria-label={t("navigation.label")}
+      role="group"
+    >
       <span className="px-1 text-meta whitespace-nowrap text-muted-foreground tabular-nums">
         {annotations.length === 0
           ? t("navigation.none")
@@ -442,6 +494,9 @@ export function PlausibilityWorkspace({
                 <SelectItem value="all">{t("filter.all")}</SelectItem>
                 <SelectItem value="mismatch">{t("filter.mismatch")}</SelectItem>
                 <SelectItem value="uncertain">{t("filter.uncertain")}</SelectItem>
+                <SelectItem value="open">{t("filter.open")}</SelectItem>
+                <SelectItem value="prepared">{t("filter.prepared")}</SelectItem>
+                <SelectItem value="reviewed">{t("filter.reviewed")}</SelectItem>
               </SelectContent>
             </Select>
           ) : null}
@@ -485,7 +540,13 @@ export function PlausibilityWorkspace({
                       />
                       <span className="text-control leading-snug">{finding.title}</span>
                       <span className="col-start-2 text-meta text-muted-foreground">
-                        {[t(`severity.${finding.severity}`), meta].filter(Boolean).join(" · ")}
+                        {[
+                          t(`severity.${finding.severity}`),
+                          meta,
+                          reviewT(`status.${finding.reviewStatus}`),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </button>
                   </li>
@@ -560,7 +621,10 @@ export function PlausibilityWorkspace({
             toolbar={
               <>
                 {summary ? (
-                  <span className="hidden text-meta whitespace-nowrap text-muted-foreground lg:inline">
+                  <span
+                    className="hidden min-w-0 truncate text-meta whitespace-nowrap text-muted-foreground lg:block"
+                    title={summary}
+                  >
                     {summary}
                   </span>
                 ) : null}
@@ -570,7 +634,7 @@ export function PlausibilityWorkspace({
           />
           {activeMark ? (
             <PopoverContent
-              className="w-80 p-0"
+              className="max-h-[min(36rem,var(--radix-popover-content-available-height))] w-96 overflow-y-auto p-0"
               align="start"
               onOpenAutoFocus={(event) => event.preventDefault()}
               onCloseAutoFocus={(event) => event.preventDefault()}
@@ -581,6 +645,11 @@ export function PlausibilityWorkspace({
                   className={`size-4 ${statusTone[activeMark.status]}`}
                 />
                 <span className="text-control font-medium">{t(`status.${activeMark.status}`)}</span>
+                {activeReview ? (
+                  <span className="ml-auto text-meta text-muted-foreground">
+                    {reviewT(`status.${activeReview.review.status}`)}
+                  </span>
+                ) : null}
               </div>
               <dl className="grid gap-1.5 px-3 py-2.5 text-meta">
                 <div className="grid grid-cols-[4.5rem_1fr] gap-2">
@@ -597,7 +666,7 @@ export function PlausibilityWorkspace({
                 ) : null}
               </dl>
               {activeChecks.length > 0 ? (
-                <ol className="max-h-72 divide-y divide-border overflow-y-auto border-t border-border">
+                <ol className="divide-y divide-border border-t border-border">
                   {activeChecks.map((check) => {
                     const CheckIcon = statusIcon[check.status];
                     return (
@@ -660,6 +729,17 @@ export function PlausibilityWorkspace({
                       : t("popover.notChecked")}
                 </p>
               )}
+              {activeReview ? (
+                <FindingReviewPanel
+                  key={activeReview.review.findingId}
+                  review={activeReview.review}
+                  aiFinding={activeReview.aiFinding}
+                  proposal={activeReview.proposal}
+                  canPrepare={canPrepare}
+                  members={members}
+                  errorMessages={reviewErrors}
+                />
+              ) : null}
             </PopoverContent>
           ) : null}
         </Popover>

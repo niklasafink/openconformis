@@ -12,6 +12,7 @@ import { requestProtectionResponse } from "@/server/security/request-protection"
 
 import { DisclosureAccessError } from "./actor";
 import { DisclosureEvidenceError } from "./evidence";
+import { FindingReviewError } from "./finding-review";
 import { DisclosureRunError } from "./start-run";
 
 export const disclosureNoStore = { "cache-control": "private, no-store" } as const;
@@ -56,6 +57,7 @@ export function disclosureErrorResponse(error: unknown, logTag: string) {
   if (error instanceof DisclosureAccessError) return disclosureFailure(error.code);
   if (error instanceof DisclosureRunError) return disclosureFailure(error.code);
   if (error instanceof DisclosureEvidenceError) return disclosureFailure(error.code);
+  if (error instanceof FindingReviewError) return disclosureFailure(error.code, error.status);
   if (error instanceof CredentialValidationError || error instanceof TemporaryCredentialError) {
     return credentialErrorResponse(error, logTag);
   }
