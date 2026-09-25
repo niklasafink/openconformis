@@ -9,6 +9,7 @@ import { appendAuditEvent } from "@/server/audit/event";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db } from "@/server/db/client";
 import { aiSavedCredentials } from "@/server/db/schema/ai";
+import { configuredValue } from "@/server/environment";
 import {
   activeCredentialEncryptionConfiguration,
   decryptCredentialSecret,
@@ -29,6 +30,15 @@ function savedBinding(record: {
     ownerUserId: record.ownerUserId,
     provider: record.provider,
   };
+}
+
+/**
+ * Nur `next dev`: ein OpenRouter-Schlüssel aus `DEV_OPENROUTER_API_KEY`, der gilt,
+ * solange der Nutzer keinen eigenen gespeichert hat. Produktion liest ihn nie.
+ */
+function developmentFallbackSecret(provider: AiRouteProvider) {
+  if (process.env.NODE_ENV !== "development" || provider !== "openrouter") return null;
+  return configuredValue("DEV_OPENROUTER_API_KEY") || null;
 }
 
 /**
@@ -96,10 +106,12 @@ export async function readSavedCredentialSecret(input: {
       ),
     )
     .limit(1);
-  if (!record) return null;
+  if (!record) return developmentFallbackSecret(input.provider);
 
   const encryption = activeCredentialEncryptionConfiguration();
-  if (record.encryptionKeyVersion !== encryption.keyVersion) return null;
+  if (record.encryptionKeyVersion !== encryption.keyVersion) {
+    return developmentFallbackSecret(input.provider);
+  }
   try {
     return decryptCredentialSecret({
       encrypted: {
@@ -128,9 +140,14 @@ export async function listSavedCredentials() {
     })
     .from(aiSavedCredentials)
     .where(eq(aiSavedCredentials.ownerUserId, user.id));
-  return records
+  const saved = records
     .filter((record) => record.encryptionKeyVersion === encryption.keyVersion)
     .map(({ provider, lastFour }) => ({ provider, lastFour }));
+  const fallback = developmentFallbackSecret("openrouter");
+  if (fallback && !saved.some((record) => record.provider === "openrouter")) {
+    saved.push({ provider: "openrouter", lastFour: fallback.slice(-4) });
+  }
+  return saved;
 }
 
 export async function deleteSavedCredential(rawProvider: string) {

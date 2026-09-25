@@ -22,6 +22,8 @@ const sharedServerEnv = {
   // Nur für E2E: `/api/health` meldet ohne gültigen BYOK-Schlüssel `degraded`.
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
   BYOK_ENCRYPTION_KEY_VERSION: "1",
+  // Der lokale Entwicklungsschlüssel aus `.env.local` darf die Tests nicht erreichen.
+  DEV_OPENROUTER_API_KEY: "",
 };
 
 export default defineConfig({
