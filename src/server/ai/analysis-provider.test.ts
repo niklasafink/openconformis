@@ -23,6 +23,7 @@ const analysis = {
   ownerUserId: "owner-id",
   routeProvider: "openrouter" as const,
   sourceDraftId: "draft-id",
+  providerModelId: "selected-model",
 };
 const request = {
   modelId: "selected-model",
@@ -63,6 +64,22 @@ describe("analysis always uses its owner's temporary credential", () => {
     expect(mocks.request).toHaveBeenCalledWith(
       "openrouter",
       expect.objectContaining({ apiKey: "own-key" }),
+    );
+  });
+
+  it("verifies with the fixed second model over the key bound to the selected model", async () => {
+    mocks.credential.mockImplementation(async (_, useSecret) => useSecret("own-key"));
+    await requestStructuredForAnalysis(analysis, {
+      ...request,
+      modelId: "anthropic/claude-sonnet-5",
+    });
+    expect(mocks.credential).toHaveBeenCalledWith(
+      expect.objectContaining({ requiredModelId: "selected-model" }),
+      expect.any(Function),
+    );
+    expect(mocks.request).toHaveBeenCalledWith(
+      "openrouter",
+      expect.objectContaining({ modelId: "anthropic/claude-sonnet-5", apiKey: "own-key" }),
     );
   });
 

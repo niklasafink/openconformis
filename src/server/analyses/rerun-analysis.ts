@@ -13,7 +13,10 @@ import {
   getActiveAnalysisInstructionSet,
 } from "@/server/ai/analysis-instruction-service";
 import { resolveAnalysisModelSelection } from "@/server/ai/model-catalogue";
-import { getAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
+import {
+  analysisVerifierModelId,
+  getAnalysisProviderConfiguration,
+} from "@/server/ai/provider-routing";
 import { createRerunAnalysisCredential } from "@/server/ai/temporary-credential-service";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { db, isDatabaseConfigured } from "@/server/db/client";
@@ -165,12 +168,16 @@ export async function rerunAnalysis(
         expiresAt: now,
       });
 
+      const verifierModelId = analysisVerifierModelId(model.routeProvider, model.providerModelId);
       const route = {
         routeProvider: model.routeProvider,
         providerModelId: model.providerModelId,
         modelProfileId: model.id,
-        verifierProviderModelId: model.providerModelId,
-        verifierModelProfileId: model.id,
+        verifierProviderModelId: verifierModelId,
+        verifierModelProfileId:
+          verifierModelId === model.providerModelId
+            ? model.id
+            : `${model.routeProvider}:${verifierModelId}`,
         modelCatalogueVersion: catalogue.version,
         privacyProfileId: provider.privacyProfileId,
         promptVersion: instructions.assessment.version,

@@ -37,7 +37,7 @@ There is no persistent application worker, Redis, Fly.io or Render service. Verc
 3. The API starts a Workflow using only the analysis UUID.
 4. Retrieval runs once and stores immutable candidate packets.
 5. Each regulatory requirement runs as its own durable step. This keeps execution below serverless duration limits and allows independent retries.
-6. Structured output is schema-validated, exact quotes are hash-checked and risk-selected results receive a separate verifier pass.
+6. Structured output is schema-validated, exact quotes are hash-checked and risk-selected results receive a separate verifier pass. Over OpenRouter the verifier is always Claude Sonnet 5, whatever model assessed (D-035).
 7. Completion, sponsored-credit consumption and the 24-hour original-document deadline are committed atomically.
 
 ## Contract review path
@@ -52,7 +52,7 @@ The contract review is the second axis next to the gap analysis: _n_ contracts Ã
 
 ## Optional Jev assist in the gap analysis
 
-`ANALYSIS_JEV_ASSIST=off|retrieval|verification|all` (default `off`, D-033) adds three interventions to the per-requirement step: a retrieval pre-filter before the assessment prompt, a citation check after grounding and a triage of the second-model verification. The mode and a short-lived TypeSafe credential are frozen in `analyses` at start; without a saved TypeSafe key the analysis runs as `off`. In `off` there is no Jev request at all. The 5 % drift sample is unchanged. Acceptance with a real key is described in `docs/JEV_ASSIST_ACCEPTANCE.md`.
+`ANALYSIS_JEV_ASSIST=off|retrieval|verification|all` (default `off`, D-033) adds three interventions to the per-requirement step: a retrieval pre-filter before the assessment prompt, a citation check after grounding and a triage of the second-model verification. The mode and a short-lived TypeSafe credential are frozen in `analyses` at start; without a saved TypeSafe key the analysis runs as `off`. In `off` there is no Jev request at all. The 10 % drift sample is unchanged by it. Acceptance with a real key is described in `docs/JEV_ASSIST_ACCEPTANCE.md`.
 
 ## Data protection
 

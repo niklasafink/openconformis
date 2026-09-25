@@ -38,12 +38,14 @@ const openRouterModelsSchema = z.object({
 type OpenRouterModel = z.infer<typeof openRouterModelSchema>;
 
 /**
- * Feste Modellauswahl der Analyse: je ein Modell von Anthropic, OpenAI und
- * Google sowie zwei chinesische Modelle, alle über OpenRouter. Der offene
- * Katalog mit Hunderten Einträgen machte die Wahl beliebig und ließ Routen
- * vorauswählen, für die es keinen Analysepfad gibt.
+ * Feste Modellauswahl der Analyse, alle über OpenRouter. Der offene Katalog mit
+ * Hunderten Einträgen machte die Wahl beliebig und ließ Routen vorauswählen, für
+ * die es keinen Analysepfad gibt. GPT-5.6 Luna steht vorn: Im Vergleich von zehn
+ * DORA-Anforderungen gegen eine Referenz von Claude Fable halluzinierte es nicht,
+ * übersah die wenigsten Lücken und kostete ein Dreizehntel von Sonnet 5.
  */
 export const analysisModelShortlist = [
+  { modelId: "openai/gpt-5.6-luna", publisher: "OpenAI", name: "GPT-5.6 Luna" },
   { modelId: "anthropic/claude-sonnet-5", publisher: "Anthropic", name: "Claude Sonnet 5" },
   { modelId: "openai/gpt-5.5", publisher: "OpenAI", name: "GPT-5.5" },
   { modelId: "google/gemini-3.8-flash", publisher: "Google", name: "Gemini 3.8 Flash" },
@@ -130,7 +132,7 @@ function configuredChatProfiles() {
  * sondern entscheidet auch die Vorauswahl im Prüfungsumfang.
  */
 function defaultAnalysisModelId() {
-  return process.env.DEFAULT_ANALYSIS_MODEL_PROFILE?.trim() || "anthropic/claude-sonnet-5";
+  return process.env.DEFAULT_ANALYSIS_MODEL_PROFILE?.trim() || "openai/gpt-5.6-luna";
 }
 
 function shortlistProfile(

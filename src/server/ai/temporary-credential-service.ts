@@ -27,6 +27,7 @@ import { validateProviderCredential } from "./credential-validation";
 import { readSavedCredentialSecret, saveUserCredential } from "./saved-credential-service";
 import {
   allowedByokProviders,
+  analysisVerifierModelId,
   getAnalysisProviderConfiguration,
   isAnalysisProviderAvailable,
 } from "./provider-routing";
@@ -217,6 +218,18 @@ async function connectTemporaryCredential(
     requiredModelId: input.requiredModelId,
     route: usesAnalysisRoute ? getAnalysisProviderConfiguration(provider) : undefined,
   });
+  // Die Verifikation einer Analyse läuft über denselben Schlüssel mit einem festen
+  // zweiten Modell. Ist es dem Schlüssel nicht zugänglich, soll der Start hier
+  // scheitern und nicht erst die erste Verifikation mitten im Lauf.
+  const verifierModelId = analysisVerifierModelId(provider, input.requiredModelId);
+  if (purpose === "analysis" && verifierModelId !== input.requiredModelId) {
+    await validateProviderCredential({
+      provider,
+      secret,
+      requiredModelId: verifierModelId,
+      route: getAnalysisProviderConfiguration(provider),
+    });
+  }
   const credentialId = randomUUID();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + credentialTtlHours() * 60 * 60 * 1_000);

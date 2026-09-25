@@ -101,6 +101,6 @@ describe("analysis model catalogue", () => {
   it("falls back to the full shortlist when the route lists none of its models", async () => {
     const catalogue = await getAnalysisModelCatalogue(catalogueResponse([]));
     expect(catalogue.models).toHaveLength(analysisModelShortlist.length);
-    expect(catalogue.models[0]).toMatchObject({ providerModelId: "anthropic/claude-sonnet-5" });
+    expect(catalogue.models[0]).toMatchObject({ providerModelId: "openai/gpt-5.6-luna" });
   });
 });

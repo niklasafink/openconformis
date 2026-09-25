@@ -347,6 +347,8 @@ async function assessItem(
   inputHash: string;
   outputHash: string;
   deterministicFallback: boolean;
+  /** Erst der zweite Versuch lieferte eine gültige, verankerte Bewertung. */
+  retried?: boolean;
 }> {
   if (candidates.length === 0) {
     const assessment = noAssessmentPossible(
@@ -451,6 +453,7 @@ async function assessItem(
   }
   let previousFailure: string | undefined;
   let truncated = false;
+  let retried = false;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const attemptPrompt =
       attempt === 1
@@ -520,6 +523,7 @@ async function assessItem(
         inputHash,
         outputHash,
         deterministicFallback: false,
+        retried,
       };
     } catch (error) {
       const failure = withProviderErrorContext(
@@ -541,6 +545,7 @@ async function assessItem(
         }
         if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
         previousFailure = error.detail;
+        retried = true;
         continue;
       }
       if (
@@ -548,6 +553,7 @@ async function assessItem(
         (error instanceof Error &&
           error.message === "MODEL_RETURNED_NOT_APPLICABLE_FOR_INCLUDED_SCOPE")
       ) {
+        retried = true;
         continue;
       }
       throw error;
@@ -1051,7 +1057,9 @@ export async function executeAnalysisScopeItem(input: {
 
     let reasons = proposed.deterministicFallback
       ? []
-      : verificationReasons(analysis.id, item.scope.requirementExternalKey, proposed.assessment);
+      : verificationReasons(analysis.id, item.scope.requirementExternalKey, proposed.assessment, {
+          retried: proposed.retried,
+        });
 
     // Eingriff 1: Triage. Nur wenn „erfüllt" der einzige Grund ist und Jev die Belege
     // nicht anzweifelt, darf das Zweitmodell entfallen. Die Driftstichprobe steht in

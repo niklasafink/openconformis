@@ -45,6 +45,31 @@ describe("verification policy", () => {
     expect(reasons).toEqual(expect.arrayContaining(["low_confidence", "contradiction"]));
   });
 
+  it("verifies not fulfilled results and results that needed a second attempt", () => {
+    expect(
+      verificationReasons("analysis", "requirement", assessment({ status: "not_fulfilled" }), {
+        retried: true,
+      }),
+    ).toEqual(expect.arrayContaining(["not_fulfilled", "retried"]));
+  });
+
+  it("treats confidence below 85 as low, since fast models state higher confidence", () => {
+    expect(
+      verificationReasons("analysis", "requirement", assessment({ confidencePercent: 84 })),
+    ).toContain("low_confidence");
+    expect(
+      verificationReasons("analysis", "requirement", assessment({ confidencePercent: 85 })),
+    ).not.toContain("low_confidence");
+  });
+
+  it("samples about one in ten results for drift", () => {
+    const sampled = Array.from({ length: 2_000 }, (_, index) =>
+      verificationReasons("analysis", `requirement-${index}`, assessment()),
+    ).filter((reasons) => reasons.includes("drift_sample")).length;
+    expect(sampled).toBeGreaterThan(150);
+    expect(sampled).toBeLessThan(250);
+  });
+
   it("selects the drift sample deterministically", () => {
     const first = verificationReasons("analysis", "requirement", assessment());
     const second = verificationReasons("analysis", "requirement", assessment());

@@ -8,6 +8,8 @@ import type { StructuredModelRequest } from "./structured-model";
 type AnalysisCredentialBinding = {
   aiCredentialId: string | null;
   ownerUserId: string;
+  /** Das gewählte Modell, für das der Schlüssel beim Verbinden geprüft wurde. */
+  providerModelId: string;
   routeProvider: AiRouteProvider;
   sourceDraftId: string;
 };
@@ -31,7 +33,10 @@ export async function requestStructuredForAnalysis<T>(
       provider: analysis.routeProvider,
       purpose: "analysis",
       bindingId: analysis.sourceDraftId,
-      requiredModelId: request.modelId,
+      // Der Schlüssel ist an das gewählte Modell gebunden. Die Verifikation ruft
+      // über ihn ein festes zweites Modell auf, das beim Verbinden mitgeprüft
+      // wurde (`analysisVerifierModelId`).
+      requiredModelId: analysis.providerModelId,
     },
     (apiKey) =>
       requestProviderStructured(analysis.routeProvider, {

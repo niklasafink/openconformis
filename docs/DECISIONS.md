@@ -715,3 +715,26 @@ Consequences: `CLAUDE.md` names the exception in one sentence. Every other part 
 product keeps the rule unchanged.
 
 Decision: accepted.
+
+## D-035 GPT-5.6 Luna assesses, Claude Sonnet 5 verifies
+
+Measured (2026-09-25): ten DORA requirements, a reference by Claude Fable 5.1 built from
+critical audit questions answered only with verbatim policy quotes, and Fable grading
+anonymised answers against it. GPT-5.6 Luna had no hallucination, no citation error and
+the fewest missed gaps after Fable, at about 1/13 of Sonnet 5's cost and 1.5× its speed.
+Sonnet 5 matched every status but missed about three times as many gaps.
+
+- GPT-5.6 Luna leads the analysis shortlist and is the default analysis model.
+- Over OpenRouter, Claude Sonnet 5 runs every triggered verification, whatever model
+  assessed. The key is still bound to the selected model; connecting it also checks that
+  it can reach Sonnet 5, so a run fails at start and not at its first verification.
+  Direct provider routes keep verifying with the selected model.
+- Triggers: status fulfilled or not fulfilled, confidence below 85 %, a contradicting
+  citation, an assessment that only succeeded on its second attempt, and a deterministic
+  10 % drift sample. The threshold moved from 75 % because fast models state higher
+  confidence (GPT-5.6 Luna: 75–88 % where Sonnet stated 55–65 %).
+- The chat, the contract review and the disclosure area are unchanged.
+
+Estimated cost for 100 requirements: about 0.75 $ instead of about 3.30 $.
+
+Decision: accepted.

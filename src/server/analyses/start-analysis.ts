@@ -11,7 +11,10 @@ import {
   conclusionInstructionOf,
   getActiveAnalysisInstructionSet,
 } from "@/server/ai/analysis-instruction-service";
-import { getAnalysisProviderConfiguration } from "@/server/ai/provider-routing";
+import {
+  analysisVerifierModelId,
+  getAnalysisProviderConfiguration,
+} from "@/server/ai/provider-routing";
 import { ensurePersonalWorkspace } from "@/server/auth/personal-workspace";
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { getPublishedFrameworkRelease } from "@/server/catalogue/service";
@@ -278,12 +281,19 @@ export async function startAnalysis(input: AnalysisStartInput): Promise<StartAna
       // Der Abschlusstext hängt am Profil des Umfangs; seine Anweisung wird wie
       // Bewertung und Verifikation beim Start eingefroren.
       const conclusionInstruction = conclusionInstructionOf(instructions, scope.analysisProfile);
+      const verifierModelId = analysisVerifierModelId(
+        modelSelection.routeProvider,
+        modelSelection.providerModelId,
+      );
       const route = {
         routeProvider: modelSelection.routeProvider,
         providerModelId: modelSelection.providerModelId,
         modelProfileId: modelSelection.modelProfileId,
-        verifierProviderModelId: modelSelection.providerModelId,
-        verifierModelProfileId: modelSelection.modelProfileId,
+        verifierProviderModelId: verifierModelId,
+        verifierModelProfileId:
+          verifierModelId === modelSelection.providerModelId
+            ? modelSelection.modelProfileId
+            : `${modelSelection.routeProvider}:${verifierModelId}`,
         modelCatalogueVersion: modelSelection.modelCatalogueVersion,
         privacyProfileId: provider.privacyProfileId,
         promptVersion: instructions.assessment.version,

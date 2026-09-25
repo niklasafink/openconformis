@@ -98,6 +98,20 @@ export function allowedByokProviders(): ReadonlySet<string> {
   return configured.size > 0 ? configured : new Set(["openrouter"]);
 }
 
+/**
+ * Das Modell der Verifikation. Über OpenRouter prüft Claude Sonnet 5 jede
+ * ausgelöste Bewertung, gleich welches Modell bewertet hat: Im Vergleich mit einer
+ * Referenz von Claude Fable fand ein zweites Modell einer anderen Familie mehr
+ * übersehene Lücken als ein Modell, das sich selbst prüft. Bei direkten
+ * Anbietern gilt der Schlüssel nur für dessen eigene Modelle; dort prüft weiter
+ * das gewählte Modell.
+ */
+export const openRouterVerifierModelId = "anthropic/claude-sonnet-5";
+
+export function analysisVerifierModelId(provider: AiRouteProvider, providerModelId: string) {
+  return provider === "openrouter" ? openRouterVerifierModelId : providerModelId;
+}
+
 export function isAnalysisProviderAvailable(provider: AiRouteProvider) {
   return Boolean(analysisBaseUrl(provider));
 }
