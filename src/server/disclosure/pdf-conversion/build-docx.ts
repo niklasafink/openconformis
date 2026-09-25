@@ -47,7 +47,9 @@ function tableNode(rows: Extract<DocumentNode, { kind: "table" }>["rows"]) {
     rows: rows.map(
       (row) =>
         new TableRow({
-          tableHeader: row.header,
+          // Nur echte Kopfzeilen markieren: schon `tableHeader: false` macht in Word
+          // (und damit in der Aufbereitung) aus jeder Zeile eine Kopfzeile.
+          ...(row.header ? { tableHeader: true } : {}),
           children: Array.from({ length: width }, (_, index) => {
             const text = row.cells[index] ?? "";
             const numeric = index > 0 && isNumericCell(text);

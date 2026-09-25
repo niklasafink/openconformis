@@ -2295,6 +2295,115 @@ i[data-result-pending="true"] {
   color: inherit;
 }
 
+/* Offenlegungspflicht: Marken des Plausichecks. Farbe nie allein — rot trägt eine
+   gepunktete, orange eine gestrichelte Unterkante; das Statuswort steht im Popover. */
+.disclosure-document {
+  max-width: 900px;
+}
+
+.disclosure-document .disclosure-mark {
+  border-radius: 2px;
+  padding: 1px 1px;
+  background: #ececec;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+
+.disclosure-document .disclosure-mark[data-kind="statement"] {
+  background: transparent;
+  box-shadow: inset 0 -1.5px 0 #b9bdc4;
+}
+
+.disclosure-document .disclosure-mark[data-status="match"] {
+  background: var(--status-met-bg);
+}
+
+.disclosure-document .disclosure-mark[data-status="mismatch"] {
+  background: var(--status-not-met-bg);
+  text-decoration: underline dotted var(--status-not-met);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.disclosure-document .disclosure-mark[data-status="uncertain"] {
+  background: var(--status-partial-bg);
+  text-decoration: underline dashed var(--status-partial);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.disclosure-document .disclosure-mark[data-kind="statement"][data-status="match"] {
+  box-shadow: inset 0 -1.5px 0 var(--status-met);
+}
+
+.disclosure-document .disclosure-mark:hover {
+  filter: brightness(0.96);
+}
+
+.disclosure-document .disclosure-mark:focus-visible,
+.disclosure-document .disclosure-mark[data-active] {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.disclosure-page-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 1.6em 0 0.8em;
+  color: var(--muted-foreground);
+  font-size: var(--text-meta);
+}
+
+.disclosure-page-marker::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.disclosure-document > .disclosure-page-marker:first-child {
+  margin-top: 0;
+}
+
+.disclosure-ocr-note {
+  color: var(--muted-foreground);
+  font-size: var(--text-meta);
+  font-style: italic;
+}
+
+.disclosure-table-scroll {
+  margin: 0.4em 0 1.1em;
+  overflow-x: auto;
+}
+
+.disclosure-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-meta);
+  line-height: 1.45;
+}
+
+.disclosure-table :is(td, th) {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  text-align: left;
+  font-weight: 400;
+}
+
+.disclosure-table :is(td, th)[data-numeric] {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.disclosure-table tr[data-header] :is(td, th) {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
 .result-document-state {
   margin: 0;
   border: 1px dashed var(--border-strong);

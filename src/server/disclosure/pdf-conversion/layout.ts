@@ -338,7 +338,6 @@ function mergeContinuationRows(rows: TableRow[]) {
       const openEnded = /(?:^|\s)\p{Ll}\S*$/u.test(previousLabel);
       const continuation =
         label === "" ||
-        previousLabel === "" ||
         (!enumerated && /^\p{Ll}/u.test(label)) ||
         (!enumerated && !/\s/u.test(label) && openEnded);
       const previousHasValues = occupied(previous).length > 0;

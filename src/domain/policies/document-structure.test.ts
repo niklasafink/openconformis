@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   blocksFromDocumentHtml,
   blocksFromPdfPages,
+  locatedBlocksFromDocumentHtml,
   numberedHeadingLevel,
   outlineBlocks,
   pdfLinesFromText,
@@ -134,5 +135,25 @@ describe("PDF structure", () => {
       { kind: "paragraph", text: "Fortsetzung auf Seite zwei.", pageNumber: 2 },
     ]);
     expect(blocks[2]?.headingPath).toEqual(["1. Governance"]);
+  });
+});
+
+describe("locatedBlocksFromDocumentHtml", () => {
+  it("keeps the block order of blocksFromDocumentHtml and adds table positions", () => {
+    const html =
+      "<p>Vorab</p><table><tr><th></th><th>2021</th><th>2020</th></tr>" +
+      "<tr><td>Umsatzerlöse</td><td>4.416,4</td><td>12.734,0</td></tr>" +
+      '<tr><td colspan="2">Summe</td><td>1,0</td></tr></table><p>Danach</p>';
+    const located = locatedBlocksFromDocumentHtml(html);
+    expect(located.map(({ cell: _cell, ...block }) => block)).toEqual(blocksFromDocumentHtml(html));
+    expect(located.filter((block) => block.cell).map((block) => [block.text, block.cell])).toEqual([
+      ["2021", { table: 0, row: 0, column: 1, header: true }],
+      ["2020", { table: 0, row: 0, column: 2, header: true }],
+      ["Umsatzerlöse", { table: 0, row: 1, column: 0, header: false }],
+      ["4.416,4", { table: 0, row: 1, column: 1, header: false }],
+      ["12.734,0", { table: 0, row: 1, column: 2, header: false }],
+      ["Summe", { table: 0, row: 2, column: 0, header: false }],
+      ["1,0", { table: 0, row: 2, column: 2, header: false }],
+    ]);
   });
 });

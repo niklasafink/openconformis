@@ -736,6 +736,50 @@
       "DISCLOSURE_REPORT_DOCX_ONLY": "Word files only (.docx). Convert a PDF to Word first.",
       "DISCLOSURE_REPORT_EXISTS": "This review already has a report.",
       "DATABASE_UNAVAILABLE": "The database is unavailable right now."
+    },
+    "plausibility": {
+      "documents": "Documents",
+      "page": "Page",
+      "ocrNote": "read by text recognition",
+      "summary": {
+        "figures": "{count, plural, one {# figure recognized} other {# figures recognized}}",
+        "statements": "{count, plural, one {# change word} other {# change words}}",
+        "unreadable": "{count} unreadable"
+      },
+      "status": {
+        "pending": "Not checked",
+        "match": "Correct",
+        "mismatch": "Deviation",
+        "uncertain": "Assignment uncertain",
+        "unassigned": "No check relation"
+      },
+      "navigation": {
+        "label": "Annotations",
+        "none": "No annotations",
+        "position": "Annotation {current} of {total}",
+        "previous": "Previous annotation (Alt+↑)",
+        "next": "Next annotation (Alt+↓)"
+      },
+      "findings": {
+        "label": "Findings",
+        "title": "Findings",
+        "empty": "No check has run yet. Grey marks show what was recognized in the report."
+      },
+      "recognition": {
+        "running": "Recognizing figures …",
+        "failed": "The figures could not be recognized."
+      },
+      "popover": {
+        "figure": "Recognized",
+        "statement": "Statement",
+        "source": "Source",
+        "notChecked": "Not checked yet.",
+        "unreadable": "Number format not readable."
+      },
+      "source": {
+        "page": "Page {page}",
+        "tz": "para. {tz}"
+      }
     }
   }
 }

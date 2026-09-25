@@ -736,6 +736,50 @@
       "DISCLOSURE_REPORT_DOCX_ONLY": "Nur Word-Dateien (.docx). PDF bitte vorher in Word umwandeln.",
       "DISCLOSURE_REPORT_EXISTS": "Diese Prüfung hat bereits einen Bericht.",
       "DATABASE_UNAVAILABLE": "Die Datenbank ist gerade nicht erreichbar."
+    },
+    "plausibility": {
+      "documents": "Dokumente",
+      "page": "Seite",
+      "ocrNote": "per Texterkennung gelesen",
+      "summary": {
+        "figures": "{count, plural, one {# Zahl erkannt} other {# Zahlen erkannt}}",
+        "statements": "{count, plural, one {# Richtungswort} other {# Richtungswörter}}",
+        "unreadable": "{count} nicht lesbar"
+      },
+      "status": {
+        "pending": "Nicht geprüft",
+        "match": "Stimmt",
+        "mismatch": "Abweichung",
+        "uncertain": "Zuordnung unsicher",
+        "unassigned": "Keine Prüfbeziehung"
+      },
+      "navigation": {
+        "label": "Anmerkungen",
+        "none": "Keine Anmerkungen",
+        "position": "Anmerkung {current} von {total}",
+        "previous": "Vorherige Anmerkung (Alt+↑)",
+        "next": "Nächste Anmerkung (Alt+↓)"
+      },
+      "findings": {
+        "label": "Feststellungen",
+        "title": "Feststellungen",
+        "empty": "Noch keine Prüfung gelaufen. Grau markiert ist, was im Bericht erkannt wurde."
+      },
+      "recognition": {
+        "running": "Zahlen werden erkannt …",
+        "failed": "Die Zahlen konnten nicht erkannt werden."
+      },
+      "popover": {
+        "figure": "Erkannt",
+        "statement": "Aussage",
+        "source": "Quelle",
+        "notChecked": "Noch nicht geprüft.",
+        "unreadable": "Zahlenformat nicht lesbar."
+      },
+      "source": {
+        "page": "Seite {page}",
+        "tz": "Tz {tz}"
+      }
     }
   }
 }

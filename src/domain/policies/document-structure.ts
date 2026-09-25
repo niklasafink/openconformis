@@ -98,14 +98,43 @@ const blockBoundaryTags = new Set([
   "div",
 ]);
 
+/** Lage einer Tabellenzelle in ihrer Word-Tabelle; leere Zellen zählen mit. */
+export type TableCellPosition = {
+  table: number;
+  row: number;
+  column: number;
+  header: boolean;
+};
+
+/** Ein Block samt Tabellenlage, in derselben Reihenfolge wie `blocksFromDocumentHtml`. */
+export type LocatedBlock = StructuredBlock & { cell?: TableCellPosition };
+
 /**
  * Zerlegt das HTML der Word-Umwandlung in Blöcke. Inline-Auszeichnung fällt
  * weg; Überschriften, Listenpunkte und Tabellenzellen behalten ihre Art. Der
  * Text entspricht damit dem, was die Originalansicht aus demselben HTML zeigt.
  */
 export function blocksFromDocumentHtml(html: string): StructuredBlock[] {
-  const blocks: StructuredBlock[] = [];
+  return locatedBlocksFromDocumentHtml(html).map(({ cell: _cell, ...block }) => block);
+}
+
+/**
+ * Dieselbe Zerlegung, zusätzlich mit Tabelle, Zeile und Spalte jeder Zelle. Die
+ * Offenlegungspflicht braucht die Tabellenstruktur für Summen und Spaltenköpfe;
+ * `document_blocks` selbst bleibt dafür unverändert.
+ */
+export function locatedBlocksFromDocumentHtml(html: string): LocatedBlock[] {
+  const blocks: LocatedBlock[] = [];
   const open: Array<{ tag: string; title: boolean }> = [];
+  const tables: Array<{
+    index: number;
+    row: number;
+    column: number;
+    header: boolean;
+    /** Zusätzliche Spalten der vorigen Zelle (`colspan`). */
+    carry: number;
+  }> = [];
+  let tableCount = 0;
   let buffer = "";
 
   const flush = () => {
@@ -123,7 +152,21 @@ export function blocksFromDocumentHtml(html: string): StructuredBlock[] {
     } else if (container?.tag === "li") {
       blocks.push({ kind: "list_item", text });
     } else if (container) {
-      blocks.push({ kind: "table_cell", text });
+      const table = tables.at(-1);
+      blocks.push(
+        table
+          ? {
+              kind: "table_cell",
+              text,
+              cell: {
+                table: table.index,
+                row: table.row,
+                column: table.column,
+                header: table.header || container.tag === "th",
+              },
+            }
+          : { kind: "table_cell", text },
+      );
     } else {
       // Nummerierte Abschnittstitel, die in Word nur fett statt als
       // Überschrift formatiert sind.
@@ -146,11 +189,29 @@ export function blocksFromDocumentHtml(html: string): StructuredBlock[] {
     if (!blockBoundaryTags.has(tag)) continue;
 
     flush();
-    if (match[0].startsWith("</")) {
+    const closing = match[0].startsWith("</");
+    if (closing) {
       const index = open.map((entry) => entry.tag).lastIndexOf(tag);
       if (index >= 0) open.length = index;
+      if (tag === "table") tables.pop();
+      if (tag === "thead" && tables.at(-1)) tables.at(-1)!.header = false;
     } else {
       open.push({ tag, title: /class\s*=\s*"[^"]*\btitle\b/u.test(match[2] ?? "") });
+      const table = tables.at(-1);
+      if (tag === "table") {
+        tables.push({ index: tableCount, row: -1, column: -1, header: false, carry: 0 });
+        tableCount += 1;
+      } else if (tag === "thead" && table) {
+        table.header = true;
+      } else if (tag === "tr" && table) {
+        table.row += 1;
+        table.column = -1;
+        table.carry = 0;
+      } else if ((tag === "td" || tag === "th") && table) {
+        table.column += 1 + table.carry;
+        const span = Number(/colspan\s*=\s*"?(\d+)/u.exec(match[2] ?? "")?.[1] ?? 1);
+        table.carry = Math.max(0, span - 1);
+      }
     }
   }
   buffer += html.slice(consumed);

@@ -3,6 +3,7 @@ import "server-only";
 import { start } from "workflow/api";
 
 import { analysisWorkflow } from "@/workflows/analysis";
+import { disclosureRecognitionWorkflow } from "@/workflows/disclosure-recognition";
 import { documentIngestionWorkflow } from "@/workflows/document-ingestion";
 import { policyOriginalRetentionWorkflow } from "@/workflows/policy-retention";
 import { reviewWorkflow } from "@/workflows/review";
@@ -26,5 +27,11 @@ export async function launchDocumentIngestionWorkflow(policyVersionId: string) {
  */
 export async function launchReviewWorkflow(reviewRunId: string) {
   const run = await start(reviewWorkflow, [reviewRunId]);
+  return { runId: run.runId };
+}
+
+/** Erkennung eines Prüfungsberichts der Offenlegungspflicht; Argument ist nur die ID. */
+export async function launchDisclosureRecognitionWorkflow(caseDocumentId: string) {
+  const run = await start(disclosureRecognitionWorkflow, [caseDocumentId]);
   return { runId: run.runId };
 }

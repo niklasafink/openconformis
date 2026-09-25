@@ -203,6 +203,9 @@ describe("pdf to docx conversion", () => {
       "74 Im Vergleich zum Vorjahr ergab sich im letzten Geschäftsjahr folgende Entwicklung der Ertragslage der Gesellschaft:",
     );
     const cells = blocks.filter((block) => block.kind === "table_cell").map((block) => block.text);
+    // Nur die Jahreszeile ist Kopf; Wertezeilen bleiben normale Zellen.
+    expect(html.match(/<th>/gu)?.length ?? 0).toBeLessThanOrEqual(3 * 3);
+    expect(html).toContain("<td><p>4.416,4</p></td>");
     expect(cells).toEqual(
       expect.arrayContaining(["Umsatzerlöse", "4.416,4", "12.734,0", "Rohertrag", "3.465,2"]),
     );

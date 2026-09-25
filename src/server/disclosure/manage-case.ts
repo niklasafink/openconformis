@@ -13,6 +13,8 @@ import {
   versionAccess,
 } from "@/server/policies/adopt-draft-version";
 
+import { launchDisclosureRecognitionWorkflow } from "@/server/workflows/launch";
+
 import { requirePreparer, resolveDisclosureActor } from "./actor";
 
 /**
@@ -115,7 +117,7 @@ export async function attachDisclosureReport(input: {
       return { ok: false, code: "DISCLOSURE_REPORT_DOCX_ONLY" };
     }
 
-    return await db.transaction(async (transaction) => {
+    const attached = await db.transaction(async (transaction) => {
       await transaction.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`disclosure-documents:${found.id}`}, 0))`,
       );
@@ -169,7 +171,21 @@ export async function attachDisclosureReport(input: {
       });
       return { ok: true as const, caseDocumentId: document!.id };
     });
+    if (attached.ok) await startRecognition(attached.caseDocumentId);
+    return attached;
   } catch (error) {
     return failureOf(error);
+  }
+}
+
+/**
+ * Startet die Erkennung eines Berichts. Scheitert der Start, bleibt der Bericht auf
+ * `pending`; die Seite startet ihn beim nächsten Aufruf erneut.
+ */
+export async function startRecognition(caseDocumentId: string) {
+  try {
+    await launchDisclosureRecognitionWorkflow(caseDocumentId);
+  } catch {
+    // Kein Fehler für den Nutzer: der Bericht ist angehängt, die Erkennung folgt.
   }
 }
