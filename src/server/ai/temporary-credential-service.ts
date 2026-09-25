@@ -136,16 +136,18 @@ export async function createDisclosureRunCredential(input: {
 }
 
 /**
- * Kurzlebiger TypeSafe-Schlüssel für die Einordnung durch Jev in einem Plausicheck-Lauf,
- * gebunden an dieselbe Lauf-ID wie der Modellschlüssel und durch den Zweck von ihm
- * getrennt. Er stammt immer aus dem gespeicherten Schlüssel des Nutzers.
+ * Kurzlebiger Schlüssel für die Einordnung durch Jev in einem Plausicheck-Lauf, gebunden
+ * an dieselbe Lauf-ID wie der Modellschlüssel und durch den Zweck von ihm getrennt. Er
+ * stammt immer aus dem gespeicherten Schlüssel des Nutzers: TypeSafe für Jev direkt,
+ * OpenRouter für den Jev Router (D-036).
  */
 export async function createDisclosureAssistCredential(input: {
   bindingId: string;
   requiredModelId: string;
+  provider?: "typesafe" | "openrouter";
 }) {
   return connectTemporaryCredential(
-    { ...input, provider: "typesafe", purpose: "disclosure_assist" },
+    { ...input, provider: input.provider ?? "typesafe", purpose: "disclosure_assist" },
     async () => input.bindingId,
   );
 }
@@ -253,6 +255,8 @@ async function connectTemporaryCredential(
     secret,
     requiredModelId: input.requiredModelId,
     route: usesAnalysisRoute ? getAnalysisProviderConfiguration(provider) : undefined,
+    // Der Jev Router über OpenRouter antwortet ohne getypte Ausgabe (D-036).
+    structuredOutputs: !(provider === "openrouter" && purpose === "disclosure_assist"),
   });
   // Die Verifikation einer Analyse läuft über denselben Schlüssel mit einem festen
   // zweiten Modell. Ist es dem Schlüssel nicht zugänglich, soll der Start hier

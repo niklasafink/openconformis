@@ -14,7 +14,7 @@ import {
 } from "@/domain/disclosure/assignment";
 import { modelAssignmentChecks, runDeterministicChecks } from "@/domain/disclosure/checks/run";
 import {
-  disclosureJevPromptVersion,
+  disclosureJevPromptVersionFor,
   jevAnswerFor as jevAnswerForBatch,
   jevConfidenceThresholdBp,
   jevResolvedFigureIds,
@@ -25,7 +25,12 @@ import { disclosureModelInvocations, disclosureRuns } from "@/server/db/schema/d
 
 import { loadEngineDocument } from "./engine-document";
 import { storeChecks } from "./execute-run";
-import { disclosureJevActive, requestJevForBatch } from "./jev-route";
+import {
+  disclosureJevActive,
+  disclosureJevViaRouter,
+  requestJevForBatch,
+  requestJevRouterForBatch,
+} from "./jev-route";
 import { requestStructuredForDisclosure } from "./model-route";
 
 /**
@@ -48,7 +53,7 @@ function jevBatchesFor(run: Run, pending: Parameters<typeof planAssignmentBatche
   if (!disclosureJevActive(run) || !run.jevModelId) return [];
   return planAssignmentBatches(pending, {
     providerModelId: run.jevModelId,
-    promptVersion: disclosureJevPromptVersion,
+    promptVersion: disclosureJevPromptVersionFor(run.jevModelId),
   });
 }
 
@@ -154,7 +159,7 @@ async function storedOrFreshJevAnswer(run: Run, batch: AssignmentBatch) {
         runId: run.id,
         batchKey: batch.key,
         provider: "jev",
-        routeProvider: "typesafe",
+        routeProvider: disclosureJevViaRouter(run) ? "openrouter" : "typesafe",
         modelId: run.jevModelId!,
         itemCount: batch.items.length,
       })
@@ -164,6 +169,24 @@ async function storedOrFreshJevAnswer(run: Run, batch: AssignmentBatch) {
   }
   const started = Date.now();
   try {
+    if (disclosureJevViaRouter(run)) {
+      // Der Jev Router antwortet schon im Schema des Modells (D-036).
+      const routed = await requestJevRouterForBatch(run, batch);
+      await db
+        .update(disclosureModelInvocations)
+        .set({
+          status: "succeeded",
+          response: routed.answer,
+          inputTokens: routed.inputTokens,
+          outputTokens: routed.outputTokens,
+          costMicrounits: routed.costMicrounits,
+          latencyMilliseconds: Date.now() - started,
+          errorCode: null,
+          completedAt: new Date(),
+        })
+        .where(where);
+      return routed.answer;
+    }
     const response = await requestJevForBatch(run, batch);
     // Gespeichert wird dasselbe Schema wie beim Modell: nur Kurzzeichen und Konfidenzen.
     const answer = jevAnswerForBatch(batch, response.answers);

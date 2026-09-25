@@ -108,6 +108,11 @@ export async function validateProviderCredential(
     secret: string;
     requiredModelId: string;
     route?: { baseUrl: string; zeroDataRetention: boolean };
+    /**
+     * Nur OpenRouter: `false` für einen Chat-Router ohne getypte Antworten (Jev Router im
+     * Plausicheck, D-036). Das Modell muss dann nur erreichbar sein.
+     */
+    structuredOutputs?: boolean;
   },
   fetchImplementation: typeof fetch = fetch,
 ): Promise<ValidationResult> {
@@ -130,6 +135,7 @@ export async function validateProviderCredential(
       const modelsUrl = openRouterModelsUrl(
         input.route ?? { baseUrl: "https://openrouter.ai/api/v1", zeroDataRetention: false },
         true,
+        input.structuredOutputs ?? true,
       );
       modelsUrl.searchParams.set("q", input.requiredModelId);
       const models = modelListSchema.safeParse(
@@ -139,7 +145,11 @@ export async function validateProviderCredential(
         throw new CredentialValidationError("PROVIDER_RESPONSE_INVALID", false);
       }
       const selectedModel = models.data.data.find(({ id }) => id === input.requiredModelId);
-      if (!selectedModel?.supported_parameters?.includes("structured_outputs")) {
+      if (
+        !selectedModel ||
+        ((input.structuredOutputs ?? true) &&
+          !selectedModel.supported_parameters?.includes("structured_outputs"))
+      ) {
         throw new CredentialValidationError("MODEL_NOT_ACCESSIBLE", false);
       }
       return {

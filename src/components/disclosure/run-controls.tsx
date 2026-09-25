@@ -27,6 +27,8 @@ export type RunControlsState = Readonly<{
   modelProfileId: string | null;
   /** Eingefroren beim Start: Jev hat eingeordnet. */
   jevAssist: "on" | "off";
+  /** Über TypeSafe direkt oder über den Jev Router von OpenRouter. */
+  jevRoute: "typesafe" | "openrouter" | null;
 }>;
 
 type RunControlsProps = Readonly<{
@@ -132,13 +134,17 @@ export function RunControls({
     run.status !== "none"
       ? run.modelProfileId
         ? run.jevAssist === "on"
-          ? t("jev.used")
+          ? run.jevRoute === "openrouter"
+            ? t("jev.usedRouter")
+            : t("jev.used")
           : t("jev.notUsed")
         : null
       : model && saved && jevEnabled
         ? typesafe
           ? t("jev.ready")
-          : t("jev.notUsed")
+          : model.routeProvider === "openrouter"
+            ? t("jev.readyRouter")
+            : t("jev.notUsed")
         : null;
 
   return (

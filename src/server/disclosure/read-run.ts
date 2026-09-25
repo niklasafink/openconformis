@@ -2,6 +2,7 @@ import "server-only";
 
 import { asc, count, desc, eq, and } from "drizzle-orm";
 
+import { jevRouterModelId } from "@/domain/disclosure/jev-assignment";
 import { renderComment, renderFindingTitle } from "@/domain/disclosure/checks/comments";
 import { deriveFindings, isSilent } from "@/domain/disclosure/checks/findings";
 import type { CheckComment, CheckKind, CheckStatus } from "@/domain/disclosure/checks/types";
@@ -25,6 +26,8 @@ export type ViewRun = {
   failureCode: string | null;
   modelProfileId: string | null;
   jevAssist: "on" | "off";
+  /** Jev direkt über TypeSafe oder über den Jev Router von OpenRouter (D-036). */
+  jevRoute: "typesafe" | "openrouter" | null;
   createdAt: string;
 };
 
@@ -160,6 +163,12 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
     failureCode: run.failureCode,
     modelProfileId: run.modelProfileId,
     jevAssist: run.jevAssist,
+    jevRoute:
+      run.jevAssist !== "on"
+        ? null
+        : run.jevModelId === jevRouterModelId
+          ? "openrouter"
+          : "typesafe",
     createdAt: run.createdAt.toISOString(),
   };
   return { run: viewRun, checks: viewChecks, findings };

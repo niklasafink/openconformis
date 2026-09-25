@@ -17,11 +17,13 @@ export function openRouterZeroDataRetention() {
 export function openRouterModelsUrl(
   input: { baseUrl: string; zeroDataRetention: boolean },
   user = false,
+  /** Ein Router wie `typesafe/jev-router` meldet keine Parameter und fiele sonst heraus. */
+  structuredOutputs = true,
 ) {
   const url = openRouterUrl(input.baseUrl, user ? "models/user" : "models");
   if (input.zeroDataRetention) url.searchParams.set("zdr", "true");
   if (url.hostname === "eu.openrouter.ai") url.searchParams.set("region", "eu");
-  url.searchParams.set("supported_parameters", "structured_outputs");
+  if (structuredOutputs) url.searchParams.set("supported_parameters", "structured_outputs");
   return url;
 }
 

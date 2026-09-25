@@ -142,6 +142,21 @@ picks the right line item in a German audit report; that is what this guide is f
    | A red case not red with `on`, or a green or orange case turned red | set the default to `off`    |
    | Only more orange with `on`                                         | keep `on`, note the figures |
 
+## Jev Router over OpenRouter
+
+Without a saved TypeSafe key, but with a model routed through OpenRouter, a run with
+Jev `on` classifies through `typesafe/jev-router` with the OpenRouter key (D-036). It is
+a chat router without typed answers, so the same gates apply and matter more:
+
+1. Remove the TypeSafe key (**API-Key** → **TypeSafe-Schlüssel entfernen**) and keep the
+   OpenRouter key saved.
+2. Choose a model whose route is OpenRouter. Before the start the line reads „Jev Router
+   über OpenRouter ordnet zuerst ein, den Rest das gewählte Modell.“, afterwards
+   „Eingeordnet durch den Jev Router (OpenRouter) und das gewählte Modell.“
+3. Run steps 6–9 with these runs. In step 8 the invocation rows of provider `jev` carry
+   `route_provider = 'openrouter'`; a batch the router answered outside the schema is
+   `failed` and its figures went to the selected model.
+
 ## Switching Jev off or on in production
 
 1. Run `vercel env add DISCLOSURE_JEV_ASSIST production` and enter `off` (or `on`).

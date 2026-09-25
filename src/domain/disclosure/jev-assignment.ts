@@ -1,6 +1,13 @@
 import type { SystemOneAnswer, SystemOneQuestion } from "@/domain/ai/system-one";
 
-import type { AssignmentAnswer, AssignmentBatch, AssignmentItem } from "./assignment";
+import { systemOneModelId } from "@/domain/ai/system-one";
+
+import {
+  buildAssignmentPrompt,
+  type AssignmentAnswer,
+  type AssignmentBatch,
+  type AssignmentItem,
+} from "./assignment";
 
 /**
  * Einordnung durch Jev (TypeSafe System One) im Plausicheck. Jev bekommt je Fundstelle
@@ -15,6 +22,40 @@ import type { AssignmentAnswer, AssignmentBatch, AssignmentItem } from "./assign
  */
 
 export const disclosureJevPromptVersion = "disclosure-jev-v1";
+
+/**
+ * Jev über OpenRouter (D-036): ein Chat-Router ohne getypte Antworten. Er bekommt
+ * denselben Auftrag wie das Nutzermodell und antwortet im selben Schema; die getypte
+ * Garantie von System One entfällt, die Antwort wird streng geparst.
+ */
+export const jevRouterModelId = "typesafe/jev-router";
+export const disclosureJevRouterPromptVersion = "disclosure-jev-router-v1";
+
+/** Die Jev-Modelle, die ein Lauf einfrieren darf. */
+export function isDisclosureJevModel(modelId: string | null | undefined) {
+  return modelId === systemOneModelId || modelId === jevRouterModelId;
+}
+
+export function disclosureJevPromptVersionFor(modelId: string) {
+  return modelId === jevRouterModelId
+    ? disclosureJevRouterPromptVersion
+    : disclosureJevPromptVersion;
+}
+
+/**
+ * Der Auftrag an den Jev Router: der des Nutzermodells, dazu die Antwortform als Text,
+ * weil der Router `response_format` nicht zusagt.
+ */
+export function buildJevRouterPrompt(batch: AssignmentBatch) {
+  const prompt = buildAssignmentPrompt(batch);
+  return {
+    ...prompt,
+    system: [
+      prompt.system,
+      'Answer with JSON only, no prose and no code fence: {"assignments":[{"ref":"F1","candidate":"1","period":"current","confidencePercent":90,"comment":"…"}]}, one entry per figure.',
+    ].join("\n"),
+  };
+}
 
 /**
  * Ab hier gilt Jevs Zuordnung; darunter geht die Fundstelle an das Nutzermodell.

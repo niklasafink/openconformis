@@ -79,26 +79,43 @@ export type DisclosureModelBinding = {
   aiCredentialId: string | null;
 };
 
-/** Ein strukturierter Aufruf des Nutzermodells mit dem Schlüssel dieses Laufs. */
+/**
+ * Ein fester zweiter Aufrufer über dieselbe Route: der Jev Router über OpenRouter mit
+ * dem Jev-Schlüssel des Laufs (Zweck `disclosure_assist`, D-036).
+ */
+export type DisclosureFixedModel = {
+  credentialId: string;
+  routeProvider: string;
+  modelId: string;
+  purpose: "disclosure_assist";
+};
+
+/**
+ * Ein strukturierter Aufruf des Nutzermodells mit dem Schlüssel dieses Laufs, oder mit
+ * `fixed` eines festen Modells über dieselbe Route.
+ */
 export async function requestStructuredForDisclosure<T>(
   run: DisclosureModelBinding,
   request: Omit<
     StructuredModelRequest<T>,
     "apiKey" | "baseUrl" | "maxOutputTokens" | "reasoningEffort" | "modelId"
   >,
+  fixed?: DisclosureFixedModel,
 ) {
-  if (!run.aiCredentialId || !run.routeProvider || !run.providerModelId) {
+  const credentialId = fixed?.credentialId ?? run.aiCredentialId;
+  const routeProvider = fixed?.routeProvider ?? run.routeProvider;
+  const modelId = fixed?.modelId ?? run.providerModelId;
+  if (!credentialId || !routeProvider || !modelId) {
     throw new TemporaryCredentialError("ANALYSIS_CREDENTIAL_MISSING");
   }
-  const provider = aiRouteProviderSchema.parse(run.routeProvider);
+  const provider = aiRouteProviderSchema.parse(routeProvider);
   const route = getAnalysisProviderConfiguration(provider);
-  const modelId = run.providerModelId;
   return withTemporaryCredential(
     {
-      credentialId: run.aiCredentialId,
+      credentialId,
       ownerUserId: run.ownerUserId,
       provider,
-      purpose: "disclosure",
+      purpose: fixed?.purpose ?? "disclosure",
       bindingId: run.id,
       requiredModelId: modelId,
     },

@@ -6,7 +6,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { checkEngineVersion } from "@/domain/disclosure/checks/types";
-import { disclosureJevPromptVersion } from "@/domain/disclosure/jev-assignment";
+import { disclosureJevPromptVersionFor } from "@/domain/disclosure/jev-assignment";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db, isDatabaseConfigured } from "@/server/db/client";
@@ -158,7 +158,10 @@ export async function startDisclosureRun(
      * Jev ordnet vor dem Modell ein (Etappe 6). Nur mit Modellwahl: was Jev nicht sicher
      * einordnet, geht an das Modell. `null` heißt `off` — ohne Fehler und ohne Jev.
      */
-    prepareJev?: (runId: string) => Promise<{
+    prepareJev?: (
+      runId: string,
+      model: FrozenModel,
+    ) => Promise<{
       modelId: string;
       credentialId: string;
       discard: () => Promise<void>;
@@ -178,7 +181,7 @@ export async function startDisclosureRun(
     input.modelProfileId && options.prepareModel ? await options.prepareModel(input, runId) : null;
   const jev =
     prepared && options.prepareJev
-      ? await options.prepareJev(runId).catch(async (error: unknown) => {
+      ? await options.prepareJev(runId, prepared.model).catch(async (error: unknown) => {
           await prepared.discard();
           throw error;
         })
@@ -193,7 +196,9 @@ export async function startDisclosureRun(
     extractionVersion: report.extractionVersion,
     checkVersion: checkEngineVersion,
     model: prepared?.model ?? null,
-    jev: jev ? { modelId: jev.modelId, promptVersion: disclosureJevPromptVersion } : null,
+    jev: jev
+      ? { modelId: jev.modelId, promptVersion: disclosureJevPromptVersionFor(jev.modelId) }
+      : null,
     evidence: evidence.map((file) => `${file.id}:${file.sha256 ?? ""}`),
   });
 
@@ -233,7 +238,7 @@ export async function startDisclosureRun(
           promptVersion: prepared?.model.promptVersion ?? null,
           aiCredentialId: prepared?.credentialId ?? null,
           credentialDeadlineAt: prepared?.deadline ?? null,
-          // Der wirksame Wert: ohne TypeSafe-Schlüssel `off`, auch wenn die Umgebung `on` will.
+          // Der wirksame Wert: ohne Jev-Schlüssel `off`, auch wenn die Umgebung `on` will.
           jevAssist: jev ? "on" : "off",
           jevModelId: jev?.modelId ?? null,
           assistCredentialId: jev?.credentialId ?? null,

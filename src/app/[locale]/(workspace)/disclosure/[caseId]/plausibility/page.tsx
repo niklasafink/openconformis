@@ -252,6 +252,7 @@ export default async function PlausibilityPage({ params }: PageProps) {
                 failureCode: run?.failureCode ?? null,
                 modelProfileId: run?.modelProfileId ?? null,
                 jevAssist: run?.jevAssist ?? "off",
+                jevRoute: run?.jevRoute ?? null,
               }}
               catalogue={catalogue}
               savedCredentials={savedCredentials}

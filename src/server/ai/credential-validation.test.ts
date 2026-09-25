@@ -76,6 +76,35 @@ describe("provider credential validation", () => {
     expect(result.safeLabel).toBe("Temporary analysis");
   });
 
+  it("accepts the Jev Router without structured outputs only when asked to", async () => {
+    const respond = () =>
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { label: "Router" } })))
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ data: [{ id: "typesafe/jev-router", supported_parameters: [] }] }),
+          ),
+        );
+    const input = {
+      provider: "openrouter" as const,
+      secret: "router-canary",
+      requiredModelId: "typesafe/jev-router",
+    };
+
+    await expect(validateProviderCredential(input, respond())).rejects.toMatchObject({
+      code: "MODEL_NOT_ACCESSIBLE",
+    });
+    const fetchMock = respond();
+    const result = await validateProviderCredential(
+      { ...input, structuredOutputs: false },
+      fetchMock,
+    );
+    const modelsUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
+    expect(modelsUrl.searchParams.get("supported_parameters")).toBeNull();
+    expect(result.accessibleModelIds).toEqual(["typesafe/jev-router"]);
+  });
+
   it("returns only safe error codes for rejected credentials", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

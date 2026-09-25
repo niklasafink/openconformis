@@ -789,4 +789,24 @@ classifies through the model; the two migrations are additive and the columns de
 is `docs/DISCLOSURE_JEV_ACCEPTANCE.md`; if Jev turns a red acceptance case green or
 raises the orange share against `off`, the default moves to `off`.
 
+Addendum (2026-09-26): Jev also runs through OpenRouter. Most users hold an OpenRouter
+key rather than a TypeSafe key, and without one every run was frozen `off`.
+
+- Order at start: a saved TypeSafe key keeps Jev direct (typed System One answers).
+  Without it, and only when the selected model's route is OpenRouter, the run derives a
+  second short-lived key from the saved OpenRouter key (purpose `disclosure_assist`,
+  bound to the run, deleted with the model key) for the fixed model
+  `typesafe/jev-router`. Otherwise the run is `off` as before.
+- The Jev Router is a chat router without typed answers. It gets the same task and
+  schema as the user's model (`requestStructuredForDisclosure` with a fixed model,
+  prompt version `disclosure-jev-router-v1`, the JSON form spelled out in the prompt
+  because the router promises no `response_format`). **The typed guarantee of D-029
+  therefore does not hold on this path**: an answer outside the schema fails the batch,
+  which is recorded once and handed to the user's model. Amounts stay the code's; the
+  80 % threshold is unchanged.
+- The key check for this one route accepts a model without `structured_outputs`; every
+  analysis, chat and model route still requires it.
+- `jev_model_id` records which path ran; the invocation rows carry `route_provider`
+  `openrouter` or `typesafe`. No migration was needed.
+
 Decision: accepted.

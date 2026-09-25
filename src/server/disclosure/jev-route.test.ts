@@ -10,12 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { systemOneModelId } from "@/domain/ai/system-one";
 import { planAssignmentBatches } from "@/domain/disclosure/assignment";
-import { disclosureJevPromptVersion } from "@/domain/disclosure/jev-assignment";
+import { disclosureJevPromptVersion, jevRouterModelId } from "@/domain/disclosure/jev-assignment";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   systemOne: vi.fn(),
   createCredential: vi.fn(),
+  structured: vi.fn(),
 }));
 
 vi.stubGlobal("fetch", mocks.fetch);
@@ -26,7 +27,9 @@ vi.mock("@/server/ai/jev-throttle", () => ({
     penalize: () => undefined,
   }),
 }));
+vi.mock("./model-route", () => ({ requestStructuredForDisclosure: mocks.structured }));
 vi.mock("@/server/ai/temporary-credential-service", () => ({
+  TemporaryCredentialError: class TemporaryCredentialError extends Error {},
   createDisclosureAssistCredential: mocks.createCredential,
   withTemporaryCredential: (_input: unknown, work: (key: string) => Promise<unknown>) =>
     work("test-typesafe-key"),
@@ -36,7 +39,7 @@ vi.mock("@/server/auth/session-user", () => ({
   requireAuthenticatedSessionUser: async () => ({ id: "user-1" }),
 }));
 
-const { disclosureJevActive, prepareDisclosureJev, requestJevForBatch } =
+const { disclosureJevActive, prepareDisclosureJev, requestJevForBatch, requestJevRouterForBatch } =
   await import("./jev-route");
 
 const [batch] = planAssignmentBatches(
@@ -59,13 +62,29 @@ const onRun = {
   jevAssist: "on" as const,
   jevModelId: systemOneModelId,
   assistCredentialId: "credential-1",
+  routeProvider: "openai",
 };
+
+const routerRun = {
+  ...onRun,
+  jevModelId: jevRouterModelId,
+  assistCredentialId: "credential-2",
+  routeProvider: "openrouter",
+  aiCredentialId: "credential-model",
+  providerModelId: "openai/gpt-5.6-luna",
+};
+
+const missingKey = () =>
+  Object.assign(new Error("BYOK_SAVED_CREDENTIAL_NOT_FOUND"), {
+    code: "BYOK_SAVED_CREDENTIAL_NOT_FOUND",
+  });
 
 describe("Jev im Plausicheck", () => {
   beforeEach(() => {
     mocks.fetch.mockReset();
     mocks.systemOne.mockReset();
     mocks.createCredential.mockReset();
+    mocks.structured.mockReset();
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -108,7 +127,73 @@ describe("Jev im Plausicheck", () => {
     expect(mocks.createCredential).toHaveBeenCalledWith({
       bindingId: "run-1",
       requiredModelId: systemOneModelId,
+      provider: "typesafe",
     });
+  });
+
+  it("nimmt ohne TypeSafe-Schlüssel den Jev Router, wenn das Modell über OpenRouter läuft", async () => {
+    vi.stubEnv("DISCLOSURE_JEV_ASSIST", "");
+    mocks.createCredential
+      .mockRejectedValueOnce(missingKey())
+      .mockResolvedValueOnce({ credentialId: "credential-2" });
+    expect(await prepareDisclosureJev("run-1", { routeProvider: "openrouter" })).toMatchObject({
+      modelId: jevRouterModelId,
+      credentialId: "credential-2",
+    });
+    expect(mocks.createCredential).toHaveBeenLastCalledWith({
+      bindingId: "run-1",
+      requiredModelId: jevRouterModelId,
+      provider: "openrouter",
+    });
+    expect(mocks.systemOne).not.toHaveBeenCalled();
+  });
+
+  it("bleibt bei gespeichertem TypeSafe-Schlüssel auf Jev direkt, auch mit OpenRouter-Modell", async () => {
+    vi.stubEnv("DISCLOSURE_JEV_ASSIST", "");
+    mocks.createCredential.mockResolvedValue({ credentialId: "credential-1" });
+    expect(await prepareDisclosureJev("run-1", { routeProvider: "openrouter" })).toMatchObject({
+      modelId: systemOneModelId,
+    });
+    expect(mocks.createCredential).toHaveBeenCalledTimes(1);
+  });
+
+  it("friert off ein, wenn weder TypeSafe-Schlüssel noch OpenRouter-Route vorliegen", async () => {
+    vi.stubEnv("DISCLOSURE_JEV_ASSIST", "");
+    mocks.createCredential.mockRejectedValue(missingKey());
+    expect(await prepareDisclosureJev("run-1", { routeProvider: "openai" })).toBeNull();
+    expect(mocks.createCredential).toHaveBeenCalledTimes(1);
+  });
+
+  it("fragt den Jev Router mit festem Modell und dem Jev-Schlüssel im Schema des Modells", async () => {
+    const answer = {
+      assignments: [
+        { ref: "F1", candidate: "1", period: "current", confidencePercent: 90, comment: "" },
+      ],
+    };
+    mocks.structured.mockResolvedValue({ output: answer, inputTokens: 300, outputTokens: 20 });
+    expect(disclosureJevActive(routerRun)).toBe(true);
+    const result = await requestJevRouterForBatch(routerRun, batch!);
+    expect(result.answer).toEqual(answer);
+    expect(mocks.structured).toHaveBeenCalledWith(
+      routerRun,
+      expect.objectContaining({ user: expect.stringContaining("⟦54⟧") }),
+      {
+        credentialId: "credential-2",
+        routeProvider: "openrouter",
+        modelId: jevRouterModelId,
+        purpose: "disclosure_assist",
+      },
+    );
+    expect(mocks.systemOne).not.toHaveBeenCalled();
+  });
+
+  it("nutzt den Jev Router nie ohne OpenRouter-Route", async () => {
+    const detached = { ...routerRun, routeProvider: "openai" };
+    expect(disclosureJevActive(detached)).toBe(false);
+    await expect(requestJevRouterForBatch(detached, batch!)).rejects.toMatchObject({
+      code: "INVALID_PROVIDER_ROUTE",
+    });
+    expect(mocks.structured).not.toHaveBeenCalled();
   });
 
   it("fragt Jev bei einem als off eingefrorenen Lauf nie, auch mit Schlüssel-ID", async () => {
