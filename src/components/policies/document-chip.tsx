@@ -2,25 +2,28 @@ import type { ReactNode } from "react";
 import { cn } from "cn";
 
 /** Dateiarten, die als Policy zugelassen sind; alles andere bleibt neutral. */
-export type DocumentKind = "pdf" | "docx" | "unknown";
+export type DocumentKind = "pdf" | "docx" | "xlsx" | "unknown";
 
 /** Leitet die Dateiart aus dem Dateinamen ab — der Chip zeigt nie mehr als das. */
 export function documentKindFromName(name: string): DocumentKind {
   const lowercase = name.toLowerCase();
   if (lowercase.endsWith(".pdf")) return "pdf";
   if (lowercase.endsWith(".docx") || lowercase.endsWith(".doc")) return "docx";
+  if (lowercase.endsWith(".xlsx")) return "xlsx";
   return "unknown";
 }
 
 const kindStyles: Record<DocumentKind, string> = {
   pdf: "bg-file-pdf text-white",
   docx: "bg-file-docx text-white",
+  xlsx: "bg-emerald-700 text-white",
   unknown: "bg-muted text-muted-foreground",
 };
 
 const kindLabels: Record<DocumentKind, string> = {
   pdf: "PDF",
   docx: "DOC",
+  xlsx: "XLS",
   unknown: "TXT",
 };
 

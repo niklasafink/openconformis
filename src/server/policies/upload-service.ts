@@ -34,10 +34,20 @@ function displayNameFromFilename(filename: string) {
   return filename.replace(/\.(pdf|docx)$/iu, "");
 }
 
-export async function createPolicyUploadIntent(untrustedInput: unknown) {
+export async function createPolicyUploadIntent(
+  untrustedInput: unknown,
+  /**
+   * Ein Bereich darf die Dateiarten enger fassen als die Kette selbst: die
+   * Offenlegungspflicht nimmt nur Word an. Ohne Angabe gelten PDF und DOCX.
+   */
+  options: { acceptedMimeTypes?: readonly string[] } = {},
+) {
   if (!isDatabaseConfigured) throw new Error("DATABASE_UNAVAILABLE");
 
   const input = policyUploadRequestSchema.parse(untrustedInput);
+  if (options.acceptedMimeTypes && !options.acceptedMimeTypes.includes(input.mimeType)) {
+    throw new Error("UNSUPPORTED_FILE_TYPE");
+  }
   const draft = await getBoundActiveDraft(input.draftId);
   if (!draft?.frameworkSlug) throw new Error("DRAFT_NOT_FOUND");
 

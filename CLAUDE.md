@@ -53,7 +53,8 @@ keinen Analysezustand und vergibt keinen Erfüllungsstatus.
   Wiederholungen dürfen keine zweite Analyse desselben Drafts erzeugen.
 - Bewertungen benötigen Begründungen und genaue Belege, auch beim Status „erfüllt“.
   Die Bewertung selbst enthält keine Verbesserungsvorschläge; Textumschreibungen,
-  Formulierungsvorschläge für die Policy und Track-Changes gibt es nirgends.
+  Formulierungsvorschläge für die Policy und Track-Changes gibt es nirgends. Ausnahme: die
+  Übernahme korrigierter Zahlen im Plausicheck der Offenlegungspflicht (D-034).
 - Jede Analyse läuft in einem Profil: „Wirtschaftsprüfer“ oder „Finanzinstitut“.
   Bewertung und Verifikation sind in beiden identisch, damit dieselbe Policy dieselbe
   Lücke ergibt. Nur der Abschlusstext je Lücke unterscheidet sich: eine Feststellung für

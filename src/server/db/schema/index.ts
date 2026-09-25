@@ -7,3 +7,4 @@ export * from "./chat";
 export * from "./documents";
 export * from "./jobs";
 export * from "./reviews";
+export * from "./disclosure";

@@ -12,6 +12,7 @@
     "chat": "Assistent",
     "administration": "Administration",
     "review": "Vertragsprüfung",
+    "disclosure": "Offenlegungspflicht",
     "brand": "OpenConformis",
     "recentProjects": "Zuletzt verwendet",
     "noProjects": "Noch keine Projekte",
@@ -684,5 +685,57 @@
         "body": "Für die Sitzung ist ein technisch notwendiges Cookie erforderlich. Es gibt keine Marketing- oder Tracking-Cookies."
       }
     ]
+  },
+  "Disclosure": {
+    "title": "Offenlegungspflicht",
+    "listEyebrow": "Prüfungsberichte",
+    "newCase": "Name der Prüfung",
+    "newCasePlaceholder": "z. B. Prüfungsbericht gbs 2021",
+    "create": "Prüfung anlegen",
+    "creating": "Wird angelegt …",
+    "createFailed": "Die Prüfung konnte nicht angelegt werden.",
+    "emptyList": "Noch keine Prüfung angelegt.",
+    "listName": "Prüfung",
+    "listUpdated": "Zuletzt geändert",
+    "listOpen": "Öffnen",
+    "notFound": "Diese Prüfung gibt es nicht oder nicht in diesem Arbeitsbereich.",
+    "backToList": "Zur Übersicht",
+    "tabs": {
+      "label": "Prüfungsart",
+      "plausibility": "Plausicheck",
+      "completeness": "Vollständigkeitsprüfung",
+      "documents": "Dokumente"
+    },
+    "upload": {
+      "title": "Prüfungsbericht hochladen",
+      "hint": "Nur Word (.docx), höchstens 25 MB. Ein PDF bitte vorher mit dem lokalen Skript in Word umwandeln.",
+      "dropzone": "Word-Datei hierher ziehen oder auswählen",
+      "select": "Datei auswählen",
+      "uploading": "Wird hochgeladen …",
+      "processing": "Wird aufbereitet …",
+      "failed": "Upload fehlgeschlagen.",
+      "processingFailed": "Die Datei konnte nicht gelesen werden.",
+      "docxOnly": "Nur Word-Dateien (.docx). PDF bitte vorher in Word umwandeln.",
+      "tooLarge": "Die Datei ist größer als 25 MB.",
+      "retry": "Andere Datei wählen"
+    },
+    "document": {
+      "processing": "Der Bericht wird aufbereitet.",
+      "failed": "Der Bericht konnte nicht aufbereitet werden.",
+      "empty": "Der Bericht enthält keinen lesbaren Text."
+    },
+    "completeness": {
+      "empty": "Die Vollständigkeitsprüfung folgt, sobald ein Bericht hochgeladen ist."
+    },
+    "errors": {
+      "DISCLOSURE_INPUT_INVALID": "Bitte einen Namen mit höchstens 200 Zeichen eingeben.",
+      "DISCLOSURE_FORBIDDEN": "Deine Rolle erlaubt diese Aktion nicht.",
+      "DISCLOSURE_CASE_NOT_FOUND": "Die Prüfung wurde nicht gefunden.",
+      "DISCLOSURE_DOCUMENT_NOT_FOUND": "Das Dokument wurde nicht gefunden.",
+      "DISCLOSURE_DOCUMENT_NOT_READY": "Das Dokument ist noch nicht aufbereitet.",
+      "DISCLOSURE_REPORT_DOCX_ONLY": "Nur Word-Dateien (.docx). PDF bitte vorher in Word umwandeln.",
+      "DISCLOSURE_REPORT_EXISTS": "Diese Prüfung hat bereits einen Bericht.",
+      "DATABASE_UNAVAILABLE": "Die Datenbank ist gerade nicht erreichbar."
+    }
   }
 }

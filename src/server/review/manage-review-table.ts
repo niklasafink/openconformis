@@ -11,15 +11,17 @@ import {
 } from "@/domain/review/column";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db } from "@/server/db/client";
-import { anonymousDrafts } from "@/server/db/schema/application";
-import { policies, policyVersions } from "@/server/db/schema/documents";
 import {
   reviewColumns,
   reviewDocuments,
   reviewRuns,
   reviewTables,
 } from "@/server/db/schema/reviews";
-import { getBoundActiveDraft } from "@/server/drafts/framework-selection";
+import {
+  adoptDraftVersion,
+  readAdoptableVersion,
+  versionAccess,
+} from "@/server/policies/adopt-draft-version";
 
 import { maximumReviewDocuments } from "./review-limits";
 import { requireManagement, resolveReviewActor } from "./review-actor";
@@ -298,34 +300,12 @@ export async function addReviewDocument(input: {
     const policyVersionId = z.uuid().parse(input.policyVersionId);
     const displayName = input.displayName ? nameSchema.parse(input.displayName) : undefined;
 
-    const [version] = await db
-      .select({
-        id: policyVersions.id,
-        policyId: policyVersions.policyId,
-        organizationId: policyVersions.organizationId,
-        anonymousDraftId: policyVersions.anonymousDraftId,
-        sha256: policyVersions.sha256,
-        parserVersion: policyVersions.parserVersion,
-        parseStatus: policyVersions.parseStatus,
-        originalFilename: policyVersions.originalFilename,
-      })
-      .from(policyVersions)
-      .where(eq(policyVersions.id, policyVersionId))
-      .limit(1);
+    const version = await readAdoptableVersion(policyVersionId);
     if (!version) return { ok: false, code: "REVIEW_DOCUMENT_NOT_FOUND" };
 
-    let adoptFromDraft = false;
-    if (version.organizationId === actor.organizationId) {
-      adoptFromDraft = false;
-    } else if (version.organizationId === null && version.anonymousDraftId && input.draftId) {
-      const draft = await getBoundActiveDraft(input.draftId);
-      if (!draft || draft.id !== version.anonymousDraftId) {
-        return { ok: false, code: "REVIEW_DOCUMENT_NOT_FOUND" };
-      }
-      adoptFromDraft = true;
-    } else {
-      return { ok: false, code: "REVIEW_DOCUMENT_NOT_FOUND" };
-    }
+    const access = await versionAccess(version, actor.organizationId, input.draftId);
+    if (access === "denied") return { ok: false, code: "REVIEW_DOCUMENT_NOT_FOUND" };
+    const adoptFromDraft = access === "adopt";
     if (version.parseStatus !== "ready" || !version.sha256 || !version.parserVersion) {
       return { ok: false, code: "REVIEW_DOCUMENT_NOT_READY" };
     }
@@ -337,54 +317,9 @@ export async function addReviewDocument(input: {
 
       let effectiveVersionId = version.id;
       if (adoptFromDraft) {
-        const [identical] = await transaction
-          .select({ id: policyVersions.id })
-          .from(policyVersions)
-          .where(
-            and(
-              eq(policyVersions.organizationId, actor.organizationId),
-              eq(policyVersions.sha256, version.sha256!),
-              eq(policyVersions.parserVersion, version.parserVersion!),
-            ),
-          )
-          .limit(1);
-        if (identical) {
-          effectiveVersionId = identical.id;
-        } else {
-          // Eine fertige Fassung ist unveränderlich; die Datenbank lässt die Übernahme
-          // in den Arbeitsbereich nur zu, wenn der Entwurf zuvor beansprucht wurde —
-          // derselbe Schritt wie beim Analysestart.
-          const [claimed] = await transaction
-            .update(anonymousDrafts)
-            .set({
-              status: "claimed",
-              claimedByUserId: actor.userId,
-              claimedAt: new Date(),
-              updatedAt: new Date(),
-              revision: sql`${anonymousDrafts.revision} + 1`,
-            })
-            .where(
-              and(
-                eq(anonymousDrafts.id, version.anonymousDraftId!),
-                eq(anonymousDrafts.status, "active"),
-              ),
-            )
-            .returning({ id: anonymousDrafts.id });
-          if (!claimed) return { ok: false as const, code: "REVIEW_DOCUMENT_NOT_FOUND" };
-          await transaction
-            .update(policies)
-            .set({
-              organizationId: actor.organizationId,
-              anonymousDraftId: null,
-              ownerUserId: actor.userId,
-              updatedAt: new Date(),
-            })
-            .where(eq(policies.id, version.policyId));
-          await transaction
-            .update(policyVersions)
-            .set({ organizationId: actor.organizationId, anonymousDraftId: null })
-            .where(eq(policyVersions.id, version.id));
-        }
+        const adopted = await adoptDraftVersion(transaction, version, actor);
+        if (!adopted) return { ok: false as const, code: "REVIEW_DOCUMENT_NOT_FOUND" };
+        effectiveVersionId = adopted;
       }
 
       const [duplicate] = await transaction

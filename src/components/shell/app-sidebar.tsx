@@ -1,6 +1,14 @@
 "use client";
 
-import { Asterisk, ChevronDown, ChevronRight, ListChecks, Settings, Table2 } from "lucide-react";
+import {
+  Asterisk,
+  ChevronDown,
+  ChevronRight,
+  FileCheck2,
+  ListChecks,
+  Settings,
+  Table2,
+} from "lucide-react";
 
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -29,7 +37,7 @@ import type { AppLocale } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 
 export type WorkflowStep = "framework" | "policy" | "scope" | "results";
-export type ActiveArea = "analysis" | "chat" | "review" | "administration";
+export type ActiveArea = "analysis" | "chat" | "review" | "disclosure" | "administration";
 
 export type SidebarLabels = Readonly<{
   brand: string;
@@ -40,6 +48,7 @@ export type SidebarLabels = Readonly<{
   results: string;
   chat: string;
   review: string;
+  disclosure: string;
   administration: string;
   recentProjects: string;
   noProjects: string;
@@ -83,6 +92,7 @@ function activeAreaOf(pathname: string): ActiveArea | undefined {
   if (pathname.startsWith("/analyses")) return "analysis";
   if (pathname.startsWith("/chat")) return "chat";
   if (pathname.startsWith("/reviews")) return "review";
+  if (pathname.startsWith("/disclosure")) return "disclosure";
   if (pathname.startsWith("/administration")) return "administration";
   return undefined;
 }
@@ -194,6 +204,24 @@ export function AppSidebar({
                   >
                     <Table2 className="size-3.5! text-emerald-700" />
                     <span>{labels.review}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={activeArea === "disclosure"}
+                  tooltip={labels.disclosure}
+                  className={activeItemClass}
+                >
+                  <Link
+                    href="/disclosure"
+                    locale={locale}
+                    aria-current={activeArea === "disclosure" ? "page" : undefined}
+                  >
+                    <FileCheck2 className="size-3.5! text-amber-700" />
+                    <span>{labels.disclosure}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

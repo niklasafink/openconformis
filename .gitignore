@@ -44,3 +44,7 @@ certificates/
 
 # Lokaler Store des shadcn-Umwegs; gehört nicht ins Repository.
 .pnpm-store/
+
+# Echte Prüfungsberichte und ihre lokal erzeugten Word-Fassungen: vertraulich,
+# bleiben ausschließlich lokal (docs/OFFENLEGUNG_SESSION_PROMPT.md).
+docs/Prüfungsberichte/

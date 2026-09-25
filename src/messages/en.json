@@ -12,6 +12,7 @@
     "chat": "Assistant",
     "administration": "Administration",
     "review": "Contract review",
+    "disclosure": "Disclosure review",
     "brand": "OpenConformis",
     "recentProjects": "Recent projects",
     "noProjects": "No projects yet",
@@ -684,5 +685,57 @@
         "body": "A technically necessary cookie is required for the session. There are no marketing or tracking cookies."
       }
     ]
+  },
+  "Disclosure": {
+    "title": "Disclosure review",
+    "listEyebrow": "Audit reports",
+    "newCase": "Review name",
+    "newCasePlaceholder": "e.g. Audit report gbs 2021",
+    "create": "Create review",
+    "creating": "Creating …",
+    "createFailed": "The review could not be created.",
+    "emptyList": "No review created yet.",
+    "listName": "Review",
+    "listUpdated": "Last changed",
+    "listOpen": "Open",
+    "notFound": "This review does not exist or not in this workspace.",
+    "backToList": "Back to overview",
+    "tabs": {
+      "label": "Review type",
+      "plausibility": "Plausibility check",
+      "completeness": "Completeness check",
+      "documents": "Documents"
+    },
+    "upload": {
+      "title": "Upload the audit report",
+      "hint": "Word only (.docx), at most 25 MB. Convert a PDF to Word with the local script first.",
+      "dropzone": "Drag a Word file here or select one",
+      "select": "Select file",
+      "uploading": "Uploading …",
+      "processing": "Processing …",
+      "failed": "Upload failed.",
+      "processingFailed": "The file could not be read.",
+      "docxOnly": "Word files only (.docx). Convert a PDF to Word first.",
+      "tooLarge": "The file is larger than 25 MB.",
+      "retry": "Choose another file"
+    },
+    "document": {
+      "processing": "The report is being processed.",
+      "failed": "The report could not be processed.",
+      "empty": "The report contains no readable text."
+    },
+    "completeness": {
+      "empty": "The completeness check becomes available once a report is uploaded."
+    },
+    "errors": {
+      "DISCLOSURE_INPUT_INVALID": "Enter a name with at most 200 characters.",
+      "DISCLOSURE_FORBIDDEN": "Your role does not allow this action.",
+      "DISCLOSURE_CASE_NOT_FOUND": "The review was not found.",
+      "DISCLOSURE_DOCUMENT_NOT_FOUND": "The document was not found.",
+      "DISCLOSURE_DOCUMENT_NOT_READY": "The document is not processed yet.",
+      "DISCLOSURE_REPORT_DOCX_ONLY": "Word files only (.docx). Convert a PDF to Word first.",
+      "DISCLOSURE_REPORT_EXISTS": "This review already has a report.",
+      "DATABASE_UNAVAILABLE": "The database is unavailable right now."
+    }
   }
 }

@@ -685,3 +685,33 @@ migrations are additive. `scripts/check-byok-config.ts` still does not require
 `typesafe`.
 
 Decision: accepted.
+
+## D-034 Corrected figures may be accepted in the disclosure plausibility check
+
+Product direction (2026-09-25): the new main area "Offenlegungspflicht" checks audit
+reports. Its plausibility check recognizes every figure and change statement,
+recomputes them in code and compares them with tables and uploaded evidence. A wrong
+figure is only useful to an auditor if the corrected value can be recorded where the
+finding is — the reference workflow (Cortea "Berichtskritik Agent") goes finding →
+preparer adopts the corrected value → second person releases → reviewed.
+
+`CLAUDE.md` forbids wording suggestions, text rewrites and track changes. That rule
+stays in force for text, in this area too: no sentence is ever proposed. The user
+decided one deliberate exception for **figures**:
+
+- Only figures: the accepted value is the recomputed target value of a finding, or a
+  value the preparer enters with a mandatory reason when it differs from the proposal.
+- Only four-eyes: a preparer (owner, admin, analyst, reviewer) accepts or confirms, a
+  manager (owner, admin) who is a different person releases. The server checks
+  membership, role and `prepared_by ≠ reviewed_by` in one transaction; a violation is
+  a 403 with an audit event. A manager's rejection is only an event in the history —
+  no status change, no return workflow, no notification.
+- Document blocks stay immutable: text, hashes and offsets never change. A correction is
+  a separate layer (`disclosure_finding_corrections`) with person, time and reason; the
+  document view shows the original value struck through with the accepted value next to
+  it, and the export lists both.
+
+Consequences: `CLAUDE.md` names the exception in one sentence. Every other part of the
+product keeps the rule unchanged.
+
+Decision: accepted.
