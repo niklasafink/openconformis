@@ -1,6 +1,15 @@
 "use client";
 
-import { Check, Download, FilePlus, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  Download,
+  Eraser,
+  FilePlus,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -8,9 +17,11 @@ import { useMemo, useRef, useState } from "react";
 import {
   addSampleDocument,
   addUploadedDocument,
+  clearResults,
   prepareUploadDraft,
   removeColumn,
   removeDocument,
+  renameReview,
   saveColumn,
 } from "@/app/[locale]/(workspace)/reviews/[reviewId]/actions";
 import { DocumentMark, documentKindFromName } from "@/components/policies/document-chip";
@@ -38,6 +49,7 @@ import { useReviewRunLive, type ReviewLiveState } from "./review-live";
 import { ReviewQuestionComposer } from "./review-question-composer";
 import { ReviewStartControls } from "./review-start-controls";
 import { CellStateDot, legendStates } from "./review-state";
+import { ClearResultsDialog, RenameReviewDialog } from "./review-table-dialogs";
 
 export type TableDocument = {
   id: string;
@@ -69,6 +81,7 @@ export type RunSnapshot = {
 type ReviewWorkspaceProps = Readonly<{
   locale: AppLocale;
   reviewTableId: string;
+  name: string;
   documents: TableDocument[];
   columns: TableColumn[];
   run: RunSnapshot | null;
@@ -125,6 +138,7 @@ function columnLetter(index: number) {
 function ReviewGridView({
   locale,
   reviewTableId,
+  name,
   documents,
   columns,
   run,
@@ -146,6 +160,10 @@ function ReviewGridView({
   });
   const [openCell, setOpenCell] = useState<OpenCell | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [dialog, setDialog] = useState<{ kind: "rename" | "clear" | null; key: number }>({
+    kind: null,
+    key: 0,
+  });
   const [actionError, setActionError] = useState<string | null>(null);
   // Frisch eingetippte Fragen stehen sofort links, noch bevor der Server sie kennt.
   const [pendingQuestions, setPendingQuestions] = useState<
@@ -303,7 +321,12 @@ function ReviewGridView({
     const percent = overridden ? undefined : percentOf(cell.confidenceBp, locale);
     return (
       <>
-        <span className="truncate font-medium">{label ?? stateText}</span>
+        <span
+          className="truncate font-medium"
+          title={unclear && cell.reviewReason ? t(`reviewReason.${cell.reviewReason}`) : undefined}
+        >
+          {label ?? stateText}
+        </span>
         {percent ? (
           <span className="ml-auto shrink-0 text-meta text-muted-foreground tabular-nums">
             {t("grid.confidence", { percent })}
@@ -346,6 +369,26 @@ function ReviewGridView({
               <FilePlus />
               {t("toolbar.addDocument")}
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setDialog({ kind: "rename", key: Date.now() })}
+            >
+              <Pencil />
+              {t("toolbar.rename")}
+            </Button>
+            {run && !runActive ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setDialog({ kind: "clear", key: Date.now() })}
+              >
+                <Eraser />
+                {t("toolbar.clearResults")}
+              </Button>
+            ) : null}
           </>
         ) : null}
         {actionError ? (
@@ -659,16 +702,32 @@ function ReviewGridView({
       </div>
 
       {canManage ? (
-        <ReviewColumnEditor
-          key={editor.key}
-          open={editor.open}
-          onOpenChange={(open) => setEditor((current) => ({ ...current, open }))}
-          column={editor.column}
-          reviewTableId={reviewTableId}
-          saveAction={saveColumn}
-          onSaved={refreshServer}
-          errorMessages={errorMessages}
-        />
+        <>
+          <RenameReviewDialog
+            key={`rename-${dialog.key}`}
+            name={name}
+            open={dialog.kind === "rename"}
+            onOpenChange={(open) => !open && setDialog((current) => ({ ...current, kind: null }))}
+            onRename={(next) =>
+              runAction(() => renameReview({ reviewTableId, name: next }), t("rename.failed"))
+            }
+          />
+          <ClearResultsDialog
+            open={dialog.kind === "clear"}
+            onOpenChange={(open) => !open && setDialog((current) => ({ ...current, kind: null }))}
+            onConfirm={() => runAction(() => clearResults({ reviewTableId }), t("clear.failed"))}
+          />
+          <ReviewColumnEditor
+            key={editor.key}
+            open={editor.open}
+            onOpenChange={(open) => setEditor((current) => ({ ...current, open }))}
+            column={editor.column}
+            reviewTableId={reviewTableId}
+            saveAction={saveColumn}
+            onSaved={refreshServer}
+            errorMessages={errorMessages}
+          />
+        </>
       ) : null}
 
       {run ? (

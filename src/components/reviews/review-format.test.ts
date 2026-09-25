@@ -27,6 +27,7 @@ const cell = (overrides: Partial<ReviewCellSummary>): ReviewCellSummary => ({
   confidenceBp: 8_300,
   citationVerdict: "verified",
   failureCode: null,
+  reviewReason: null,
   confirmed: false,
   override: null,
   revision: 1,

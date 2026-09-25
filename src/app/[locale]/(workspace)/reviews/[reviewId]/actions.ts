@@ -14,6 +14,7 @@ import {
   addReviewColumn,
   addReviewDocument,
   archiveReviewColumn,
+  clearReviewResults,
   removeReviewDocument,
   renameReviewTable,
   updateReviewColumn,
@@ -61,6 +62,10 @@ export async function renameReview(input: {
   name: string;
 }): Promise<ReviewActionResult> {
   return renameReviewTable(input);
+}
+
+export async function clearResults(input: { reviewTableId: string }): Promise<ReviewActionResult> {
+  return clearReviewResults(input);
 }
 
 /**

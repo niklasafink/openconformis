@@ -52,3 +52,22 @@ export function cellStateAfterDecision(input: {
   if (input.escalation.blockedByBudget || input.citationNeedsReview) return "needs_review";
   return "complete";
 }
+
+/**
+ * Warum eine Zelle `needs_review` ist, abgeleitet aus dem Gespeicherten. Jeder Weg
+ * dorthin hat einen nicht bestätigten Beleg oder eine Konfidenz unter der eingefrorenen
+ * Schwelle — dieselbe Reihenfolge wie `decideEscalation`.
+ */
+export function reviewReasonOf(input: {
+  state: string;
+  citationVerdict: string | null;
+  confidenceBp: number | null;
+  escalationThresholdBp: number;
+}): EscalationReason | null {
+  if (input.state !== "needs_review") return null;
+  if (input.citationVerdict !== "verified") return "citation_needs_review";
+  if (input.confidenceBp === null || input.confidenceBp < input.escalationThresholdBp) {
+    return "low_confidence";
+  }
+  return null;
+}

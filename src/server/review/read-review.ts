@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 
+import { reviewReasonOf, type EscalationReason } from "@/domain/review/escalation";
 import { db } from "@/server/db/client";
 import { documentBlocks, policyVersions } from "@/server/db/schema/documents";
 import {
@@ -120,6 +121,8 @@ export type ReviewCellSummary = {
   confidenceBp: number | null;
   citationVerdict: string | null;
   failureCode: string | null;
+  /** Warum die Zelle „Prüfung nötig" ist; sonst `null`. */
+  reviewReason: EscalationReason | null;
   confirmed: boolean;
   /** Ein Mensch hat die Antwort überschrieben; `override` trägt dann die wirksame. */
   override: {
@@ -205,6 +208,7 @@ export async function getReviewCellDelta(input: {
     const override = latestOverride.get(row.id);
     return {
       ...row,
+      reviewReason: reviewReasonOf({ ...row, escalationThresholdBp: run.escalationThresholdBp }),
       confirmed: confirmedAt !== null,
       override: override
         ? {
@@ -316,6 +320,7 @@ export async function getReviewCellDetail(input: {
       confidenceBp: cell.confidenceBp,
       citationVerdict: cell.citationVerdict,
       failureCode: cell.failureCode,
+      reviewReason: reviewReasonOf({ ...cell, escalationThresholdBp: run.escalationThresholdBp }),
       confirmed: cell.confirmedAt !== null,
       override: latest
         ? {
@@ -506,7 +511,12 @@ export async function getReviewTable(reviewTableId: string) {
     db
       .select({ id: reviewRuns.id, status: reviewRuns.status })
       .from(reviewRuns)
-      .where(eq(reviewRuns.reviewTableId, table.id))
+      .where(
+        and(
+          eq(reviewRuns.reviewTableId, table.id),
+          table.resultsClearedAt ? gt(reviewRuns.createdAt, table.resultsClearedAt) : undefined,
+        ),
+      )
       .orderBy(desc(reviewRuns.createdAt))
       .limit(1),
   ]);

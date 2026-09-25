@@ -1,0 +1,1 @@
+ALTER TABLE "review_tables" ADD COLUMN "results_cleared_at" timestamp with time zone;

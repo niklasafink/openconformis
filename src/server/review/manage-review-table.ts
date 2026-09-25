@@ -139,6 +139,49 @@ export async function archiveReviewTable(input: {
   }
 }
 
+/**
+ * Leert die sichtbaren Ergebnisse: Fragen und Dokumente bleiben, das Raster zeigt
+ * wieder leere Zellen. Frühere Läufe werden nicht gelöscht, nur ausgeblendet.
+ */
+export async function clearReviewResults(input: {
+  reviewTableId: string;
+}): Promise<{ ok: true } | ManageFailure> {
+  try {
+    const actor = requireManagement(await resolveReviewActor());
+    const table = await ownedTable(input.reviewTableId, actor.organizationId);
+    if (!table) return { ok: false, code: "REVIEW_TABLE_NOT_FOUND" };
+    return await db.transaction(async (transaction) => {
+      const [open] = await transaction
+        .select({ id: reviewRuns.id })
+        .from(reviewRuns)
+        .where(
+          and(
+            eq(reviewRuns.reviewTableId, table.id),
+            sql`${reviewRuns.status} in ('queued', 'running')`,
+          ),
+        )
+        .limit(1);
+      if (open) return { ok: false as const, code: "REVIEW_RUN_ACTIVE" };
+      const now = new Date();
+      await transaction
+        .update(reviewTables)
+        .set({ resultsClearedAt: now, updatedAt: now })
+        .where(eq(reviewTables.id, table.id));
+      await appendAuditEvent(transaction, {
+        organizationId: table.organizationId,
+        actorUserId: actor.userId,
+        action: "review_table.results_cleared",
+        targetType: "review_table",
+        targetId: table.id,
+        metadata: {},
+      });
+      return { ok: true as const };
+    });
+  } catch (error) {
+    return failureOf(error);
+  }
+}
+
 /* ------------------------------ Spalten ------------------------------ */
 
 const maximumColumns = 40;

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { cellStateAfterDecision, decideEscalation } from "./escalation";
+import { cellStateAfterDecision, decideEscalation, reviewReasonOf } from "./escalation";
 
 const base = {
   escalationThresholdBp: 7_000,
@@ -71,5 +71,32 @@ describe("escalation", () => {
 
   it("treats the exact threshold as good enough", () => {
     expect(decideEscalation({ ...base, confidenceBp: 7_000 }).escalate).toBe(false);
+  });
+});
+
+describe("reviewReasonOf", () => {
+  const cell = { state: "needs_review", escalationThresholdBp: 7_000 };
+
+  it("names an unconfirmed citation first", () => {
+    expect(reviewReasonOf({ ...cell, citationVerdict: "unsupported", confidenceBp: 5_000 })).toBe(
+      "citation_needs_review",
+    );
+  });
+
+  it("names low confidence when the citation holds", () => {
+    expect(reviewReasonOf({ ...cell, citationVerdict: "verified", confidenceBp: 6_999 })).toBe(
+      "low_confidence",
+    );
+  });
+
+  it("has no reason outside needs_review", () => {
+    expect(
+      reviewReasonOf({
+        ...cell,
+        state: "complete",
+        citationVerdict: "unsupported",
+        confidenceBp: 1,
+      }),
+    ).toBeNull();
   });
 });

@@ -117,6 +117,11 @@ export const reviewTables = pgTable(
     name: text("name").notNull(),
     locale: text("locale").notNull(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    /**
+     * „Ergebnisse leeren": Läufe davor zeigt das Raster nicht mehr. Sie bleiben samt
+     * Zellen, Belegen und Overrides für Audit und Export erhalten.
+     */
+    resultsClearedAt: timestamp("results_cleared_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

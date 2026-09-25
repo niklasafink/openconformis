@@ -104,6 +104,7 @@ export default async function ReviewGridPage({ params }: ReviewGridPageProps) {
         <ReviewWorkspace
           locale={locale}
           reviewTableId={review.table.id}
+          name={review.table.name}
           documents={review.documents.map((document) => ({
             id: document.id,
             policyVersionId: document.policyVersionId,

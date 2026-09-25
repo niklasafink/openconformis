@@ -360,7 +360,9 @@
       "export": "Export to Excel",
       "cancel": "Cancel run",
       "cancelling": "Cancelling …",
-      "cancelFailed": "The run could not be cancelled."
+      "cancelFailed": "The run could not be cancelled.",
+      "rename": "Rename",
+      "clearResults": "Clear results"
     },
     "grid": {
       "editColumn": "Edit column",
@@ -518,7 +520,8 @@
       "originalView": "Original",
       "textView": "Text",
       "originalUnavailable": "The original is no longer available; the extracted text remains readable.",
-      "close": "Close"
+      "close": "Close",
+      "reviewReason": "Review reason"
     },
     "errors": {
       "REVIEW_TYPESAFE_KEY_REQUIRED": "The contract review needs a saved TypeSafe key.",
@@ -565,6 +568,23 @@
       "REVIEW_CANCELLED": "The run was cancelled.",
       "REVIEW_DEADLINE_EXCEEDED": "The run exceeded its time limit.",
       "REVIEW_TOO_MANY_GAPS": "Too many cells failed; the run counts as failed."
+    },
+    "reviewReason": {
+      "low_confidence": "Confidence below threshold",
+      "citation_needs_review": "Citation not confirmed"
+    },
+    "rename": {
+      "title": "Rename review",
+      "save": "Save",
+      "cancel": "Cancel",
+      "failed": "The review could not be renamed."
+    },
+    "clear": {
+      "title": "Clear results?",
+      "description": "Questions and documents stay; the grid shows empty cells again. Earlier runs remain stored for audit.",
+      "confirm": "Clear results",
+      "cancel": "Cancel",
+      "failed": "The results could not be cleared."
     }
   },
   "Auth": {

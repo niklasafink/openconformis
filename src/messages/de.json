@@ -360,7 +360,9 @@
       "export": "Excel exportieren",
       "cancel": "Lauf abbrechen",
       "cancelling": "Wird abgebrochen …",
-      "cancelFailed": "Der Lauf konnte nicht abgebrochen werden."
+      "cancelFailed": "Der Lauf konnte nicht abgebrochen werden.",
+      "rename": "Umbenennen",
+      "clearResults": "Ergebnisse leeren"
     },
     "grid": {
       "editColumn": "Spalte bearbeiten",
@@ -518,7 +520,8 @@
       "originalView": "Original",
       "textView": "Text",
       "originalUnavailable": "Das Original liegt nicht mehr vor; der ausgelesene Text bleibt lesbar.",
-      "close": "Schließen"
+      "close": "Schließen",
+      "reviewReason": "Prüfgrund"
     },
     "errors": {
       "REVIEW_TYPESAFE_KEY_REQUIRED": "Für die Vertragsprüfung ist ein gespeicherter TypeSafe-Schlüssel nötig.",
@@ -565,6 +568,23 @@
       "REVIEW_CANCELLED": "Der Lauf wurde abgebrochen.",
       "REVIEW_DEADLINE_EXCEEDED": "Der Lauf hat sein Zeitlimit überschritten.",
       "REVIEW_TOO_MANY_GAPS": "Zu viele Zellen sind gescheitert; der Lauf gilt als fehlgeschlagen."
+    },
+    "reviewReason": {
+      "low_confidence": "Konfidenz unter der Schwelle",
+      "citation_needs_review": "Beleg nicht bestätigt"
+    },
+    "rename": {
+      "title": "Prüfung umbenennen",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "failed": "Die Prüfung konnte nicht umbenannt werden."
+    },
+    "clear": {
+      "title": "Ergebnisse leeren?",
+      "description": "Fragen und Dokumente bleiben erhalten, das Raster zeigt wieder leere Zellen. Frühere Läufe bleiben für Audit gespeichert.",
+      "confirm": "Ergebnisse leeren",
+      "cancel": "Abbrechen",
+      "failed": "Die Ergebnisse konnten nicht geleert werden."
     }
   },
   "Auth": {

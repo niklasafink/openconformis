@@ -354,6 +354,14 @@ export function ReviewCellSheet({
                             </dd>
                           </>
                         ) : null}
+                        {detail.cell.reviewReason ? (
+                          <>
+                            <dt>{t("detail.reviewReason")}</dt>
+                            <dd className="text-foreground">
+                              {t(`reviewReason.${detail.cell.reviewReason}`)}
+                            </dd>
+                          </>
+                        ) : null}
                         {detail.cell.citationVerdict ? (
                           <>
                             <dt>{t("detail.evidence")}</dt>
