@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 
-type ReviewStartRowProps = Readonly<{
+type ReviewStartControlsProps = Readonly<{
   reviewTableId: string;
   documentCount: number;
   readyDocumentCount: number;
@@ -30,12 +30,12 @@ type ReviewStartRowProps = Readonly<{
 }>;
 
 /**
- * Die Startzeile: links der Stand („n Dokumente vorbereitet"), rechts der Zugang
- * und die Primäraktion. Der Zugang ist ein einziges Feld — der eigene
- * OpenRouter-Schlüssel des Nutzers; das Modell kommt aus dem Katalog und wird
- * hier nicht einzeln gewählt. Fehlt eine Voraussetzung, ist Start deaktiviert.
+ * Zugang und Primäraktion der Werkzeugleiste. Der Zugang ist ein einziges Feld —
+ * der eigene OpenRouter-Schlüssel des Nutzers; das Modell kommt aus dem Katalog
+ * und wird hier nicht einzeln gewählt. Fehlt eine Voraussetzung, ist Start
+ * deaktiviert und nennt den Grund daneben.
  */
-export function ReviewStartRow({
+export function ReviewStartControls({
   reviewTableId,
   documentCount,
   readyDocumentCount,
@@ -44,7 +44,7 @@ export function ReviewStartRow({
   savedCredentials,
   errorMessages,
   keyErrorMessages,
-}: ReviewStartRowProps) {
+}: ReviewStartControlsProps) {
   const t = useTranslations("Review.start");
   const router = useRouter();
   const id = useId();
@@ -60,11 +60,9 @@ export function ReviewStartRow({
     catalogue.models.find((entry) => entry.routeProvider === "openrouter") ?? catalogue.models[0];
   const saved = keys.savedFor(model);
 
-  // Ohne Dokument sagt der leere Zustand der Tabelle schon alles; die Startzeile
-  // nennt nur Gründe, die dort nicht sichtbar sind.
   const reason =
     documentCount === 0
-      ? null
+      ? t("reasonNoDocuments")
       : columnCount === 0
         ? t("reasonNoColumns")
         : readyDocumentCount < documentCount
@@ -102,23 +100,22 @@ export function ReviewStartRow({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-2.5">
-      <div className="grid min-w-0 flex-1">
-        <span className="text-body font-medium tabular-nums">
-          {t("prepared", { count: documentCount })} · {t("columns", { count: columnCount })}
+    <>
+      {reason || startError ? (
+        <span className="grid min-w-0 text-meta">
+          {reason ? (
+            <span className="truncate text-muted-foreground" data-testid="review-start-reason">
+              {reason}
+            </span>
+          ) : null}
+          {startError ? (
+            <span role="alert" className="truncate text-destructive">
+              {startError}
+            </span>
+          ) : null}
         </span>
-        {reason ? (
-          <span className="text-meta text-muted-foreground" data-testid="review-start-reason">
-            {reason}
-          </span>
-        ) : null}
-        {startError ? (
-          <span role="alert" className="text-meta text-destructive">
-            {startError}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
+      ) : null}
+      <div className="flex items-center gap-2">
         <Popover open={keyOpen} onOpenChange={setKeyOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2" title={t("apiKeyTitle")}>
@@ -183,6 +180,6 @@ export function ReviewStartRow({
           pending={pending}
         />
       </div>
-    </div>
+    </>
   );
 }

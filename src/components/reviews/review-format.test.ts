@@ -4,7 +4,15 @@ import de from "@/messages/de.json";
 import en from "@/messages/en.json";
 import type { ReviewCellSummary } from "@/server/review/read-review";
 
-import { answerLabel, effectiveAnswer, mergeCells, percentOf, scoreLevelOf } from "./review-format";
+import {
+  answerLabel,
+  effectiveAnswer,
+  mergeCells,
+  percentOf,
+  questionColumnInput,
+  questionLabel,
+  scoreLevelOf,
+} from "./review-format";
 
 const cell = (overrides: Partial<ReviewCellSummary>): ReviewCellSummary => ({
   id: "cell-1",
@@ -87,6 +95,42 @@ describe("mergeCells", () => {
     expect(next?.get("cell-1")?.state).toBe("complete");
     expect(next?.size).toBe(2);
     expect(known.get("cell-1")?.state).toBe("deciding");
+  });
+});
+
+describe("questionLabel", () => {
+  it("keeps a short question as its own label", () => {
+    expect(questionLabel("  Gibt es ein Sonderkündigungsrecht?  ")).toBe(
+      "Gibt es ein Sonderkündigungsrecht?",
+    );
+  });
+
+  it("uses the first line of a question that carries several paragraphs", () => {
+    const question = `${"Gilt deutsches Recht? ".repeat(3)}\n\nUnd wenn nein, welches?`;
+    expect(questionLabel(question)).toBe(
+      "Gilt deutsches Recht? Gilt deutsches Recht? Gilt deutsches Recht?",
+    );
+  });
+
+  it("never exceeds the 120 characters a column label allows", () => {
+    const label = questionLabel("Kündigung ".repeat(40));
+    expect(label.length).toBeLessThanOrEqual(120);
+    expect(label.endsWith("…")).toBe(true);
+  });
+});
+
+describe("questionColumnInput", () => {
+  it("keeps the whole question as the instruction and labels the answers in the user's language", () => {
+    const question = "Enthält der Vertrag eine Haftungsbegrenzung?\n\nAuch der Höhe nach?";
+    const column = questionColumnInput(question, { yes: "Ja", no: "Nein" });
+    expect(column.instructions).toBe(question);
+    expect(column.criteria.type).toBe("noul");
+    if (column.criteria.type !== "noul") throw new Error("noul erwartet");
+    expect(column.criteria.true.label).toBe("Ja");
+    expect(column.criteria.false.label).toBe("Nein");
+    // Die Beschreibungen gehen an das Modell und bleiben deshalb englisch.
+    expect(column.criteria.true.description).toMatch(/^[\u0000-\u007f]+$/u);
+    expect(column.criteria.false.description).toMatch(/^[\u0000-\u007f]+$/u);
   });
 });
 

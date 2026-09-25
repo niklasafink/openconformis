@@ -3,7 +3,7 @@
 import { Check, Download, FilePlus, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   addSampleDocument,
@@ -16,7 +16,6 @@ import {
 import { DocumentMark, documentKindFromName } from "@/components/policies/document-chip";
 import type { SavedCredential } from "@/components/results/model-access-panel";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 import type { ReviewColumnCriteria } from "@/domain/review/column";
 import type { AppLocale } from "@/i18n/routing";
@@ -30,11 +29,14 @@ import {
   effectiveAnswer,
   formatBytes,
   percentOf,
+  questionColumnInput,
+  questionLabel,
   terminalRunStatuses,
   workingCellStates,
 } from "./review-format";
 import { useReviewRunLive, type ReviewLiveState } from "./review-live";
-import { ReviewStartRow } from "./review-start-row";
+import { ReviewQuestionComposer } from "./review-question-composer";
+import { ReviewStartControls } from "./review-start-controls";
 import { CellStateDot, legendStates } from "./review-state";
 
 export type TableDocument = {
@@ -80,9 +82,10 @@ type ReviewWorkspaceProps = Readonly<{
 }>;
 
 /**
- * Das Raster der Vertragsprüfung: Kennzahlen, Startzeile, Werkzeugleiste und die
- * Tabelle mit fixierter Dokumentspalte. Läuft eine Prüfung, kommen die Zellen
- * über das Delta des Live-Rasters; sonst steht die Tabelle still.
+ * Die Vertragsprüfung auf einem Bildschirm: oben die Werkzeugleiste, links die
+ * Fragen (Spalte A) und rechts je Dokument eine schmale Spalte B, C, D … Ganz
+ * rechts steht das Upload-Feld. Läuft eine Prüfung, kommen die Zellen über das
+ * Delta des Live-Rasters; sonst steht die Tabelle still.
  */
 export function ReviewWorkspace(props: ReviewWorkspaceProps) {
   return props.run ? (
@@ -104,8 +107,20 @@ function LiveReviewWorkspace(props: ReviewWorkspaceProps & { run: RunSnapshot })
 }
 
 const headerCell =
-  "sticky top-0 z-10 h-11 border-b border-border bg-card px-3 text-left align-middle text-meta font-medium";
-const bodyCell = "h-11 border-b border-border px-1 align-middle";
+  "sticky top-0 z-10 border-b border-border bg-card px-3 py-2 text-left align-top text-meta font-medium";
+const questionCell = "border-b border-border px-3 py-2 align-top";
+const answerCell = "border-b border-border px-1 py-1 align-middle";
+
+/** Die Spaltenbuchstaben des Rasters: A sind die Fragen, B, C, D … die Dokumente. */
+function columnLetter(index: number) {
+  let letter = "";
+  let position = index;
+  do {
+    letter = String.fromCharCode(65 + (position % 26)) + letter;
+    position = Math.floor(position / 26) - 1;
+  } while (position >= 0);
+  return letter;
+}
 
 function ReviewGridView({
   locale,
@@ -130,10 +145,16 @@ function ReviewGridView({
     key: 0,
   });
   const [openCell, setOpenCell] = useState<OpenCell | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addingSample, setAddingSample] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Frisch eingetippte Fragen stehen sofort links, noch bevor der Server sie kennt.
+  const [pendingQuestions, setPendingQuestions] = useState<
+    Array<{ id: number; label: string; question: string }>
+  >([]);
+  const uploadInput = useRef<HTMLInputElement>(null);
+  const questionQueue = useRef<Array<{ id: number; label: string; question: string }>>([]);
+  const savingQuestions = useRef(false);
+  const nextQuestionId = useRef(1);
 
   const head = live?.head ?? null;
   const cells = live?.cells;
@@ -155,17 +176,12 @@ function ReviewGridView({
     return { runDocumentByReviewDocument, runColumnByReviewColumn, cellByPosition };
   }, [run, cells]);
 
-  const runningCount = useMemo(
-    () => [...(cells?.values() ?? [])].filter((cell) => workingCellStates.has(cell.state)).length,
-    [cells],
-  );
   const readyDocuments = documents.filter((document) => document.parseStatus === "ready").length;
-  const totalCells = head?.totalCellCount ?? documents.length * columns.length;
-  const completedCells = head ? head.completedCellCount : 0;
-  const escalationPercent =
-    head && head.totalCellCount > 0
-      ? Math.round((head.escalatedCellCount / head.totalCellCount) * 100)
-      : 0;
+  const savedLabels = useMemo(() => new Set(columns.map((column) => column.label)), [columns]);
+
+  // Sobald der Server eine Frage kennt, verschwindet sie aus der optimistischen
+  // Liste — sonst stünde sie zweimal da.
+  const openQuestions = pendingQuestions.filter((entry) => !savedLabels.has(entry.label));
 
   function refreshServer() {
     router.refresh();
@@ -187,6 +203,48 @@ function ReviewGridView({
     } catch {
       setActionError(fallback);
       return false;
+    }
+  }
+
+  function addQuestion(question: string) {
+    const entry = { id: nextQuestionId.current++, label: questionLabel(question), question };
+    setPendingQuestions((current) => [
+      ...current.filter((item) => !savedLabels.has(item.label)),
+      entry,
+    ]);
+    questionQueue.current.push(entry);
+    void saveQuestions();
+  }
+
+  // Eine Frage nach der anderen: die Reihenfolge der Spalten ist die Reihenfolge
+  // der Eingabe, und zwei Server Actions dürfen sich nicht überholen.
+  async function saveQuestions() {
+    if (savingQuestions.current) return;
+    savingQuestions.current = true;
+    try {
+      let next = questionQueue.current.shift();
+      while (next) {
+        const entry = next;
+        setActionError(null);
+        try {
+          const result = await saveColumn({
+            reviewTableId,
+            column: questionColumnInput(entry.question, {
+              yes: t("questions.yes"),
+              no: t("questions.no"),
+            }),
+          });
+          if (!result.ok) throw new Error(result.code);
+          refreshServer();
+        } catch (caught) {
+          const code = caught instanceof Error ? caught.message : "";
+          setActionError(errorMessages[code] ?? t("questions.failed"));
+          setPendingQuestions((current) => current.filter((item) => item.id !== entry.id));
+        }
+        next = questionQueue.current.shift();
+      }
+    } finally {
+      savingQuestions.current = false;
     }
   }
 
@@ -220,9 +278,12 @@ function ReviewGridView({
     return cell ? { cell, runDocumentId, runColumn } : undefined;
   }
 
+  /**
+   * Der Inhalt einer Zelle: die Antwort der Spalte — bei einer offenen
+   * Zweitmeinung „Unklar" — und daneben die Konfidenz von Jev in Prozent.
+   */
   function cellContent(cell: ReviewCellSummary, criteria: ReviewColumnCriteria) {
     const { answer, overridden } = effectiveAnswer(cell);
-    const label = answerLabel(criteria, answer);
     const stateText = t(`cellState.${cell.state}` as never);
     if (workingCellStates.has(cell.state) || cell.state === "abandoned") {
       return <span className="truncate text-muted-foreground">{stateText}</span>;
@@ -237,20 +298,19 @@ function ReviewGridView({
         </span>
       );
     }
-    const percent = overridden ? undefined : percentOf(cell.probabilityBp, locale);
+    const unclear = cell.state === "needs_review" && !overridden && !cell.confirmed;
+    const label = unclear ? t("grid.unclear") : answerLabel(criteria, answer);
+    const percent = overridden ? undefined : percentOf(cell.confidenceBp, locale);
     return (
-      <span className="flex min-w-0 items-center gap-1.5">
+      <>
         <span className="truncate font-medium">{label ?? stateText}</span>
-        {cell.state === "needs_review" ? (
-          <span className="shrink-0 text-meta text-muted-foreground">· {stateText}</span>
-        ) : null}
         {percent ? (
-          <span className="shrink-0 text-meta text-muted-foreground tabular-nums">
-            · {t("grid.probability", { percent })}
+          <span className="ml-auto shrink-0 text-meta text-muted-foreground tabular-nums">
+            {t("grid.confidence", { percent })}
           </span>
         ) : null}
         {overridden ? (
-          <span className="shrink-0 text-meta text-muted-foreground">· {t("grid.overridden")}</span>
+          <span className="shrink-0 text-meta text-muted-foreground">{t("grid.overridden")}</span>
         ) : null}
         {cell.confirmed ? (
           <Check
@@ -259,53 +319,54 @@ function ReviewGridView({
             className="size-3.5 shrink-0 text-(--status-met)"
           />
         ) : null}
-      </span>
+      </>
     );
   }
 
-  const addDocumentControls = (
-    <div className="grid gap-3">
-      <ReviewDocumentUpload
-        locale={locale}
-        reviewTableId={reviewTableId}
-        prepareDraft={prepareUploadDraft}
-        addDocument={addUploadedDocument}
-        onAdded={() => {
-          setAddOpen(false);
-          refreshServer();
-        }}
-        errorMessages={errorMessages}
-      />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="justify-self-start"
-        disabled={addingSample}
-        onClick={() => {
-          setAddingSample(true);
-          void runAction(
-            () => addSampleDocument({ reviewTableId, locale }),
-            t("createFailed"),
-          ).finally(() => {
-            setAddingSample(false);
-            setAddOpen(false);
-          });
-        }}
-      >
-        {addingSample ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FilePlus />}
-        {addingSample ? t("toolbar.addingSample") : t("toolbar.addSample")}
-      </Button>
-    </div>
-  );
-
   return (
     <div className="flex h-[calc(100dvh-var(--header-height))] min-h-0 flex-col gap-3 px-4 pb-4 md:px-6">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-meta text-muted-foreground tabular-nums">
-        <span>{t("metrics.files", { count: documents.length })}</span>
-        <span>{t("metrics.decisions", { done: completedCells, total: totalCells })}</span>
-        <span>{t("metrics.running", { count: runningCount })}</span>
-        <span>{t("metrics.escalation", { percent: escalationPercent })}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        {canManage ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setEditor({ open: true, column: null, key: Date.now() })}
+            >
+              <Plus />
+              {t("toolbar.newColumn")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => uploadInput.current?.click()}
+            >
+              <FilePlus />
+              {t("toolbar.addDocument")}
+            </Button>
+          </>
+        ) : null}
+        {actionError ? (
+          <span role="alert" className="text-meta text-destructive">
+            {actionError}
+          </span>
+        ) : null}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {canManage && !runActive ? (
+            <ReviewStartControls
+              reviewTableId={reviewTableId}
+              documentCount={documents.length}
+              readyDocumentCount={readyDocuments}
+              columnCount={columns.length}
+              catalogue={catalogue}
+              savedCredentials={savedCredentials}
+              errorMessages={errorMessages}
+              keyErrorMessages={keyErrorMessages}
+            />
+          ) : null}
+        </div>
       </div>
 
       {head ? (
@@ -328,6 +389,17 @@ function ReviewGridView({
               </span>
             ) : null}
           </div>
+          <ul
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-muted-foreground"
+            aria-label={t("toolbar.legend")}
+          >
+            {legendStates.map((state) => (
+              <li key={state} className="inline-flex items-center gap-1.5">
+                <CellStateDot state={state} />
+                {t(`cellState.${state}` as never)}
+              </li>
+            ))}
+          </ul>
           {runActive ? (
             <div
               className="h-1.5 w-40 overflow-hidden rounded-full bg-muted"
@@ -364,176 +436,142 @@ function ReviewGridView({
         </div>
       ) : null}
 
-      {canManage && !runActive ? (
-        <ReviewStartRow
-          reviewTableId={reviewTableId}
-          documentCount={documents.length}
-          readyDocumentCount={readyDocuments}
-          columnCount={columns.length}
-          catalogue={catalogue}
-          savedCredentials={savedCredentials}
-          errorMessages={errorMessages}
-          keyErrorMessages={keyErrorMessages}
-        />
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-2">
-        {canManage ? (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setEditor({ open: true, column: null, key: Date.now() })}
-            >
-              <Plus />
-              {t("toolbar.newColumn")}
-            </Button>
-            <Popover open={addOpen} onOpenChange={setAddOpen}>
-              <PopoverTrigger asChild>
-                <Button type="button" size="sm" variant="outline">
-                  <FilePlus />
-                  {t("toolbar.addDocument")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-96 p-4">
-                {addDocumentControls}
-              </PopoverContent>
-            </Popover>
-          </>
-        ) : null}
-        {actionError ? (
-          <span role="alert" className="text-meta text-destructive">
-            {actionError}
-          </span>
-        ) : null}
-        <ul
-          className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-muted-foreground"
-          aria-label={t("toolbar.legend")}
-        >
-          {legendStates.map((state) => (
-            <li key={state} className="inline-flex items-center gap-1.5">
-              <CellStateDot state={state} />
-              {t(`cellState.${state}` as never)}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
-        <table className="w-full border-separate border-spacing-0 text-body">
-          <thead>
-            <tr>
-              <th
-                scope="col"
-                className={`${headerCell} left-0 z-20 min-w-64 border-r border-border`}
-              />
-              {columns.map((column) => (
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div className="min-w-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
+          <table className="w-full border-separate border-spacing-0 text-body">
+            <thead>
+              <tr>
                 <th
-                  key={column.id}
                   scope="col"
-                  className={`${headerCell} min-w-52 border-r border-border`}
+                  className={`${headerCell} left-0 z-20 w-88 min-w-88 border-r border-border`}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="grid min-w-0 flex-1">
-                      <span className="truncate text-body font-medium text-foreground">
-                        {column.label}
-                      </span>
-                      <span className="font-normal text-muted-foreground">
-                        {t(`columnType.${column.columnType}` as never)}
-                      </span>
-                    </div>
-                    {canManage ? (
-                      <span className="flex shrink-0 items-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`${t("grid.editColumn")}: ${column.label}`}
-                          onClick={() => setEditor({ open: true, column, key: Date.now() })}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`${t("grid.removeColumn")}: ${column.label}`}
-                          disabled={runActive}
-                          onClick={() =>
-                            void runAction(
-                              () => removeColumn({ reviewTableId, reviewColumnId: column.id }),
-                              t("editor.failed"),
-                            )
-                          }
-                        >
-                          <Trash2 />
-                        </Button>
-                      </span>
-                    ) : null}
-                  </div>
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground tabular-nums">{columnLetter(0)}</span>
+                    <span className="text-body text-foreground">{t("grid.questions")}</span>
+                  </span>
                 </th>
-              ))}
-              {columns.length === 0 ? <th className={`${headerCell} w-full`} /> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((document) => {
-              const fileName = document.originalFilename || document.displayName;
-              const meta = [
-                formatBytes(document.byteSize, locale),
-                document.pageCount ? t("grid.pages", { count: document.pageCount }) : undefined,
-                document.parseStatus === "ready"
-                  ? undefined
-                  : ["failed", "quarantined", "needs_ocr_review", "deleted"].includes(
-                        document.parseStatus,
-                      )
-                    ? t("grid.documentFailed")
-                    : t("grid.documentProcessing"),
-              ].filter(Boolean);
-              return (
-                <tr key={document.id} className="group">
+                {documents.map((document, position) => {
+                  const fileName = document.originalFilename || document.displayName;
+                  const meta = [
+                    formatBytes(document.byteSize, locale),
+                    document.pageCount ? t("grid.pages", { count: document.pageCount }) : undefined,
+                    document.parseStatus === "ready"
+                      ? undefined
+                      : ["failed", "quarantined", "needs_ocr_review", "deleted"].includes(
+                            document.parseStatus,
+                          )
+                        ? t("grid.documentFailed")
+                        : t("grid.documentProcessing"),
+                  ].filter(Boolean);
+                  return (
+                    <th
+                      key={document.id}
+                      scope="col"
+                      className={`${headerCell} w-48 min-w-48 border-r border-border`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <DocumentMark kind={documentKindFromName(fileName)} />
+                        <div className="grid min-w-0 flex-1">
+                          <span className="flex min-w-0 items-baseline gap-1.5">
+                            <span className="shrink-0 text-muted-foreground tabular-nums">
+                              {columnLetter(position + 1)}
+                            </span>
+                            <span
+                              className="truncate text-body text-foreground"
+                              title={document.displayName}
+                            >
+                              {document.displayName}
+                            </span>
+                          </span>
+                          <span className="truncate font-normal text-muted-foreground tabular-nums">
+                            {meta.join(" · ")}
+                          </span>
+                        </div>
+                        {canManage ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t("grid.removeDocument")}: ${document.displayName}`}
+                            disabled={runActive}
+                            onClick={() =>
+                              void runAction(
+                                () =>
+                                  removeDocument({ reviewTableId, reviewDocumentId: document.id }),
+                                t("editor.failed"),
+                              )
+                            }
+                          >
+                            <Trash2 />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </th>
+                  );
+                })}
+                <td className={`${headerCell} w-full`}>
+                  {documents.length === 0 ? (
+                    <span className="font-normal text-muted-foreground">
+                      {t("grid.emptyDocuments")}
+                    </span>
+                  ) : null}
+                </td>
+              </tr>
+            </thead>
+            <tbody>
+              {columns.map((column) => (
+                <tr key={column.id} className="group">
                   <th
                     scope="row"
-                    className={`${bodyCell} sticky left-0 z-10 border-r border-border bg-card px-3 text-left font-normal`}
+                    className={`${questionCell} sticky left-0 z-10 border-r border-border bg-card text-left font-normal`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <DocumentMark kind={documentKindFromName(fileName)} />
-                      <div className="grid min-w-0 flex-1">
-                        <span className="truncate font-medium">{document.displayName}</span>
-                        <span className="truncate text-meta text-muted-foreground tabular-nums">
-                          {meta.join(" · ")}
-                        </span>
+                    <div className="flex items-start gap-2">
+                      <div className="grid min-w-0 flex-1 gap-0.5">
+                        <span className="font-medium break-words">{column.label}</span>
+                        {column.instructions !== column.label ? (
+                          <span className="text-meta whitespace-pre-line text-muted-foreground">
+                            {column.instructions}
+                          </span>
+                        ) : null}
                       </div>
                       {canManage ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                          aria-label={`${t("grid.removeDocument")}: ${document.displayName}`}
-                          disabled={runActive}
-                          onClick={() =>
-                            void runAction(
-                              () =>
-                                removeDocument({ reviewTableId, reviewDocumentId: document.id }),
-                              t("editor.failed"),
-                            )
-                          }
-                        >
-                          <Trash2 />
-                        </Button>
+                        <span className="flex shrink-0 items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t("grid.editColumn")}: ${column.label}`}
+                            onClick={() => setEditor({ open: true, column, key: Date.now() })}
+                          >
+                            <Pencil />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t("grid.removeColumn")}: ${column.label}`}
+                            disabled={runActive}
+                            onClick={() =>
+                              void runAction(
+                                () => removeColumn({ reviewTableId, reviewColumnId: column.id }),
+                                t("editor.failed"),
+                              )
+                            }
+                          >
+                            <Trash2 />
+                          </Button>
+                        </span>
                       ) : null}
                     </div>
                   </th>
-                  {columns.map((column) => {
+                  {documents.map((document) => {
                     const found = cellFor(document, column);
                     return (
-                      <td key={column.id} className={`${bodyCell} border-r border-border`}>
+                      <td key={document.id} className={`${answerCell} border-r border-border`}>
                         {found ? (
                           <button
                             type="button"
-                            className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                            className="flex h-9 w-full items-center gap-1.5 rounded-md px-2 text-left hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                             data-cell-state={found.cell.state}
                             aria-label={t("grid.openCell", {
                               document: document.displayName,
@@ -553,32 +591,71 @@ function ReviewGridView({
                             {cellContent(found.cell, found.runColumn.criteria)}
                           </button>
                         ) : (
-                          <span className="flex h-9 items-center gap-2 px-2 text-muted-foreground">
+                          <span className="flex h-9 items-center gap-1.5 px-2 text-muted-foreground">
                             <CellStateDot state="idle" />
-                            {t("grid.notStarted")}
+                            <span className="truncate">{t("grid.notStarted")}</span>
                           </span>
                         )}
                       </td>
                     );
                   })}
-                  {columns.length === 0 ? <td className={bodyCell} /> : null}
+                  <td className={answerCell} />
                 </tr>
-              );
-            })}
-            {documents.length === 0 ? (
-              <tr>
-                <td colSpan={Math.max(2, columns.length + 1)} className="px-4 py-10">
-                  <div className="mx-auto grid max-w-md justify-items-center gap-2 text-center">
-                    <p className="text-body font-medium">{t("grid.emptyTitle")}</p>
-                    {canManage ? (
-                      <div className="mt-2 w-full text-left">{addDocumentControls}</div>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+              ))}
+              {openQuestions.map((entry) => (
+                <tr key={`pending-${entry.id}`}>
+                  <th
+                    scope="row"
+                    className={`${questionCell} sticky left-0 z-10 border-r border-border bg-card text-left font-normal`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="min-w-0 flex-1 font-medium break-words whitespace-pre-line text-muted-foreground">
+                        {entry.question}
+                      </span>
+                      <LoaderCircle
+                        aria-label={t("questions.saving")}
+                        role="img"
+                        className="size-4 shrink-0 animate-spin text-muted-foreground"
+                      />
+                    </div>
+                  </th>
+                  <td className={answerCell} colSpan={documents.length + 1} />
+                </tr>
+              ))}
+              {canManage ? (
+                <tr>
+                  <th
+                    scope="row"
+                    className={`${questionCell} sticky left-0 z-10 border-r border-border bg-card px-2 text-left font-normal`}
+                  >
+                    <ReviewQuestionComposer onSubmit={addQuestion} disabled={runActive} />
+                  </th>
+                  <td className={answerCell} colSpan={documents.length + 1} />
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        {canManage ? (
+          <aside className="w-72 shrink-0 overflow-auto rounded-lg border border-border bg-card p-3">
+            <ReviewDocumentUpload
+              locale={locale}
+              reviewTableId={reviewTableId}
+              inputRef={uploadInput}
+              prepareDraft={prepareUploadDraft}
+              addDocument={addUploadedDocument}
+              addSample={async () => {
+                await runAction(
+                  () => addSampleDocument({ reviewTableId, locale }),
+                  t("createFailed"),
+                );
+              }}
+              onAdded={refreshServer}
+              errorMessages={errorMessages}
+            />
+          </aside>
+        ) : null}
       </div>
 
       {canManage ? (

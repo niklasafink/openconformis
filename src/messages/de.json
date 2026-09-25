@@ -350,15 +350,9 @@
     "listOpen": "Öffnen",
     "notFound": "Diese Prüfung wurde nicht gefunden.",
     "backToList": "Zur Übersicht",
-    "metrics": {
-      "files": "{count, plural, =1 {1 Datei} other {# Dateien}}",
-      "decisions": "{done} von {total} Entscheidungen",
-      "running": "{count} laufend",
-      "escalation": "Eskalationsquote {percent} %"
-    },
     "toolbar": {
       "newColumn": "Neue Spalte",
-      "addDocument": "Dokument hinzufügen",
+      "addDocument": "Dokumente hinzufügen",
       "addSample": "Beispieldokument hinzufügen",
       "addingSample": "Wird hinzugefügt …",
       "legend": "Zustände",
@@ -368,7 +362,6 @@
       "cancelFailed": "Der Lauf konnte nicht abgebrochen werden."
     },
     "grid": {
-      "emptyTitle": "Noch keine Dokumente in dieser Prüfung.",
       "editColumn": "Spalte bearbeiten",
       "removeColumn": "Spalte entfernen",
       "removeDocument": "Dokument entfernen",
@@ -380,7 +373,19 @@
       "openCell": "Zelle öffnen: {document}, {column}",
       "overridden": "überschrieben",
       "confirmed": "bestätigt",
-      "probability": "{percent} %"
+      "questions": "Fragen",
+      "unclear": "Unklar",
+      "confidence": "{percent} %",
+      "emptyDocuments": "Noch keine Dokumente in dieser Prüfung."
+    },
+    "questions": {
+      "placeholder": "Frage eingeben — Enter legt die nächste an, Shift+Enter macht einen Absatz",
+      "add": "Frage anlegen",
+      "saving": "Frage wird angelegt …",
+      "tooShort": "Eine Frage braucht mindestens 8 Zeichen.",
+      "failed": "Die Frage konnte nicht angelegt werden.",
+      "yes": "Ja",
+      "no": "Nein"
     },
     "columnType": {
       "noul": "Ja/Nein",
@@ -406,15 +411,13 @@
       "cancelled": "Abgebrochen"
     },
     "start": {
-      "prepared": "{count, plural, =1 {1 Dokument vorbereitet} other {# Dokumente vorbereitet}}",
-      "columns": "{count, plural, =1 {1 Spalte} other {# Spalten}}",
-      "action": "Prüfung starten",
-      "starting": "Prüfung startet …",
-      "reasonNoColumns": "Es fehlt mindestens eine Spalte.",
+      "action": "Analyse starten",
+      "starting": "Analyse startet …",
+      "reasonNoColumns": "Es fehlt mindestens eine Frage.",
       "reasonDocumentNotReady": "Mindestens ein Dokument ist noch nicht fertig aufbereitet.",
       "reasonNoModelKey": "Es ist kein API-Key gespeichert.",
       "reasonRunActive": "Ein Lauf ist noch aktiv.",
-      "failed": "Die Prüfung konnte nicht gestartet werden.",
+      "failed": "Die Analyse konnte nicht gestartet werden.",
       "apiKeyTitle": "Modellzugang über Ihren OpenRouter-Schlüssel",
       "apiKey": "API-Key",
       "savedKey": "••••{lastFour} gespeichert",
@@ -422,10 +425,11 @@
       "addKey": "Hinzufügen",
       "addingKey": "Wird hinzugefügt …",
       "keyFailed": "Der Schlüssel konnte nicht bestätigt werden.",
-      "pollingFailed": "Die Verbindung zum Server ist unterbrochen; der Stand wird weiter abgefragt."
+      "pollingFailed": "Die Verbindung zum Server ist unterbrochen; der Stand wird weiter abgefragt.",
+      "reasonNoDocuments": "Es fehlt mindestens ein Dokument."
     },
     "upload": {
-      "dropzone": "Vertrag hier ablegen oder Datei auswählen",
+      "dropzone": "Dokumente hier ablegen oder auswählen",
       "select": "PDF oder DOCX, maximal 25 MB",
       "remove": "Datei entfernen",
       "upload": "Hochladen",
@@ -435,7 +439,8 @@
       "invalidType": "Bitte eine PDF- oder DOCX-Datei auswählen.",
       "tooLarge": "Die Datei darf maximal 25 MB groß sein.",
       "failed": "Der Upload konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
-      "processingFailed": "Das Dokument konnte nicht aufbereitet werden."
+      "processingFailed": "Das Dokument konnte nicht aufbereitet werden.",
+      "queued": "Wartet"
     },
     "editor": {
       "newTitle": "Neue Spalte",

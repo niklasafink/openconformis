@@ -1,4 +1,4 @@
-import type { ReviewColumnCriteria } from "@/domain/review/column";
+import type { ReviewColumnCriteria, ReviewColumnInput } from "@/domain/review/column";
 import type { ReviewCellSummary } from "@/server/review/read-review";
 
 /**
@@ -108,4 +108,43 @@ export function formatBytes(byteSize: number | null | undefined, locale: string)
   const megabytes = byteSize / 1024 / 1024;
   const formatter = new Intl.NumberFormat(locale, { maximumFractionDigits: megabytes < 1 ? 2 : 1 });
   return `${formatter.format(megabytes)} MB`;
+}
+
+/**
+ * Die Bezeichnung einer frei eingegebenen Frage. Sie steht später in Begründung
+ * und Export und darf höchstens 120 Zeichen lang sein — sie ist deshalb immer
+ * die erste Zeile der Frage, nicht ihr ganzer Text.
+ */
+export function questionLabel(question: string): string {
+  const trimmed = question.trim();
+  const firstLine = trimmed.split("\n")[0]!.trim().replace(/\s+/gu, " ");
+  const text = firstLine.length > 0 ? firstLine : trimmed.replace(/\s+/gu, " ");
+  return text.length <= 120 ? text : `${text.slice(0, 119).trimEnd()}…`;
+}
+
+/**
+ * Eine eingetippte Frage als Spalteneingabe: Ja/Nein mit den Beschriftungen der
+ * Oberfläche und festen englischen Kriterien — englisch, weil TypeSafe Deutsch
+ * ausdrücklich schwächer nennt. Wer andere Kriterien oder einen anderen Typ
+ * braucht, legt die Spalte über „Neue Spalte" an.
+ */
+export function questionColumnInput(
+  question: string,
+  labels: Readonly<{ yes: string; no: string }>,
+): ReviewColumnInput {
+  return {
+    label: questionLabel(question),
+    instructions: question.trim(),
+    criteria: {
+      type: "noul",
+      true: {
+        label: labels.yes,
+        description: "The document answers this question with yes.",
+      },
+      false: {
+        label: labels.no,
+        description: "The document answers this question with no, or says nothing about it.",
+      },
+    },
+  };
 }

@@ -350,15 +350,9 @@
     "listOpen": "Open",
     "notFound": "This review was not found.",
     "backToList": "Back to overview",
-    "metrics": {
-      "files": "{count, plural, =1 {1 file} other {# files}}",
-      "decisions": "{done} of {total} decisions",
-      "running": "{count} in progress",
-      "escalation": "Escalation rate {percent}%"
-    },
     "toolbar": {
       "newColumn": "New column",
-      "addDocument": "Add document",
+      "addDocument": "Add documents",
       "addSample": "Add sample document",
       "addingSample": "Adding …",
       "legend": "States",
@@ -368,7 +362,6 @@
       "cancelFailed": "The run could not be cancelled."
     },
     "grid": {
-      "emptyTitle": "No documents in this review yet.",
       "editColumn": "Edit column",
       "removeColumn": "Remove column",
       "removeDocument": "Remove document",
@@ -380,7 +373,19 @@
       "openCell": "Open cell: {document}, {column}",
       "overridden": "overridden",
       "confirmed": "confirmed",
-      "probability": "{percent}%"
+      "questions": "Questions",
+      "unclear": "Unclear",
+      "confidence": "{percent}%",
+      "emptyDocuments": "No documents in this review yet."
+    },
+    "questions": {
+      "placeholder": "Type a question — Enter starts the next one, Shift+Enter adds a paragraph",
+      "add": "Add question",
+      "saving": "Adding question …",
+      "tooShort": "A question needs at least 8 characters.",
+      "failed": "The question could not be added.",
+      "yes": "Yes",
+      "no": "No"
     },
     "columnType": {
       "noul": "Yes/No",
@@ -406,15 +411,13 @@
       "cancelled": "Cancelled"
     },
     "start": {
-      "prepared": "{count, plural, =1 {1 document prepared} other {# documents prepared}}",
-      "columns": "{count, plural, =1 {1 column} other {# columns}}",
-      "action": "Start review",
-      "starting": "Starting review …",
-      "reasonNoColumns": "At least one column is missing.",
+      "action": "Start analysis",
+      "starting": "Starting analysis …",
+      "reasonNoColumns": "At least one question is missing.",
       "reasonDocumentNotReady": "At least one document is still being processed.",
       "reasonNoModelKey": "No API key is saved.",
       "reasonRunActive": "A run is still active.",
-      "failed": "The review could not be started.",
+      "failed": "The analysis could not be started.",
       "apiKeyTitle": "Model access through your OpenRouter key",
       "apiKey": "API key",
       "savedKey": "••••{lastFour} saved",
@@ -422,10 +425,11 @@
       "addKey": "Add",
       "addingKey": "Adding …",
       "keyFailed": "The key could not be verified.",
-      "pollingFailed": "The connection to the server is interrupted; the state keeps being polled."
+      "pollingFailed": "The connection to the server is interrupted; the state keeps being polled.",
+      "reasonNoDocuments": "At least one document is missing."
     },
     "upload": {
-      "dropzone": "Drop your contract here or select a file",
+      "dropzone": "Drop documents here or select them",
       "select": "PDF or DOCX, up to 25 MB",
       "remove": "Remove file",
       "upload": "Upload",
@@ -435,7 +439,8 @@
       "invalidType": "Select a PDF or DOCX file.",
       "tooLarge": "The file must not exceed 25 MB.",
       "failed": "The upload could not be completed. Please try again.",
-      "processingFailed": "The document could not be processed."
+      "processingFailed": "The document could not be processed.",
+      "queued": "Waiting"
     },
     "editor": {
       "newTitle": "New column",
