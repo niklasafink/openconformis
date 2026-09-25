@@ -25,7 +25,8 @@ type Expected = {
   /** Erkannter Text der Zahl bzw. des Richtungsworts. */
   raw: string;
   page: number;
-  status: "match" | "mismatch" | "uncertain";
+  /** `none`: die Zahl bekommt bewusst keine Feststellung (keine Prüfung, nur grün). */
+  status: "match" | "mismatch" | "uncertain" | "none";
   rounded?: boolean;
   note: string;
 };
@@ -119,6 +120,20 @@ const expectations: Expected[] = [
     page: 48,
     status: "uncertain",
     note: "Anlage 2.2 Betriebsergebnis",
+  },
+  {
+    report: "gbs",
+    raw: "-6.312,7",
+    page: 48,
+    status: "none",
+    note: "Anlage 2.2 Personalaufwand, andere Gliederung ohne Hinweis",
+  },
+  {
+    report: "gbs",
+    raw: "-1.003,2",
+    page: 48,
+    status: "none",
+    note: "Anlage 2.2 sonstige betriebliche Aufwendungen, ohne Hinweis",
   },
   {
     report: "gbs",
@@ -287,7 +302,10 @@ for (const [report, evidence] of [
       (current, row) => (!current || rank[row.status] > rank[current.status] ? row : current),
       null,
     );
-    const statusOk = worst?.status === expected.status;
+    const statusOk =
+      expected.status === "none"
+        ? !worst || worst.status === "match"
+        : worst?.status === expected.status;
     const roundedOk =
       expected.rounded === undefined || matching.some((row) => row.rounded === expected.rounded);
     const ok = statusOk && roundedOk;

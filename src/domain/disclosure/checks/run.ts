@@ -159,6 +159,9 @@ function tableReferenceChecks(byPosten: Map<string, Fact[]>): CheckDraft[] {
               ? "reference_sign"
               : "reference_differs";
         if (comparison.status !== "match" && (fact.table.alternate || reference.table.alternate)) {
+          // Eine abweichende Gliederung (ordentlich/neutral) verschiebt Aufwands- und
+          // Ertragsposten zwangsläufig; ein Hinweis lohnt nur beim Ergebnis.
+          if (posten.kind !== "result") continue;
           status = "uncertain";
           code = "reference_structure";
         } else if (comparison.status !== "match" && (fact.relabeled || reference.relabeled)) {

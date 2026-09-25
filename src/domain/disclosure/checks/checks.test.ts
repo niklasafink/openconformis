@@ -317,7 +317,7 @@ describe("orange: uncertain assignment", () => {
     });
   });
 
-  it("gbs Anlage 2.2: Betriebsergebnis in neutral/ordentlich gegliederter Tabelle bleibt orange", () => {
+  it("gbs Anlage 2.2: nur das Betriebsergebnis der neutral/ordentlich gegliederten Tabelle bleibt orange", () => {
     const checks = checksOf(
       buildDocument([
         {
@@ -325,6 +325,7 @@ describe("orange: uncertain assignment", () => {
           header: 1,
           cells: [
             [null, "2021 TEUR", "2020 TEUR"],
+            ["Personalaufwand", "-6.364,0", "-7.099,7"],
             ["Betriebsergebnis", "-3.811,9", "2.254,2"],
           ],
         },
@@ -334,6 +335,7 @@ describe("orange: uncertain assignment", () => {
           cells: [
             [null, "2021 TEUR", "2020 TEUR"],
             ["Ordentliche betriebliche Erträge", "3.475,8", "11.731,4"],
+            ["Personalaufwand", "-6.312,7", "-7.050,1"],
             ["Betriebsergebnis", "-3.922,3", "2.618,4"],
             ["Neutrales Ergebnis", "109,3", "-365,2"],
           ],
@@ -344,6 +346,9 @@ describe("orange: uncertain assignment", () => {
       status: "uncertain",
       comment: { code: "reference_structure" },
     });
+    // Aufwandsposten verschiebt die andere Gliederung zwangsläufig: kein Hinweis.
+    expect(find(checks, "-6.312,7").filter((check) => check.status !== "match")).toEqual([]);
+    expect(find(checks, "-7.050,1").filter((check) => check.status !== "match")).toEqual([]);
   });
 });
 
