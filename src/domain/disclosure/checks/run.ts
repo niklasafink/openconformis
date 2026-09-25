@@ -16,7 +16,7 @@ import {
   tableSumChecks,
   type TableModel,
 } from "./tables";
-import { textChecks, type PendingMention } from "./text";
+import { referenceCheck, textChecks, type PendingMention } from "./text";
 import { compareWithTolerance, abs } from "../arithmetic";
 import type { CheckDraft, EngineDocument } from "./types";
 
@@ -281,3 +281,57 @@ function dedupe(drafts: CheckDraft[]) {
 }
 
 export type { PendingMention, TableModel };
+
+/** Eine Zuordnung des Modells: Zahl, Posten-Key oder Tabellenlabel, Periode, Konfidenz. */
+export type ModelAssignment = Readonly<{
+  figureId: string;
+  key: string | null;
+  label: string | null;
+  period: "current" | "prior" | "other";
+  confidenceBp: number;
+  candidateCount: number;
+}>;
+
+/**
+ * Prüfungen aus der Einordnung durch das Modell. Das Modell wählt nur den Posten; der
+ * Wert kommt aus den Tabellen und wird im Code verglichen. Unter der Konfidenzschwelle
+ * oder bei mehreren Kandidaten wird eine Abweichung nie rot, sondern bleibt orange.
+ */
+export function modelAssignmentChecks(
+  document: EngineDocument,
+  resolver: ReturnType<typeof createResolver>,
+  assignments: readonly ModelAssignment[],
+  thresholdBp: number,
+): CheckDraft[] {
+  const figures = new Map(document.figures.map((figure) => [figure.id, figure]));
+  const drafts: CheckDraft[] = [];
+  for (const assignment of assignments) {
+    const figure = figures.get(assignment.figureId);
+    if (!figure || !assignment.key || assignment.period === "other" || figure.micro === null)
+      continue;
+    const posten = postenByKey.get(assignment.key) ?? {
+      key: assignment.key,
+      label: assignment.label ?? assignment.key.replace(/^label:/u, ""),
+      kind: "balance" as const,
+      row: /(?!)/u,
+      text: /(?!)/u,
+    };
+    const draft = referenceCheck(figure, posten, assignment.period, resolver, {
+      share: figure.unit === "percent",
+      assignment: "model",
+      confidenceBp: assignment.confidenceBp,
+    });
+    if (!draft) continue;
+    const unsure =
+      draft.status === "mismatch" &&
+      (assignment.confidenceBp < thresholdBp || assignment.candidateCount > 1);
+    drafts.push({
+      ...draft,
+      status: unsure ? "uncertain" : draft.status,
+      comment: unsure ? { code: "model_unsure", params: { label: posten.label } } : draft.comment,
+      subjectLabel: posten.label,
+      sourceKey: `model:${draft.sourceKey}`,
+    });
+  }
+  return drafts;
+}

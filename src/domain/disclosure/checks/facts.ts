@@ -133,7 +133,7 @@ export function agree(
 export function factSourceLabel(fact: Fact) {
   return [
     fact.table.page ? `Seite ${fact.table.page}` : null,
-    fact.label,
+    fact.viaCaption ? `${fact.label}, Summe` : fact.label,
     fact.period === "prior" ? "Vorjahr" : null,
   ]
     .filter(Boolean)

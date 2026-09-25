@@ -12,6 +12,8 @@ import { RunControls } from "@/components/disclosure/run-controls";
 import { StopRunButton } from "@/components/disclosure/stop-run-button";
 import { formatAmount } from "@/domain/disclosure/checks/comments";
 import { markStatuses } from "@/domain/disclosure/checks/findings";
+import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
+import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { readDocumentBlocks } from "@/server/disclosure/read-case";
 import { readRecognition, type ViewFigure } from "@/server/disclosure/read-plausibility";
 import { readLatestRun, type ViewCheck } from "@/server/disclosure/read-run";
@@ -59,8 +61,9 @@ export default async function PlausibilityPage({ params }: PageProps) {
   if (!found) return <CaseNotFound locale={locale} />;
   const t = await getTranslations("Disclosure");
   const plausibilityT = await getTranslations("Disclosure.plausibility");
+  const resultsT = await getTranslations("ResultsPreview");
   const report = found.documents.find((document) => document.role === "report");
-  const [blocks, recognition, latest] = await Promise.all([
+  const [blocks, recognition, latest, catalogue, savedCredentials] = await Promise.all([
     readDocumentBlocks(
       found.documents.flatMap((document) =>
         document.policyVersionId ? [document.policyVersionId] : [],
@@ -68,6 +71,8 @@ export default async function PlausibilityPage({ params }: PageProps) {
     ),
     report ? readRecognition(report.id) : Promise.resolve(undefined),
     report ? readLatestRun(found.id, locale) : Promise.resolve(null),
+    getAnalysisModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
+    listSavedCredentials().catch(() => []),
   ]);
 
   const run = latest?.run ?? null;
@@ -179,8 +184,12 @@ export default async function PlausibilityPage({ params }: PageProps) {
                 storedCheckCount: run?.storedCheckCount ?? 0,
                 plannedCheckCount: run?.plannedCheckCount ?? null,
                 failureCode: run?.failureCode ?? null,
+                modelProfileId: run?.modelProfileId ?? null,
               }}
+              catalogue={catalogue}
+              savedCredentials={savedCredentials}
               errorMessages={plausibilityT.raw("errors") as Record<string, string>}
+              keyErrorMessages={resultsT.raw("keyErrors") as Record<string, string>}
             />
           }
         />

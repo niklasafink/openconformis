@@ -6,6 +6,7 @@ import {
   disclosureFailure,
   disclosureNoStore,
 } from "@/server/disclosure/disclosure-http";
+import { prepareDisclosureModel } from "@/server/disclosure/model-route";
 import { disclosureRunStartSchema, startDisclosureRun } from "@/server/disclosure/start-run";
 import { assertRequestSize, enforceRequestRateLimit } from "@/server/security/request-protection";
 import { hasTrustedApplicationOrigin } from "@/server/security/trusted-origin";
@@ -29,7 +30,9 @@ export async function POST(request: Request, context: { params: Promise<{ caseId
     });
     const caseId = z.uuid().parse((await context.params).caseId);
     const body = await request.json().catch(() => ({}));
-    const result = await startDisclosureRun(caseId, disclosureRunStartSchema.parse(body ?? {}));
+    const result = await startDisclosureRun(caseId, disclosureRunStartSchema.parse(body ?? {}), {
+      prepareModel: prepareDisclosureModel,
+    });
     return NextResponse.json(result, {
       status: result.reused ? 200 : 202,
       headers: disclosureNoStore,

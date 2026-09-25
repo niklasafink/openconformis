@@ -595,3 +595,63 @@ describe("findings", () => {
     ]);
   });
 });
+
+describe("model assignment", () => {
+  const document = () =>
+    buildDocument([
+      {
+        table: 1,
+        header: 1,
+        cells: [
+          [null, "31.12.2021 TEUR", "31.12.2020 TEUR"],
+          ["Forderungen gegen Beteiligungsunternehmen", "53,6", "110,3"],
+          ["Bilanzsumme", "6.828,2", "10.268,8"],
+        ],
+      },
+      {
+        text: "Die Forderungen gegen Beteiligungsunternehmen von TEUR 54 (Vorjahr TEUR 110) betreffen die apoBank.",
+      },
+    ]);
+
+  it("bietet die Zahl mit lexikalischen Kandidaten zur Einordnung an", () => {
+    const { pending } = runDeterministicChecks(document());
+    const entry = pending.find((item) => item.sentence.includes("TEUR 54"))!;
+    expect(entry.candidates[0]).toEqual({
+      key: "label:forderungen gegen beteiligungsunternehmen",
+      label: "Forderungen gegen Beteiligungsunternehmen",
+    });
+  });
+
+  it("rechnet die Zuordnung im Code nach: grün bei Treffer, orange unter der Schwelle", async () => {
+    const { modelAssignmentChecks } = await import("./run");
+    const built = document();
+    const { resolver } = runDeterministicChecks(built);
+    const figure = built.figures.find((item) => item.raw === "54")!;
+    const assignment = {
+      figureId: figure.id,
+      key: "label:forderungen gegen beteiligungsunternehmen",
+      label: "Forderungen gegen Beteiligungsunternehmen",
+      period: "current" as const,
+      candidateCount: 1,
+    };
+    const [match] = modelAssignmentChecks(
+      built,
+      resolver,
+      [{ ...assignment, confidenceBp: 9_000 }],
+      7_000,
+    );
+    expect(match).toMatchObject({
+      status: "match",
+      rounded: true,
+      assignment: "model",
+      confidenceBp: 9_000,
+    });
+    const [unsure] = modelAssignmentChecks(
+      built,
+      resolver,
+      [{ ...assignment, period: "prior", confidenceBp: 5_000 }],
+      7_000,
+    );
+    expect(unsure).toMatchObject({ status: "uncertain", comment: { code: "model_unsure" } });
+  });
+});

@@ -119,6 +119,23 @@ export async function createReviewRunCredential(input: {
 }
 
 /**
+ * Kurzlebiger Schlüssel für die Einordnung eines Plausicheck-Laufs der
+ * Offenlegungspflicht über das Nutzermodell, gebunden an die Lauf-ID. Er stammt immer
+ * aus dem gespeicherten Schlüssel des Nutzers; einen Schlüssel im Start-Body gibt es
+ * nicht. Der Aufrufer besitzt die Lauf-ID, weil er sie eben erst vergeben hat.
+ */
+export async function createDisclosureRunCredential(input: {
+  provider: string;
+  bindingId: string;
+  requiredModelId: string;
+}) {
+  return connectTemporaryCredential(
+    { ...input, purpose: "disclosure" },
+    async () => input.bindingId,
+  );
+}
+
+/**
  * Kurzlebiger TypeSafe-Schlüssel für die optionale Jev-Hilfe einer Analyse, gebunden
  * an den Draft des Laufs. Er stammt immer aus dem gespeicherten Schlüssel des Nutzers:
  * einen Betreiber-Schlüssel gibt es nicht, und ein Schlüssel in einer Anfrage würde
@@ -205,6 +222,7 @@ async function connectTemporaryCredential(
   const usesAnalysisRoute =
     purpose === "analysis" ||
     purpose === "review_escalation" ||
+    purpose === "disclosure" ||
     (purpose === "review_routing" && isAnalysisProviderAvailable(provider));
   if (usesAnalysisRoute && !isAnalysisProviderAvailable(provider)) {
     throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");

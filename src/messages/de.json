@@ -859,9 +859,25 @@
         "DISCLOSURE_FORBIDDEN": "Deine Rolle erlaubt diese Aktion nicht.",
         "DISCLOSURE_RUN_NOT_FOUND": "Der Lauf wurde nicht gefunden.",
         "DISCLOSURE_RECOGNITION_CHANGED": "Die Erkennung des Berichts hat sich geändert. Bitte neu starten.",
-        "NETWORK_ERROR": "Keine Verbindung zum Server."
+        "NETWORK_ERROR": "Keine Verbindung zum Server.",
+        "DISCLOSURE_MODEL_KEY_REQUIRED": "Für das gewählte Modell ist kein API-Key gespeichert.",
+        "MODEL_SELECTION_NOT_FOUND": "Das gewählte Modell ist nicht mehr verfügbar.",
+        "BYOK_ROUTE_NOT_EXECUTABLE": "Die Route dieses Modells ist gesperrt."
       },
-      "findingsRunning": "Feststellungen erscheinen, sobald die Prüfungen gespeichert sind."
+      "findingsRunning": "Feststellungen erscheinen, sobald die Prüfungen gespeichert sind.",
+      "model": {
+        "apiKey": "API-Key",
+        "apiKeyTitle": "Modell und Schlüssel für die Einordnung",
+        "model": "Modell",
+        "selected": "Ausgewählt",
+        "savedKey": "••••{lastFour} gespeichert",
+        "removeSavedKey": "Gespeicherten Key entfernen",
+        "addKey": "Hinzufügen",
+        "addingKey": "Wird hinzugefügt …",
+        "keyFailed": "Der Schlüssel konnte nicht bestätigt werden.",
+        "withModel": "Einordnung über {model}; gerechnet wird im Code.",
+        "withoutKey": "Ohne Schlüssel: nur Regeln, keine Einordnung über das Modell."
+      }
     }
   }
 }

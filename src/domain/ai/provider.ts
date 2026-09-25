@@ -58,6 +58,9 @@ export const aiCredentialPurposeSchema = z.enum([
   // Jev als optionale Hilfe der Gap-Analyse. Ein eigener Zweck, damit der Schlüssel
   // weder mit dem Analyse-Schlüssel des Drafts noch mit einem Prüflauf kollidiert.
   "analysis_assist",
+  // Einordnung von Fundstellen im Plausicheck der Offenlegungspflicht über das
+  // Nutzermodell, gebunden an die Lauf-ID.
+  "disclosure",
 ]);
 
 export type AiCredentialPurpose = z.infer<typeof aiCredentialPurposeSchema>;

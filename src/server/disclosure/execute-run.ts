@@ -7,6 +7,7 @@ import { deriveFindings } from "@/domain/disclosure/checks/findings";
 import { runDeterministicChecks } from "@/domain/disclosure/checks/run";
 import type { CheckDraft } from "@/domain/disclosure/checks/types";
 import { appendAuditEvent } from "@/server/audit/event";
+import { deleteTemporaryCredentialsForBinding } from "@/server/ai/credential-cleanup";
 import { db } from "@/server/db/client";
 import {
   disclosureBlockContext,
@@ -46,6 +47,11 @@ export async function deleteDisclosureRunCredentials(run: {
   routeProvider: string | null;
 }) {
   if (!run.routeProvider) return;
+  await deleteTemporaryCredentialsForBinding({
+    purpose: "disclosure",
+    bindingId: run.id,
+    ownerUserId: run.ownerUserId,
+  });
 }
 
 export type PrepareDisclosureResult =

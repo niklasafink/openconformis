@@ -859,9 +859,25 @@
         "DISCLOSURE_FORBIDDEN": "Your role does not allow this action.",
         "DISCLOSURE_RUN_NOT_FOUND": "The run was not found.",
         "DISCLOSURE_RECOGNITION_CHANGED": "The report's recognition has changed. Please start again.",
-        "NETWORK_ERROR": "No connection to the server."
+        "NETWORK_ERROR": "No connection to the server.",
+        "DISCLOSURE_MODEL_KEY_REQUIRED": "No API key is saved for the selected model.",
+        "MODEL_SELECTION_NOT_FOUND": "The selected model is no longer available.",
+        "BYOK_ROUTE_NOT_EXECUTABLE": "This model's route is blocked."
       },
-      "findingsRunning": "Findings appear as soon as the checks are stored."
+      "findingsRunning": "Findings appear as soon as the checks are stored.",
+      "model": {
+        "apiKey": "API key",
+        "apiKeyTitle": "Model and key for the assignment",
+        "model": "Model",
+        "selected": "Selected",
+        "savedKey": "••••{lastFour} saved",
+        "removeSavedKey": "Remove saved key",
+        "addKey": "Add",
+        "addingKey": "Adding …",
+        "keyFailed": "The key could not be confirmed.",
+        "withModel": "Assignment by {model}; all arithmetic runs in code.",
+        "withoutKey": "Without a key: rules only, no assignment by the model."
+      }
     }
   }
 }
