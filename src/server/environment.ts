@@ -62,3 +62,22 @@ export function reviewDecisionEngine(): ReviewDecisionEngine {
 export function analysisJevAssistMode(): AnalysisJevAssistMode {
   return parseAnalysisJevAssistMode(configuredValue("ANALYSIS_JEV_ASSIST").toLowerCase());
 }
+
+export type DisclosureJevAssist = "on" | "off";
+
+/**
+ * Ob Jev (TypeSafe) im Plausicheck der Offenlegungspflicht Fundstellen zuerst einordnet.
+ * `on` ist der Standard (docs/DECISIONS.md D-036): die Einordnung vieler Fundstellen
+ * über das Nutzermodell ist erheblich teurer. Ohne gespeicherten TypeSafe-Schlüssel
+ * läuft der Lauf trotzdem, dann über das Nutzermodell allein, und wird als `off`
+ * eingefroren.
+ *
+ * Ein unbekannter Wert fällt still auf `off` zurück: dann ordnet das Nutzermodell alles
+ * ein wie ohne TypeSafe. Ein Tippfehler darf weder Läufe blockieren noch Anfragen an
+ * einen Dienst schicken, den der Betreiber abschalten wollte.
+ */
+export function disclosureJevAssist(): DisclosureJevAssist {
+  const value = configuredValue("DISCLOSURE_JEV_ASSIST").toLowerCase();
+  if (!value || value === "on") return "on";
+  return "off";
+}

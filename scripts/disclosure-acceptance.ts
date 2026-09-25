@@ -7,6 +7,10 @@
  *
  *   node --import tsx scripts/disclosure-acceptance.ts            # lokale Datenbank
  *   DATABASE_URL=… node --import tsx scripts/disclosure-acceptance.ts
+ *   DISCLOSURE_ACCEPTANCE_JEV=on node --import tsx scripts/disclosure-acceptance.ts
+ *
+ * `DISCLOSURE_ACCEPTANCE_JEV=on|off` wertet nur Läufe aus, die mit diesem Jev-Wert
+ * eingefroren wurden (docs/DISCLOSURE_JEV_ACCEPTANCE.md); ohne Angabe den jüngsten.
  */
 
 import postgres from "postgres";
@@ -119,6 +123,20 @@ const expectations: Expected[] = [
     note: "Anlagevermögen um 72 (Vorjahr 181)",
   },
   {
+    report: "gbs",
+    raw: "113",
+    page: 20,
+    status: "mismatch",
+    note: "Tz 66 um TEUR 113 auf TEUR 228, gerechnet 115 (echter Fehler)",
+  },
+  {
+    report: "icbc",
+    raw: "17.811,66",
+    page: 23,
+    status: "mismatch",
+    note: "Anlagenspiegel Zugang Summe, Positionen 171.811,66 (echter Fehler)",
+  },
+  {
     report: "icbc",
     raw: "774.491,78",
     page: 15,
@@ -178,13 +196,19 @@ const sql = postgres(
 
 const rank = { match: 0, uncertain: 1, mismatch: 2 } as const;
 
+const jevFilter = process.env.DISCLOSURE_ACCEPTANCE_JEV?.trim().toLowerCase() ?? "";
+if (jevFilter && jevFilter !== "on" && jevFilter !== "off") {
+  throw new Error("DISCLOSURE_ACCEPTANCE_JEV must be on or off.");
+}
+
 async function latestRun(report: Expected["report"]) {
   const pattern = report === "gbs" ? "%117-gbs%" : "%icbc%";
-  const [run] = await sql<{ id: string; case_document_id: string }[]>`
-    select r.id, r.report_case_document_id as case_document_id
+  const [run] = await sql<{ id: string; case_document_id: string; jev_assist: string }[]>`
+    select r.id, r.report_case_document_id as case_document_id, r.jev_assist
     from disclosure_runs r
     join disclosure_case_documents d on d.id = r.report_case_document_id
     where d.display_name ilike ${pattern} and r.status in ('completed', 'completed_with_gaps')
+      and (${jevFilter} = '' or r.jev_assist::text = ${jevFilter})
     order by r.completed_at desc limit 1`;
   return run;
 }
@@ -218,6 +242,7 @@ for (const report of ["gbs", "icbc"] as const) {
     failures += expectations.filter((entry) => entry.report === report).length;
     continue;
   }
+  console.log(`${report}: Lauf ${run.id.slice(0, 8)}, Jev ${run.jev_assist}`);
   const rows = await subjects(run.id, run.case_document_id);
   for (const expected of expectations.filter((entry) => entry.report === report)) {
     const matching = rows.filter(

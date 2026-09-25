@@ -24,6 +24,7 @@ export type ViewRun = {
   storedCheckCount: number;
   failureCode: string | null;
   modelProfileId: string | null;
+  jevAssist: "on" | "off";
   createdAt: string;
 };
 
@@ -156,6 +157,7 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
     storedCheckCount: total?.value ?? 0,
     failureCode: run.failureCode,
     modelProfileId: run.modelProfileId,
+    jevAssist: run.jevAssist,
     createdAt: run.createdAt.toISOString(),
   };
   return { run: viewRun, checks: viewChecks, findings };

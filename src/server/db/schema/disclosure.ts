@@ -303,6 +303,13 @@ export const disclosureInvocationStatus = pgEnum("disclosure_invocation_status",
   "failed",
 ]);
 
+/**
+ * Die Einordnung durch Jev, wie der Start sie eingefroren hat: der wirksame Wert.
+ * Ohne gespeicherten TypeSafe-Schlüssel steht hier `off`, auch wenn die Umgebung `on`
+ * verlangt — der Nachweis behauptet nichts, was nicht geschah.
+ */
+export const disclosureJevAssist = pgEnum("disclosure_jev_assist", ["on", "off"]);
+
 export const disclosureRuns = pgTable(
   "disclosure_runs",
   {
@@ -339,6 +346,8 @@ export const disclosureRuns = pgTable(
     promptVersion: text("prompt_version"),
     aiCredentialId: uuid("ai_credential_id"),
     assistCredentialId: uuid("assist_credential_id"),
+    jevAssist: disclosureJevAssist("jev_assist").default("off").notNull(),
+    jevModelId: text("jev_model_id"),
     credentialDeadlineAt: timestamp("credential_deadline_at", { withTimezone: true }),
     workflowRunId: text("workflow_run_id"),
     // Zähler: `plannedCheckCount` steht nach den deterministischen Prüfungen fest.
@@ -370,6 +379,10 @@ export const disclosureRuns = pgTable(
         AND (${table.routeProvider} IS NULL OR ${table.promptVersion} IS NOT NULL)`,
     ),
     check("disclosure_runs_failure_detail_check", sql`length(${table.failureDetail}) <= 700`),
+    check(
+      "disclosure_runs_jev_frozen_check",
+      sql`${table.jevAssist} = 'off' OR (${table.jevModelId} IS NOT NULL AND ${table.assistCredentialId} IS NOT NULL AND ${table.routeProvider} IS NOT NULL)`,
+    ),
   ],
 );
 

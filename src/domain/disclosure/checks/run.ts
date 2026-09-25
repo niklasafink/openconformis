@@ -302,6 +302,8 @@ export function modelAssignmentChecks(
   resolver: ReturnType<typeof createResolver>,
   assignments: readonly ModelAssignment[],
   thresholdBp: number,
+  /** Wer eingeordnet hat; Jev und Modell rechnen genau gleich nach. */
+  source: "model" | "jev" = "model",
 ): CheckDraft[] {
   const figures = new Map(document.figures.map((figure) => [figure.id, figure]));
   const drafts: CheckDraft[] = [];
@@ -318,7 +320,7 @@ export function modelAssignmentChecks(
     };
     const draft = referenceCheck(figure, posten, assignment.period, resolver, {
       share: figure.unit === "percent",
-      assignment: "model",
+      assignment: source,
       confidenceBp: assignment.confidenceBp,
     });
     if (!draft) continue;
@@ -330,7 +332,7 @@ export function modelAssignmentChecks(
       status: unsure ? "uncertain" : draft.status,
       comment: unsure ? { code: "model_unsure", params: { label: posten.label } } : draft.comment,
       subjectLabel: posten.label,
-      sourceKey: `model:${draft.sourceKey}`,
+      sourceKey: `${source}:${draft.sourceKey}`,
     });
   }
   return drafts;

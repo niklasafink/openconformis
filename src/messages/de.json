@@ -877,6 +877,18 @@
         "keyFailed": "Der Schlüssel konnte nicht bestätigt werden.",
         "withModel": "Einordnung über {model}; gerechnet wird im Code.",
         "withoutKey": "Ohne Schlüssel: nur Regeln, keine Einordnung über das Modell."
+      },
+      "jev": {
+        "ready": "Jev ordnet zuerst ein, den Rest das gewählte Modell.",
+        "used": "Eingeordnet durch Jev und das gewählte Modell.",
+        "notUsed": "Einordnung über das gewählte Modell, kein Jev-Schlüssel.",
+        "keyLabel": "TypeSafe-Schlüssel (Jev, optional)",
+        "keyPlaceholder": "Schlüssel einfügen",
+        "keySaved": "••••{lastFour} gespeichert",
+        "keySave": "Speichern",
+        "keyRemove": "TypeSafe-Schlüssel entfernen",
+        "keyHint": "Jev ordnet Fundstellen günstiger ein. Ohne Schlüssel übernimmt das gewählte Modell.",
+        "keyFailed": "Der TypeSafe-Schlüssel konnte nicht bestätigt werden."
       }
     }
   }

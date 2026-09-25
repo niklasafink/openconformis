@@ -61,6 +61,9 @@ export const aiCredentialPurposeSchema = z.enum([
   // Einordnung von Fundstellen im Plausicheck der Offenlegungspflicht über das
   // Nutzermodell, gebunden an die Lauf-ID.
   "disclosure",
+  // Jev (TypeSafe) ordnet im Plausicheck zuerst ein; eigener Zweck neben dem
+  // Modellschlüssel desselben Laufs.
+  "disclosure_assist",
 ]);
 
 export type AiCredentialPurpose = z.infer<typeof aiCredentialPurposeSchema>;

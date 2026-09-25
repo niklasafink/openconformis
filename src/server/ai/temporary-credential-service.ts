@@ -136,6 +136,21 @@ export async function createDisclosureRunCredential(input: {
 }
 
 /**
+ * Kurzlebiger TypeSafe-Schlüssel für die Einordnung durch Jev in einem Plausicheck-Lauf,
+ * gebunden an dieselbe Lauf-ID wie der Modellschlüssel und durch den Zweck von ihm
+ * getrennt. Er stammt immer aus dem gespeicherten Schlüssel des Nutzers.
+ */
+export async function createDisclosureAssistCredential(input: {
+  bindingId: string;
+  requiredModelId: string;
+}) {
+  return connectTemporaryCredential(
+    { ...input, provider: "typesafe", purpose: "disclosure_assist" },
+    async () => input.bindingId,
+  );
+}
+
+/**
  * Kurzlebiger TypeSafe-Schlüssel für die optionale Jev-Hilfe einer Analyse, gebunden
  * an den Draft des Laufs. Er stammt immer aus dem gespeicherten Schlüssel des Nutzers:
  * einen Betreiber-Schlüssel gibt es nicht, und ein Schlüssel in einer Anfrage würde
@@ -176,7 +191,10 @@ export async function verifyAndSaveUserCredential(input: {
   if (!allowedByokProviders().has(provider)) {
     throw new TemporaryCredentialError("BYOK_PROVIDER_DISABLED");
   }
-  if (!isAnalysisProviderAvailable(provider)) {
+  // TypeSafe ist ein Entscheidungsdienst ohne Analyse-Route (D-029): sein Schlüssel wird
+  // gegen die Jev-Route geprüft und dient nur der Einordnung, nie einer Bewertung.
+  const decisionService = provider === "typesafe";
+  if (!decisionService && !isAnalysisProviderAvailable(provider)) {
     throw new TemporaryCredentialError("BYOK_PRIVACY_ROUTE_UNAVAILABLE");
   }
 
@@ -184,7 +202,7 @@ export async function verifyAndSaveUserCredential(input: {
     provider,
     secret,
     requiredModelId: input.requiredModelId,
-    route: getAnalysisProviderConfiguration(provider),
+    route: decisionService ? undefined : getAnalysisProviderConfiguration(provider),
   });
   await db.transaction((transaction) =>
     saveUserCredential(transaction, { ownerUserId: user.id, provider, secret }),

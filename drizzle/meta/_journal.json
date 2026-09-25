@@ -414,6 +414,20 @@
       "when": 1790346694554,
       "tag": "0058_disclosure_credential_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790368734041,
+      "tag": "0059_disclosure_assist_purpose",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790368744552,
+      "tag": "0060_disclosure_jev_assist",
+      "breakpoints": true
     }
   ]
 }

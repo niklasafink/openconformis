@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 
+import { TypesafeKeyField } from "./typesafe-key-field";
+
 export type RunControlsState = Readonly<{
   status:
     "none" | "queued" | "running" | "completed" | "completed_with_gaps" | "failed" | "cancelled";
@@ -23,6 +25,8 @@ export type RunControlsState = Readonly<{
   plannedCheckCount: number | null;
   failureCode: string | null;
   modelProfileId: string | null;
+  /** Eingefroren beim Start: Jev hat eingeordnet. */
+  jevAssist: "on" | "off";
 }>;
 
 type RunControlsProps = Readonly<{
@@ -33,6 +37,8 @@ type RunControlsProps = Readonly<{
   canStart: boolean;
   catalogue: AnalysisModelCatalogue;
   savedCredentials: readonly SavedCredential[];
+  /** Die Umgebung lässt Jev einordnen (`DISCLOSURE_JEV_ASSIST=on`). */
+  jevEnabled: boolean;
   errorMessages: Readonly<Record<string, string>>;
   keyErrorMessages: Readonly<Record<string, string>>;
 }>;
@@ -50,6 +56,7 @@ export function RunControls({
   canStart,
   catalogue,
   savedCredentials,
+  jevEnabled,
   errorMessages,
   keyErrorMessages,
 }: RunControlsProps) {
@@ -67,6 +74,9 @@ export function RunControls({
     return (previous ?? withKey ?? catalogue.models[0])?.id ?? "";
   });
   const [keyOpen, setKeyOpen] = useState(false);
+  const [typesafe, setTypesafe] = useState<SavedCredential | null>(
+    () => savedCredentials.find((entry) => entry.provider === "typesafe") ?? null,
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = run.status === "queued" || run.status === "running";
@@ -117,6 +127,19 @@ export function RunControls({
               : model && saved
                 ? t("model.withModel", { model: model.name })
                 : t("model.withoutKey");
+  // Wer einordnet: nach dem Start der eingefrorene Wert, davor die Vorschau.
+  const routing =
+    run.status !== "none"
+      ? run.modelProfileId
+        ? run.jevAssist === "on"
+          ? t("jev.used")
+          : t("jev.notUsed")
+        : null
+      : model && saved && jevEnabled
+        ? typesafe
+          ? t("jev.ready")
+          : t("jev.notUsed")
+        : null;
 
   return (
     <div className="grid gap-2">
@@ -162,6 +185,15 @@ export function RunControls({
               submitLabel={t("model.addKey")}
               submittingLabel={t("model.addingKey")}
             />
+            {jevEnabled ? (
+              <div className="mt-3">
+                <TypesafeKeyField
+                  saved={typesafe}
+                  onSavedChange={setTypesafe}
+                  keyErrorMessages={keyErrorMessages}
+                />
+              </div>
+            ) : null}
           </PopoverContent>
         </Popover>
         <Button
@@ -184,6 +216,11 @@ export function RunControls({
       <p className="text-meta text-muted-foreground" role="status" aria-live="polite">
         {status}
       </p>
+      {routing ? (
+        <p className="text-meta text-muted-foreground" data-testid="disclosure-jev-routing">
+          {routing}
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="text-meta text-destructive">
           {error}

@@ -877,6 +877,18 @@
         "keyFailed": "The key could not be confirmed.",
         "withModel": "Assignment by {model}; all arithmetic runs in code.",
         "withoutKey": "Without a key: rules only, no assignment by the model."
+      },
+      "jev": {
+        "ready": "Jev classifies first, the selected model takes the rest.",
+        "used": "Classified by Jev and the selected model.",
+        "notUsed": "Classification by the selected model, no Jev key.",
+        "keyLabel": "TypeSafe key (Jev, optional)",
+        "keyPlaceholder": "Paste key",
+        "keySaved": "••••{lastFour} saved",
+        "keySave": "Save",
+        "keyRemove": "Remove TypeSafe key",
+        "keyHint": "Jev classifies findings at lower cost. Without a key, the selected model does it.",
+        "keyFailed": "The TypeSafe key could not be confirmed."
       }
     }
   }

@@ -13,8 +13,9 @@ import { deleteDisclosureRunCredentials, materializeFindings } from "./execute-r
 
 /**
  * „Analyse stoppen“: beendet einen wartenden oder laufenden Lauf wie die
- * Vertragsprüfung. Bereits gespeicherte Prüfungen bleiben sichtbar, die kurzlebigen
- * Schlüssel werden sofort gelöscht, und ein neuer Start ist danach erlaubt.
+ * Vertragsprüfung. Bereits gespeicherte Prüfungen bleiben sichtbar, beide kurzlebigen
+ * Schlüssel (Modell und Jev) werden sofort gelöscht, und ein neuer Start ist danach
+ * erlaubt.
  */
 export async function cancelDisclosureRun(
   runId: string,
@@ -33,6 +34,7 @@ export async function cancelDisclosureRun(
         organizationId: disclosureRuns.organizationId,
         ownerUserId: disclosureRuns.ownerUserId,
         routeProvider: disclosureRuns.routeProvider,
+        assistCredentialId: disclosureRuns.assistCredentialId,
         workflowRunId: disclosureRuns.workflowRunId,
       })
       .from(disclosureRuns)

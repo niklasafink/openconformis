@@ -738,3 +738,55 @@ Sonnet 5 matched every status but missed about three times as many gaps.
 Estimated cost for 100 requirements: about 0.75 $ instead of about 3.30 $.
 
 Decision: accepted.
+
+## D-036 Jev classifies in the disclosure plausibility check, default on
+
+Product direction (2026-09-25, stage 6 of the disclosure area): the plausibility check
+recomputes every figure in code, but figures in running text that the rules cannot tie
+to a line item need a classification — which line item, which period. A report like
+gbs 2021 leaves several hundred such mentions. Classifying them one batch after another
+through the user's large BYOK model costs cents per report and minutes of wall-clock;
+Jev answers the same typed question for a fraction of that (D-029).
+
+The switch `DISCLOSURE_JEV_ASSIST=on|off` therefore starts **on**, unlike the gap
+analysis (D-033, `off`). The difference is deliberate:
+
+- In the gap analysis Jev would change a tested result path (triage of the second
+  model, citation re-check, pre-filter). Nothing may move there before the gates of
+  `docs/JEV_ASSIST_ACCEPTANCE.md` are measured.
+- In the plausibility check Jev only picks a candidate ID and a period. The amount is
+  never Jev's: the code recomputes every assignment against the tables, exactly as for
+  the model. A wrong pick yields a comparison that does not hold, never an invented
+  figure, and below the threshold nothing of Jev's is used at all.
+
+Flow per run, frozen at start:
+
+- Jev asks two choice questions per open mention (line item among at most six
+  candidates or none; period). The state is the German sentence with the figure marked;
+  questions are English (D-029). The answer is translated into the same schema as the
+  model's (`AssignmentAnswer`: references, candidate code, period, confidence) and
+  stored in `disclosure_model_invocations` with provider `jev`, one row per batch, which
+  is also the replay.
+- Assignments at 80 % or more — the lower of both questions — become checks with
+  `assignment_source = 'jev'`. Everything else, and every mention of a batch Jev failed,
+  goes to the user's model; a failed Jev batch is recorded once and never repeated.
+- `off`, an unknown value, a missing saved TypeSafe key or any failure while deriving the
+  key freeze the run as `off`: the model classifies everything, and no TypeSafe request
+  is made. Jev runs only together with a model selection.
+- The TypeSafe key is a short-lived credential of purpose `disclosure_assist`, bound to
+  the run ID next to the model key (`disclosure`) and deleted with it in finalize, fail
+  and cancel. `disclosure_runs` gains `jev_assist` and `jev_model_id` (migration 0060,
+  after the enum value in 0059); `assist_credential_id` existed since 0057. A check
+  requires model, key and route whenever `jev_assist = 'on'`.
+- Saving a TypeSafe key is possible again: the key popover of the plausibility check has
+  an optional TypeSafe field, and `verifyAndSaveUserCredential` accepts `typesafe` as a
+  decision service without an analysis route. It still needs `typesafe` in
+  `BYOK_PROVIDER_ALLOWLIST`.
+
+Consequences: `git revert` of the stage-6 commit leaves a working plausibility check that
+classifies through the model; the two migrations are additive and the columns default to
+`off`. `scripts/check-byok-config.ts` still does not require `typesafe`. The measurement
+is `docs/DISCLOSURE_JEV_ACCEPTANCE.md`; if Jev turns a red acceptance case green or
+raises the orange share against `off`, the default moves to `off`.
+
+Decision: accepted.

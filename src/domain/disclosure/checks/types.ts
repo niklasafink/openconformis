@@ -138,7 +138,7 @@ export type CheckDraft = {
   /** Menschlich lesbare Quelle: „Seite 25 · Sonstige Vermögensgegenstände · Summe“. */
   sourceLabel: string;
   comment: CheckComment;
-  assignment: "rule" | "model";
+  assignment: "rule" | "jev" | "model";
   confidenceBp: number | null;
   sourceKey: string;
   /** Posten oder Tabellenzeile des Gegenstands, für den Titel einer Feststellung. */

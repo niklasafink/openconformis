@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   actor: vi.fn(),
   launch: vi.fn(),
   model: vi.fn(),
+  jev: vi.fn(),
   deleteCredentials: vi.fn(),
   cancelRun: vi.fn(),
 }));
@@ -46,6 +47,10 @@ vi.mock("@/server/workflows/launch", () => ({
   launchDisclosureRecognitionWorkflow: vi.fn(),
 }));
 vi.mock("./model-route", () => ({ requestStructuredForDisclosure: mocks.model }));
+vi.mock("./jev-route", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./jev-route")>()),
+  requestJevForBatch: mocks.jev,
+}));
 vi.mock("@/server/ai/credential-cleanup", () => ({
   deleteTemporaryCredentialsForBinding: mocks.deleteCredentials,
   deleteTemporaryCredential: vi.fn(async () => undefined),
@@ -160,6 +165,11 @@ suite("disclosure plausibility runs against a real database", () => {
         text: "Die Bilanzsumme ist im Berichtsjahr um 3.441 TEUR auf 6.828 TEUR gesunken.",
         type: "paragraph",
       },
+      // Die Richtungslüge wie gbs Tz 62: sie ist auf jedem Einordnungsweg rot.
+      {
+        text: "Die Bilanzsumme erhöhte sich im Berichtsjahr um 3.441 TEUR auf 6.828 TEUR.",
+        type: "paragraph",
+      },
     ];
     const inserted = await db
       .insert(documents.documentBlocks)
@@ -246,6 +256,7 @@ suite("disclosure plausibility runs against a real database", () => {
     mocks.launch.mockReset().mockResolvedValue({ runId: "wf" });
     mocks.deleteCredentials.mockReset().mockResolvedValue(0);
     mocks.model.mockReset();
+    mocks.jev.mockReset();
     prepareModel.mockClear();
     discard.mockClear();
   });
@@ -318,6 +329,7 @@ suite("disclosure plausibility runs against a real database", () => {
     expect(await execute.prepareDisclosureRun(run.runId, `wf-${run.runId}`)).toEqual({
       status: "running",
       model: true,
+      jev: false,
     });
     expect(await execute.prepareDisclosureRun(run.runId, `other-${run.runId}`)).toEqual({
       status: "duplicate",
@@ -373,5 +385,166 @@ suite("disclosure plausibility runs against a real database", () => {
     expect(invocation).toMatchObject({ status: "succeeded", itemCount: 2, inputTokens: 500 });
     // Die gespeicherte Antwort enthält Kurzzeichen, keinen Berichtstext und keinen Schlüssel.
     expect(JSON.stringify(invocation!.response)).not.toMatch(/Beteiligungsunternehmen|apoBank/u);
+  });
+
+  const modelAnswer = async () => ({
+    output: {
+      assignments: [
+        {
+          ref: "F1",
+          candidate: "1",
+          period: "current",
+          confidencePercent: 92,
+          comment: "Bestand.",
+        },
+      ],
+    },
+    inputTokens: 500,
+    outputTokens: 40,
+    costMicrounits: 100,
+  });
+  const jevDiscard = vi.fn(async () => undefined);
+  const prepareJev = vi.fn(async () => ({
+    modelId: "jev-latest",
+    credentialId: randomUUID(),
+    discard: jevDiscard,
+  }));
+
+  /** Ein ganzer Lauf ohne Workflow: dieselben Schritte in derselben Reihenfolge. */
+  async function runThrough(options: { jev: boolean }) {
+    await closeOpenRuns();
+    const run = await start.startDisclosureRun(
+      caseId,
+      { modelProfileId: frozenModel.modelProfileId },
+      { prepareModel, prepareJev: options.jev ? prepareJev : async () => null },
+    );
+    const prepared = await execute.prepareDisclosureRun(run.runId, `wf-${run.runId}`);
+    expect(prepared).toMatchObject({ status: "running", jev: options.jev });
+    await execute.runDeterministicStage(run.runId);
+    if (prepared.status === "running" && prepared.jev) {
+      const { batches } = await assign.planDisclosureJev(run.runId);
+      for (let index = 0; index < batches; index += 1) {
+        await assign.assignDisclosureJevBatch(run.runId, index);
+      }
+    }
+    const { batches } = await assign.planDisclosureAssignment(run.runId);
+    for (let index = 0; index < batches; index += 1) {
+      await assign.assignDisclosureBatch(run.runId, index);
+    }
+    await execute.finalizeDisclosureRun(run.runId);
+    const checks = await db
+      .select()
+      .from(schema.disclosureChecks)
+      .where(eq(schema.disclosureChecks.runId, run.runId));
+    const invocations = await db
+      .select()
+      .from(schema.disclosureModelInvocations)
+      .where(eq(schema.disclosureModelInvocations.runId, run.runId));
+    const [stored] = await db
+      .select()
+      .from(schema.disclosureRuns)
+      .where(eq(schema.disclosureRuns.id, run.runId));
+    return { runId: run.runId, checks, invocations, stored: stored!, modelBatches: batches };
+  }
+
+  const outcome = (checks: Array<{ kind: string; status: string; subjectKey: string }>) =>
+    checks.map((check) => `${check.kind}|${check.subjectKey}|${check.status}`).sort();
+
+  it("ordnet mit Jev zuerst ein, gibt nur Unsicheres ans Modell und löscht beide Schlüssel", async () => {
+    mocks.model.mockImplementation(modelAnswer);
+    const off = await runThrough({ jev: false });
+    expect(off.stored).toMatchObject({ jevAssist: "off", assistCredentialId: null });
+    expect(mocks.jev).not.toHaveBeenCalled();
+    expect(off.invocations.every((row) => row.provider === "model")).toBe(true);
+
+    mocks.model.mockClear();
+    mocks.deleteCredentials.mockClear();
+    // Jev ist sicher bei der ersten Fundstelle und unsicher bei der zweiten.
+    mocks.jev.mockImplementation(async () => ({
+      answers: new Map([
+        [
+          "F1",
+          {
+            line_item: { type: "choice", choice: "c1", confidence: 0.92, probabilities: {} },
+            period: { type: "choice", choice: "current", confidence: 0.95, probabilities: {} },
+          },
+        ],
+        [
+          "F2",
+          {
+            line_item: { type: "choice", choice: "c1", confidence: 0.4, probabilities: {} },
+            period: { type: "choice", choice: "prior", confidence: 0.9, probabilities: {} },
+          },
+        ],
+      ]),
+      inputTokens: 300,
+      outputTokens: 8,
+      failedItems: 0,
+      lastErrorCode: null,
+    }));
+    const on = await runThrough({ jev: true });
+    expect(on.stored).toMatchObject({ jevAssist: "on", jevModelId: "jev-latest" });
+    expect(on.stored.configurationHash).not.toBe(off.stored.configurationHash);
+    const jevRow = on.invocations.find((row) => row.provider === "jev")!;
+    expect(jevRow).toMatchObject({ status: "succeeded", routeProvider: "typesafe", itemCount: 2 });
+    // Nur die unsichere Fundstelle geht an das Nutzermodell.
+    const modelRow = on.invocations.find((row) => row.provider === "model")!;
+    expect(modelRow.itemCount).toBe(1);
+    expect(on.checks.some((check) => check.assignmentSource === "jev")).toBe(true);
+    expect(mocks.deleteCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "disclosure", bindingId: on.runId }),
+    );
+    expect(mocks.deleteCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "disclosure_assist", bindingId: on.runId }),
+    );
+
+    // Dasselbe Ergebnis-Schema auf beiden Wegen; die Richtungslüge ist auf beiden rot.
+    const rules = (checks: typeof on.checks) =>
+      outcome(checks.filter((check) => check.assignmentSource === "rule"));
+    expect(rules(on.checks)).toEqual(rules(off.checks));
+    for (const result of [on, off]) {
+      expect(
+        result.checks.some((check) => check.kind === "direction" && check.status === "mismatch"),
+      ).toBe(true);
+    }
+    const jevCheck = on.checks.find((check) => check.assignmentSource === "jev")!;
+    const offCheck = off.checks.find(
+      (check) => check.assignmentSource === "model" && check.subjectKey === jevCheck.subjectKey,
+    )!;
+    expect({ status: jevCheck.status, rounded: jevCheck.rounded }).toEqual({
+      status: offCheck.status,
+      rounded: offCheck.rounded,
+    });
+  });
+
+  it("gibt bei einem Jev-Ausfall alle Fundstellen an das Modell, ohne Jev zu wiederholen", async () => {
+    mocks.model.mockImplementation(modelAnswer);
+    mocks.jev.mockRejectedValue(
+      Object.assign(new Error("PROVIDER_CREDENTIAL_INVALID"), {
+        code: "PROVIDER_CREDENTIAL_INVALID",
+      }),
+    );
+    const result = await runThrough({ jev: true });
+    expect(result.stored.status).toBe("completed");
+    const jevRow = result.invocations.find((row) => row.provider === "jev")!;
+    expect(jevRow.status).toBe("failed");
+    expect(result.invocations.find((row) => row.provider === "model")!.itemCount).toBe(2);
+    await assign.assignDisclosureJevBatch(result.runId, 0);
+    expect(mocks.jev).toHaveBeenCalledTimes(1);
+  });
+
+  it("löscht beim Stoppen den Modell- und den Jev-Schlüssel", async () => {
+    await closeOpenRuns();
+    const run = await start.startDisclosureRun(
+      caseId,
+      { modelProfileId: frozenModel.modelProfileId },
+      { prepareModel, prepareJev },
+    );
+    await cancel.cancelDisclosureRun(run.runId);
+    for (const purpose of ["disclosure", "disclosure_assist"]) {
+      expect(mocks.deleteCredentials).toHaveBeenCalledWith(
+        expect.objectContaining({ purpose, bindingId: run.runId }),
+      );
+    }
   });
 });

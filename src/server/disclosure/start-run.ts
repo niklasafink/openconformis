@@ -6,6 +6,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { checkEngineVersion } from "@/domain/disclosure/checks/types";
+import { disclosureJevPromptVersion } from "@/domain/disclosure/jev-assignment";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 import { appendAuditEvent } from "@/server/audit/event";
 import { db, isDatabaseConfigured } from "@/server/db/client";
@@ -78,6 +79,8 @@ export function disclosureConfigurationHash(input: {
   extractionVersion: string;
   checkVersion: string;
   model: FrozenModel | null;
+  /** Nur bei Jev `on`; bei `off` bleibt der Hash wie vor der Einordnung durch Jev. */
+  jev?: { modelId: string; promptVersion: string } | null;
 }) {
   return createContentHash({
     reportSha256: input.reportSha256,
@@ -85,6 +88,7 @@ export function disclosureConfigurationHash(input: {
     extractionVersion: input.extractionVersion,
     checkVersion: input.checkVersion,
     model: input.model,
+    ...(input.jev ? { jev: input.jev } : {}),
   });
 }
 
@@ -146,6 +150,15 @@ export async function startDisclosureRun(
       deadline: Date;
       discard: () => Promise<void>;
     } | null>;
+    /**
+     * Jev ordnet vor dem Modell ein (Etappe 6). Nur mit Modellwahl: was Jev nicht sicher
+     * einordnet, geht an das Modell. `null` heißt `off` — ohne Fehler und ohne Jev.
+     */
+    prepareJev?: (runId: string) => Promise<{
+      modelId: string;
+      credentialId: string;
+      discard: () => Promise<void>;
+    } | null>;
   } = {},
 ): Promise<StartDisclosureRunResult> {
   const input = disclosureRunStartSchema.parse(untrustedInput);
@@ -158,12 +171,24 @@ export async function startDisclosureRun(
   const runId = randomUUID();
   const prepared =
     input.modelProfileId && options.prepareModel ? await options.prepareModel(input, runId) : null;
+  const jev =
+    prepared && options.prepareJev
+      ? await options.prepareJev(runId).catch(async (error: unknown) => {
+          await prepared.discard();
+          throw error;
+        })
+      : null;
+  const discardAll = async () => {
+    await prepared?.discard();
+    await jev?.discard();
+  };
   const configurationHash = disclosureConfigurationHash({
     reportSha256: report.sha256,
     reportParserVersion: report.parserVersion,
     extractionVersion: report.extractionVersion,
     checkVersion: checkEngineVersion,
     model: prepared?.model ?? null,
+    jev: jev ? { modelId: jev.modelId, promptVersion: disclosureJevPromptVersion } : null,
   });
 
   let result: StartDisclosureRunResult;
@@ -201,6 +226,10 @@ export async function startDisclosureRun(
           promptVersion: prepared?.model.promptVersion ?? null,
           aiCredentialId: prepared?.credentialId ?? null,
           credentialDeadlineAt: prepared?.deadline ?? null,
+          // Der wirksame Wert: ohne TypeSafe-Schlüssel `off`, auch wenn die Umgebung `on` will.
+          jevAssist: jev ? "on" : "off",
+          jevModelId: jev?.modelId ?? null,
+          assistCredentialId: jev?.credentialId ?? null,
         })
         .returning({ id: disclosureRuns.id, status: disclosureRuns.status });
       if (!run) throw new DisclosureRunError("DISCLOSURE_RUN_NOT_CREATED");
@@ -214,15 +243,16 @@ export async function startDisclosureRun(
           caseId: found.id,
           checkVersion: checkEngineVersion,
           modelProfileId: prepared?.model.modelProfileId ?? null,
+          jevAssist: jev ? "on" : "off",
         },
       });
       return { runId: run.id, status: run.status, reused: false };
     });
   } catch (error) {
-    await prepared?.discard();
+    await discardAll();
     throw error;
   }
-  if (result.reused) await prepared?.discard();
+  if (result.reused) await discardAll();
   if (result.status === "queued") await launchDisclosurePlausibilityWorkflow(result.runId);
   return result;
 }

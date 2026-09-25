@@ -6,6 +6,7 @@ import {
   disclosureFailure,
   disclosureNoStore,
 } from "@/server/disclosure/disclosure-http";
+import { prepareDisclosureJev } from "@/server/disclosure/jev-route";
 import { prepareDisclosureModel } from "@/server/disclosure/model-route";
 import { disclosureRunStartSchema, startDisclosureRun } from "@/server/disclosure/start-run";
 import { assertRequestSize, enforceRequestRateLimit } from "@/server/security/request-protection";
@@ -32,6 +33,7 @@ export async function POST(request: Request, context: { params: Promise<{ caseId
     const body = await request.json().catch(() => ({}));
     const result = await startDisclosureRun(caseId, disclosureRunStartSchema.parse(body ?? {}), {
       prepareModel: prepareDisclosureModel,
+      prepareJev: prepareDisclosureJev,
     });
     return NextResponse.json(result, {
       status: result.reused ? 200 : 202,

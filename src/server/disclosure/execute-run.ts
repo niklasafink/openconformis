@@ -20,6 +20,7 @@ import {
 } from "@/server/db/schema/disclosure";
 
 import { loadEngineDocument } from "./engine-document";
+import { disclosureJevActive } from "./jev-route";
 
 /**
  * Ausführung eines Plausicheck-Laufs in Workflow-Schritten. Jeder Schritt liest den
@@ -38,24 +39,31 @@ async function loadRun(runId: string) {
 }
 
 /**
- * Löscht die kurzlebigen Schlüssel eines Laufs; nur im Abschluss, Fehler und Abbruch.
- * Ein Lauf ohne Modellroute hat keinen.
+ * Löscht die kurzlebigen Schlüssel eines Laufs — Modell und Jev — im Abschluss, im
+ * Fehlerpfad und beim Stoppen. Ein Lauf ohne Modellroute hat keinen.
  */
 export async function deleteDisclosureRunCredentials(run: {
   id: string;
   ownerUserId: string;
   routeProvider: string | null;
+  assistCredentialId?: string | null;
 }) {
-  if (!run.routeProvider) return;
-  await deleteTemporaryCredentialsForBinding({
-    purpose: "disclosure",
-    bindingId: run.id,
-    ownerUserId: run.ownerUserId,
-  });
+  if (!run.routeProvider && !run.assistCredentialId) return;
+  const purposes = [
+    ...(run.routeProvider ? (["disclosure"] as const) : []),
+    ...(run.assistCredentialId ? (["disclosure_assist"] as const) : []),
+  ];
+  for (const purpose of purposes) {
+    await deleteTemporaryCredentialsForBinding({
+      purpose,
+      bindingId: run.id,
+      ownerUserId: run.ownerUserId,
+    });
+  }
 }
 
 export type PrepareDisclosureResult =
-  | { status: "running"; model: boolean }
+  | { status: "running"; model: boolean; jev: boolean }
   | { status: "duplicate" | "completed" | "completed_with_gaps" | "failed" | "cancelled" };
 
 /** Beansprucht den Lauf für genau einen Workflow; ein Duplikat endet still. */
@@ -92,7 +100,11 @@ export async function prepareDisclosureRun(
     .where(
       and(eq(disclosureRuns.id, runId), inArray(disclosureRuns.status, ["queued", "running"])),
     );
-  return { status: "running", model: run.routeProvider !== null };
+  return {
+    status: "running",
+    model: run.routeProvider !== null,
+    jev: run.routeProvider !== null && disclosureJevActive(run),
+  };
 }
 
 function rowOf(runId: string, draft: CheckDraft): typeof disclosureChecks.$inferInsert {

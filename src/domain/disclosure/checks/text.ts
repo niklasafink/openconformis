@@ -324,7 +324,7 @@ function compareReference(
   resolved: Resolved,
   posten: Posten | null,
   kind: "cross_reference" | "prior_year",
-  assignment: "rule" | "model" = "rule",
+  assignment: "rule" | "jev" | "model" = "rule",
   confidenceBp: number | null = null,
 ): CheckDraft {
   const expense = posten?.kind === "expense";
@@ -410,7 +410,7 @@ export function referenceCheck(
   options: {
     share: boolean;
     actual?: bigint;
-    assignment?: "rule" | "model";
+    assignment?: "rule" | "jev" | "model";
     confidenceBp?: number | null;
   } = { share: false },
 ): CheckDraft | null {

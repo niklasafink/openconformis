@@ -17,6 +17,7 @@ import { listSavedCredentials } from "@/server/ai/saved-credential-service";
 import { readDocumentBlocks } from "@/server/disclosure/read-case";
 import { readRecognition, type ViewFigure } from "@/server/disclosure/read-plausibility";
 import { readLatestRun, type ViewCheck } from "@/server/disclosure/read-run";
+import { disclosureJevAssist } from "@/server/environment";
 
 import { attachReport, prepareReportDraft } from "../actions";
 import { CaseNotFound, loadCasePage } from "../case-page";
@@ -185,9 +186,11 @@ export default async function PlausibilityPage({ params }: PageProps) {
                 plannedCheckCount: run?.plannedCheckCount ?? null,
                 failureCode: run?.failureCode ?? null,
                 modelProfileId: run?.modelProfileId ?? null,
+                jevAssist: run?.jevAssist ?? "off",
               }}
               catalogue={catalogue}
               savedCredentials={savedCredentials}
+              jevEnabled={disclosureJevAssist() === "on"}
               errorMessages={plausibilityT.raw("errors") as Record<string, string>}
               keyErrorMessages={resultsT.raw("keyErrors") as Record<string, string>}
             />
