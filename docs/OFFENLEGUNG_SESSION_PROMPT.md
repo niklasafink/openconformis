@@ -15,16 +15,21 @@ Schritt-für-Schritt-Anleitung mit genauen Befehlen und Klickwegen (`CLAUDE.md`,
 „Zusammenarbeit“).
 
 Entscheidungen des Nutzers vom 2026-09-25, die diesen Auftrag prägen: (1) korrigierte
-Zahlen dürfen übernommen werden, zweistufig durch zwei verschiedene Personen;
-(2) gerechnet wird ohne KI im bestehenden TypeScript; (3) Jev (TypeSafe) ordnet
-Fundstellen ein, bleibt aber abschaltbar; (4) PDF wird ohne KI nach Word konvertiert,
-damit es nur einen DOCX-Parserpfad gibt; (5) Freigabe, Kommentare, Verlauf und
-Dokument-Reiter werden jetzt gebaut; (6) eigene Checklisten kommen per Excel-Import;
-(7) die Beispiel-PDFs bleiben lokal.
+Zahlen dürfen übernommen werden, zweistufig durch zwei verschiedene Personen; eine
+Ablehnung durch den Manager ist nur ein Ereignis im Verlauf; (2) gerechnet wird ohne KI
+im bestehenden TypeScript; (3) Jev (TypeSafe) ordnet Fundstellen ein und ist von Anfang
+an eingeschaltet, bleibt aber abschaltbar; (4) Nutzer laden nur Word hoch; PDF wird mit
+einem lokalen Skript ohne KI nach Word konvertiert, damit es nur einen DOCX-Parserpfad
+gibt; (5) Freigabe, Kommentare, Verlauf und Dokument-Reiter werden jetzt gebaut;
+(6) Checklisten folgen einem Vorlagen-Modell: der Betreiber importiert Vorlagen per
+Excel, Nutzer wählen sie oder leiten eigene Checklisten daraus ab; (7) die Beispiel-PDFs
+und die daraus erzeugten DOCX bleiben lokal; (8) Prüfer und Manager im selben
+Arbeitsbereich per Einladung kommt später — Regel, Datenmodell und Oberfläche für beide
+Stufen werden trotzdem jetzt gebaut.
 
 ## 1. Pflichtlektüre vor dem Plan
 
-- `CLAUDE.md` vollständig; jede Regel gilt auch hier, mit der einen in Abschnitt 10
+- `CLAUDE.md` vollständig; jede Regel gilt auch hier, mit der einen in Abschnitt 11
   beschriebenen Ausnahme. `DESIGN.md`, `src/styles/globals.css`.
 - `README.md`, `docs/ARCHITECTURE.md`, `docs/AI_WORKER.md`, `docs/PRODUCT_SPEC.md`,
   `docs/DECISIONS.md` (D-030 Muster für einen neuen Bereich, D-029/D-033 Jev-Muster),
@@ -42,10 +47,11 @@ im Browser durchspielen kann und du es mit Playwright nachgewiesen hast:
 
 1. Sidebar-Punkt „Offenlegungspflicht“ (EN „Disclosure review“) gleichrangig neben
    Gap-Analyse, Assistent, Vertragsprüfung und Administration; eigene URL `/disclosure`.
-2. Neue Prüfung anlegen, Prüfungsbericht als Word hochladen (Produktivweg) oder als PDF
-   (Demo/Import; wird ohne KI nach Word konvertiert, Abschnitt 5), optional eine SuSa als
-   `.xlsx` als Beleg hinzufügen. Über dem Dokument erscheinen Reiter je Dokument
-   („Prüfungsbericht.docx“, „SuSa 2021.xlsx“) in gespeicherter Reihenfolge.
+2. Neue Prüfung anlegen, Prüfungsbericht **nur als `.docx`** hochladen (Client und Server
+   lehnen PDF ab), optional eine SuSa als `.xlsx` als Beleg hinzufügen. Über dem Dokument
+   erscheinen Reiter je Dokument („Prüfungsbericht.docx“, „SuSa 2021.xlsx“) in
+   gespeicherter Reihenfolge. Die Beispielberichte werden vorher mit dem lokalen Skript
+   aus Abschnitt 5 nach DOCX konvertiert; die Abnahme läuft über diese DOCX-Dateien.
 3. Reiter „Plausicheck“: sofort nach dem Parsen sind alle erkannten Zahlen und
    Veränderungswörter grau hinterlegt (kein Modellaufruf). Nach „Prüfung starten“ (mit
    Schlüssel) färben sie sich grün, rot oder orange; ein Klick auf eine Markierung öffnet
@@ -57,21 +63,29 @@ im Browser durchspielen kann und du es mit Playwright nachgewiesen hast:
    Stufen ausführen; der Server lehnt das ab, auch bei manipuliertem Request. Eine
    übernommene Korrektur erscheint im Dokument als korrigierter Wert neben dem
    durchgestrichenen Ist-Wert, im Verlauf des Popovers und im Export. Kommentare mit
-   @Erwähnung eines Organisationsmitglieds sind im Verlauf möglich.
-5. Reiter „Vollständigkeitsprüfung“: Checkliste wählen, Prüfung starten, je Position
+   @Erwähnung eines Organisationsmitglieds sind im Verlauf möglich. „Ablehnen“ durch den
+   Manager wird nur als Ereignis mit Person, Zeitpunkt und optionalem Kommentar im Verlauf
+   vermerkt; Status und Korrektur bleiben, es gibt keinen Rücksprung. In einem
+   Arbeitsbereich mit nur einem Mitglied zeigt die Manager-Stufe einen gesperrten
+   Zustand „Bestätigung durch eine zweite Person erforderlich“ statt eines Fehlers.
+5. Reiter „Vollständigkeitsprüfung“: eine veröffentlichte Vorlage direkt wählen oder
+   daraus eine eigene Checkliste anlegen und bearbeiten, Prüfung starten, je Position
    Status (erfüllt / teilweise / nicht erfüllt / nicht einschlägig mit Begründung / keine
    Einschätzung möglich), Begründung und exakte Zitate; Override mit Begründung; dieselbe
    zweistufige Freigabe je Position (Prüfer bestätigt, Manager gibt frei).
 6. Ein zweiter Start derselben Prüfung erzeugt keinen zweiten Lauf mit denselben
-   eingefrorenen Eingaben (Idempotenz wie bei `analyses`). Mit `DISCLOSURE_JEV_ASSIST=off`
-   läuft alles ohne einen einzigen TypeSafe-Aufruf gleich durch.
+   eingefrorenen Eingaben (Idempotenz wie bei `analyses`). Beide Wege sind abgenommen:
+   `DISCLOSURE_JEV_ASSIST=on` (Default) mit TypeSafe-Schlüssel, und `off` bzw. ohne
+   TypeSafe-Schlüssel, wo das Nutzermodell dieselbe Einordnung ohne einen einzigen
+   TypeSafe-Aufruf übernimmt und derselbe Bericht gleich durchläuft.
 
 Toleranzregel für alle Zahlenvergleiche (Abschnitt 7): Abweichung bis **eine
 Anzeigeeinheit** der gröber dargestellten Zahl → **grün** mit Vermerk „gerundet“, darüber
 **rot**. **Orange** gibt es ausschließlich bei unsicherer Zuordnung (Jev oder Modell
 unsicher, mehrere Kandidaten, abweichende Gliederung), nie wegen Rundung.
 
-Prüfbare Fachergebnisse an den Beispielberichten (der Plausicheck muss sie liefern):
+Prüfbare Fachergebnisse an den Beispielberichten — geprüft an den per Skript erzeugten
+DOCX-Fassungen, Seitenangaben beziehen sich auf die PDF (der Plausicheck muss sie liefern):
 
 - `117-gbs-…_Local.pdf`, Prüfungsbericht Tz 62 (S. 19): „Unter Berücksichtigung der
   **Erhöhung** der Bilanzsumme“ — die Bilanzsumme sank von 10.268,8 auf 6.828,2 TEUR.
@@ -150,9 +164,10 @@ Veränderung TEUR | %`. Anlagen: Bilanz und GuV in **EUR mit Cent** (Spalten 31.
   Anlage 2.1/2.2 Dreijahresvergleich (2021/2020/2019) mit **abweichender Gliederung**
   (ordentlich/neutral). Einheiten stehen vor oder nach der Zahl („TEUR 5.478“, „5.478
   TEUR“), Vorjahr als „(Vorjahr: TEUR 8.411)“, „(Vj: TEUR 124)“, „i.Vj.“.
-  **PDF-Seiten 27–31 (Anhang) und 53–54 haben keine Textebene** (gescannt) — der
-  Konverter aus Abschnitt 5 erkennt sie per OCR. Der Bericht ist vermutlich vertraulich:
-  er bleibt lokal (Abschnitt 9).
+  **PDF-Seiten 27–31 (Anhang) und 53–54 haben keine Textebene** (gescannt) — das
+  Konverter-Skript aus Abschnitt 5 erkennt sie per OCR. Der Bericht ist vermutlich
+  vertraulich: PDF und erzeugte DOCX bleiben lokal in `docs/Prüfungsberichte/`
+  (Abschnitt 9).
 - `icbc_austria_bank_gmbh_jahresabschluss_2025.pdf` (55 Seiten, UGB/BWG, EY Wien, GJ 2025,
   Kreditinstitut): kurzer Berichtsteil, Bestätigungsvermerk mit Key Audit Matters, Bilanz
   und GuV nach BWG-Formblatt (EUR mit Cent, „31.12.2025 in EUR | 31.12.2024 in EUR“,
@@ -169,29 +184,31 @@ Veränderung TEUR | %`. Anlagen: Bilanz und GuV in **EUR mit Cent** (Spalten 31.
   im Text, derselbe Sachverhalt in Prüfungsbericht und Lagebericht (gbs Tz 5–6 wiederholt
   den Lagebericht fast wörtlich mit anderen Rundungen).
 
-## 5. Dokumentpfad: PDF → Word ohne KI, ein Parserpfad
+## 5. Dokumentpfad: nur DOCX-Upload, PDF → Word als lokales Skript
 
-- In Produktion lädt der Nutzer Word hoch. Ein PDF wird vor dem Parsen serverseitig in
-  eine DOCX konvertiert, die dann denselben Weg nimmt wie ein Word-Upload
-  (`mammoth` → `blocksFromDocumentHtml` → `document_blocks`). Es gibt danach nur einen
-  Parserpfad; die Originalansicht darf das PDF weiterhin zeigen, Blöcke und Offsets stammen
-  aus der DOCX.
-- Konverter (`src/server/policies/pdf-to-docx.ts`, Workflow-Schritt in
-  `src/workflows/document-ingestion.ts`): Text- und Positionsdaten je Seite mit dem
-  vorhandenen `pdfjs-dist` lesen; Zeilen aus y-Koordinaten bilden, Tabellenzeilen aus
-  x-Lücken (Label + Zahlenspalten) als echte Word-Tabellen anlegen, Überschriften über
-  `numberedHeadingLevel`; Seiten ohne Textebene (z. B. gbs 27–31) mit dem vorhandenen
-  `tesseract.js` (deu+eng, Muster `src/server/worker/serverless-ocr.ts`, Vier-Seiten-
-  Batches) erkennen und als Absätze mit OCR-Vermerk einfügen; die DOCX mit der
-  MIT-lizenzierten Bibliothek `docx` (npm) erzeugen. Konverter-Version im
-  `policy_versions.parser_version` festhalten; die erzeugte DOCX als `processed_object_key`
-  im privaten Blob ablegen (Feld existiert).
+- Im Bereich Offenlegungspflicht dürfen Nutzer **nur `.docx`** hochladen. Der Client
+  (Dateidialog `accept`, Dropzone-Prüfung, Fehlertext) und der Server (Intent-Route,
+  MIME- und Signaturprüfung, Abschluss-Route) lehnen PDF ab; die Gap-Analyse und die
+  Vertragsprüfung behalten ihren PDF-Weg unverändert. Die SuSa bleibt als `.xlsx`
+  erlaubt. Danach gibt es für Berichte genau einen Parserpfad: `mammoth` →
+  `blocksFromDocumentHtml` → `document_blocks`, inklusive echter `table_cell`-Blöcke.
+- Die Umwandlung PDF → Word ist ein **lokales Entwicklungswerkzeug** unter `scripts/`
+  (`scripts/disclosure-pdf-to-docx.ts`, Aufruf `pnpm disclosure:pdf-to-docx <pdf>
+<out.docx>`), kein Upload-Pfad und keine Server- oder Worker-Stufe: Text- und
+  Positionsdaten je Seite mit dem vorhandenen `pdfjs-dist` lesen; Zeilen aus
+  y-Koordinaten bilden, Tabellenzeilen aus x-Lücken (Label + Zahlenspalten) als echte
+  Word-Tabellen anlegen, Überschriften über `numberedHeadingLevel`; Seiten ohne Textebene
+  (gbs 27–31, 53–54) mit dem vorhandenen `tesseract.js` (deu+eng, Muster
+  `src/server/worker/serverless-ocr.ts`) erkennen und als Absätze mit OCR-Vermerk
+  einfügen; die DOCX mit der MIT-lizenzierten Bibliothek `docx` (npm, devDependency)
+  erzeugen. Ohne KI. Damit wandelst du beide Beispielberichte für Entwicklung und Abnahme
+  um; die Ausgaben bleiben lokal neben den PDFs.
 - **Nicht** `pdf2docx` (baut auf PyMuPDF/AGPL und Python auf). Vor jeder neuen Abhängigkeit
   Lizenz prüfen (nur MIT/BSD/Apache/ISC), exakt pinnen, `pnpm license:inventory` laufen
   lassen und in `LICENSE-MANIFEST.md`/`NOTICE.md` nach Vorbild der bestehenden Einträge
   vermerken.
-- OCR-Seiten bekommen im Dokument einen dezenten Hinweis „per Texterkennung gelesen“; die
-  Zahlenerkennung markiert Kandidaten von OCR-Seiten wie alle anderen.
+- OCR-Absätze tragen im erzeugten DOCX einen dezenten Vermerk „per Texterkennung
+  gelesen“; die Zahlenerkennung behandelt sie wie alle anderen Blöcke.
 
 ## 6. UX-Spezifikation
 
@@ -241,12 +258,16 @@ Veränderung TEUR | %`. Anlagen: Bilanz und GuV in **EUR mit Cent** (Spalten 31.
   die Aktionen der aktuellen Person: Prüfer sieht „Übernehmen“ (Soll-Wert, optional
   editierbar mit Pflicht-Begründung, wenn der Soll-Wert vom Vorschlag abweicht) und
   „Bestätigen“ (Ist bleibt, Begründung Pflicht), Manager sieht „Freigeben“ und
-  „Zurückweisen“ (Begründung Pflicht, Status zurück auf offen); ein Kommentarfeld mit
-  @Erwähnung (Tippen von `@` öffnet die Mitgliederliste der Organisation). Öffnen per
-  Klick, Enter/Space (Marken sind `button`-artig mit `tabIndex`), Schließen per Escape.
+  „Ablehnen“ (optionaler Kommentar; nur ein Ereignis im Verlauf, kein Statuswechsel,
+  keine Benachrichtigung); ein Kommentarfeld mit @Erwähnung (Tippen von `@` öffnet die
+  Mitgliederliste der Organisation). Hat der Arbeitsbereich nur ein Mitglied oder ist die
+  aktuelle Person selbst der Prüfer der Stufe 1, zeigt die Manager-Stufe den gesperrten
+  Zustand „Bestätigung durch eine zweite Person erforderlich“ (Text und Schloss-Icon,
+  keine Fehlermeldung). Öffnen per Klick, Enter/Space (Marken sind `button`-artig mit
+  `tabIndex`), Schließen per Escape.
   Grau markierte Zahlen zeigen „Erkannt: 4.416,4 TEUR · noch nicht geprüft“ bzw. nach dem
   Lauf „keine Prüfbeziehung gefunden“.
-- Zustände: `recognizing` (Konvertieren/Parsen; graue Marken erscheinen sobald
+- Zustände: `recognizing` (Parsen; graue Marken erscheinen sobald
   `document_blocks` bereit), `ready` (Start möglich), `running` mit Fortschritt „n von m
   Prüfungen“ und bereits gefärbten Marken (Fortschritt zählt gespeicherte Prüfungen, sinkt
   nie), `completed` / `completed_with_gaps` / `failed` (Fehlerursache benennen,
@@ -254,11 +275,21 @@ Veränderung TEUR | %`. Anlagen: Bilanz und GuV in **EUR mit Cent** (Spalten 31.
 - Vollständigkeitsprüfung: dieselbe Dreiteilung wie das Ergebnis der Gap-Analyse
   (`analysis-results-workspace.tsx`): Liste der Checklistenpositionen mit Status und
   Freigabestatus, Detail mit Begründung, Belegen, Verlauf und denselben zweistufigen
-  Aktionen (Prüfer bestätigt oder überschreibt mit Begründung, Manager gibt frei),
-  Dokument rechts mit Zitat-Hervorhebung. Nicht einschlägig nur mit Begründung.
-- Administration: neuer Abschnitt „Checklisten“ mit Liste der Releases, Excel-Import
-  (Direktupload, Vorschau der erkannten Positionen, Validierung, Veröffentlichen) und
-  Archivieren; Format in Abschnitt 7.
+  Aktionen (Prüfer bestätigt oder überschreibt mit Begründung, Manager gibt frei oder
+  lehnt als Ereignis ab, gesperrter Zustand bei nur einem Mitglied), Dokument rechts mit
+  Zitat-Hervorhebung. Nicht einschlägig nur mit Begründung.
+- Checkliste wählen (vor dem Start, Dialog): Liste der veröffentlichten Vorlagen mit
+  Version und der eigenen Checklisten des Arbeitsbereichs; Aktionen „Vorlage verwenden“
+  und „Eigene Checkliste daraus anlegen“. Eigene Checklisten haben eine Bearbeitungsseite
+  `/disclosure/checklists/[checklistId]`: Tabelle der Positionen (Referenz, Titel,
+  Anforderung, Prüfaspekte, übergeordnete Position), Bearbeiten im Dialog, Hinzufügen,
+  Entfernen, Umsortieren per Pfeil-Buttons, Herkunftszeile „aus Vorlage X, Version Y“ und
+  der Hinweis „neuere Vorlage verfügbar (Version Z)“, wenn die Vorlage inzwischen neu
+  veröffentlicht wurde — ohne Zusammenführen.
+- Administration (nur Catalogue-Administratoren, `catalogue_administrators`): neuer
+  Abschnitt „Checklisten-Vorlagen“ mit Liste der Vorlagen und Versionen, Excel-Import
+  (Direktupload, Vorschau der erkannten Positionen, Validierung, Veröffentlichen als neue
+  Version) und Archivieren; Format in Abschnitt 7. Normale Nutzer sehen keinen Import.
 - Alle Texte Deutsch und Englisch; keine Marketing-Adjektive, keine Badges-Inflation.
 
 ## 7. Fachliche Prüflogik
@@ -305,23 +336,29 @@ jeden Abnahmefall aus Abschnitt 2.
    Operanden eindeutig zugeordnet sind, sonst grau).
 6. Beleg-Abgleich (SuSa): Summe der zugeordneten Kontensalden ↔ Berichtszahl.
 
-**Einordnung durch Jev (TypeSafe), abschaltbar:** Jev bekommt je Fundstelle den Blocktext
+**Einordnung durch Jev (TypeSafe), eingeschaltet und abschaltbar:** Jev bekommt je
+Fundstelle den Blocktext
 mit Kandidaten-IDs und liefert typisiert zurück: Posten (Label), Periode (laufendes Jahr /
 Vorjahr), Einheit, Bezug eines Richtungsworts auf Zahlen-IDs, Zuordnung zu Tabellenzeile
 bzw. SuSa-Konto, Vorsortierung (welche Prüfung greift), jeweils mit Konfidenz. Muster:
 `src/server/review/jev-client.ts`, `src/server/worker/jev-assist-client.ts`,
 `src/server/ai/typesafe.ts`, Drosselung `jev-throttle.ts`, Tests
-`src/server/worker/execute-analysis-jev.test.ts`. Schalter `DISCLOSURE_JEV_ASSIST=off|on`
-(Default `off`, Parser in `src/server/environment.ts` nach dem Muster von
-`REVIEW_DECISION_ENGINE`), Wert je Lauf in `disclosure_runs.jev_assist` eingefroren; ohne
-gespeicherten TypeSafe-Schlüssel läuft der Lauf als `off`. Jev-Schlüssel ist BYOK wie alle
-anderen (Zweck `disclosure_assist`, kurzlebig, Löschung im Finalize). Bei `off` übernimmt
-das Nutzermodell dieselbe Einordnung mit demselben Ausgabe-Schema; kein Pfad hängt von
-TypeSafe ab, `scripts/check-byok-config.ts` verlangt ihn nicht.
+`src/server/worker/execute-analysis-jev.test.ts`. Schalter `DISCLOSURE_JEV_ASSIST=on|off`
+mit **Default `on`** (Parser in `src/server/environment.ts` nach dem Muster von
+`REVIEW_DECISION_ENGINE`; `.env.example` trägt `on`), Wert je Lauf in
+`disclosure_runs.jev_assist` eingefroren. Ohne gespeicherten TypeSafe-Schlüssel oder bei
+`off` übernimmt automatisch das Nutzermodell dieselbe Einordnung mit demselben
+Ausgabe-Schema; der Lauf wird dann als `off` eingefroren und die Oberfläche sagt es in
+einer Zeile („Einordnung über das gewählte Modell, kein Jev-Schlüssel“). Jev-Schlüssel
+ist BYOK wie alle anderen (Zweck `disclosure_assist`, kurzlebig, Löschung im Finalize).
+Kein Pfad hängt von TypeSafe ab, `scripts/check-byok-config.ts` verlangt ihn nicht, die
+Anwendung bleibt ohne Jev voll nutzbar. Halte in der Entscheidung zu Jev im Plausicheck
+fest, dass dieser Bereich bewusst anders als die Gap-Analyse (D-033, `off`) mit `on`
+startet, weil die Einordnung vieler Fundstellen über das Nutzermodell erheblich teurer ist.
 
 **Nutzermodell (BYOK, strukturierte Ausgabe)** nur für Fälle, die Jev unter der
-Konfidenzschwelle lässt oder bei `off` für alle Einordnungen, und für die
-Vollständigkeitsprüfung. Modell und Jev geben ausschließlich IDs erkannter Zahlen/Blöcke/
+Konfidenzschwelle lässt, bei `off` oder fehlendem TypeSafe-Schlüssel für alle
+Einordnungen, und für die Vollständigkeitsprüfung. Modell und Jev geben ausschließlich IDs erkannter Zahlen/Blöcke/
 Konten, ein Label, eine Konfidenz und höchstens einen Satz Kommentar zurück — nie Beträge,
 nie Rechenergebnisse. Der Code rechnet nach; Konfidenz unter Schwelle oder mehrere
 Kandidaten → orange „Zuordnung unsicher“. Batches nach Blöcken/Positionen, Ausgabe-Schema
@@ -334,27 +371,49 @@ Organisation (`src/server/db/schema/auth.ts`): Prüfer = jedes Mitglied, Manager
 `owner`/`admin` — wenn die vorhandenen Rollenwerte nicht so heißen, bilde sie ab und frag
 mich als Stichpunkt. Ablauf je Feststellung und je Checklistenposition: `open` →
 (Prüfer: Übernehmen mit Soll-Wert oder Bestätigen, Begründung) → `prepared` → (Manager:
-Freigeben) → `reviewed`; Zurückweisen → `open`. Server prüft Mitgliedschaft, Rolle und
-`prepared_by_user_id ≠ reviewed_by_user_id` in einer Transaktion; Verstoß → 403 mit Code,
-Audit-Event. Eine Übernahme speichert den akzeptierten Wert als Korrekturschicht, nie im
-Block; Export und Dokumentansicht lesen sie dazu. Neuer Lauf oder geänderte Eingaben
-invalidieren offene Freigaben (wie Bestätigungen in der Gap-Analyse).
+Freigeben) → `reviewed`. „Ablehnen“ durch den Manager ist ausschließlich ein Ereignis
+(`rejected`, Person, Zeitpunkt, optionaler Kommentar) im Verlauf: kein Statuswechsel,
+keine Pflichtbegründung, kein Rücksprung-Workflow, keine Benachrichtigung; der Prüfer kann
+danach erneut übernehmen oder bestätigen, was die vorige Korrektur ersetzt. Server prüft
+Mitgliedschaft, Rolle und `prepared_by_user_id ≠ reviewed_by_user_id` in einer
+Transaktion; Verstoß → 403 mit Code, Audit-Event. Gibt es in der Organisation keine
+zweite Person mit Manager-Rolle oder ist die aktuelle Person der Prüfer, liefert die
+Leseseite den Zustand `second_person_required`, den die Oberfläche als gesperrten
+Hinweis zeigt. Gemeinsame Arbeitsbereiche per Einladung kommen später (Abschnitt 12);
+E2E legt den zweiten Nutzer per Test-Fixture direkt in derselben Organisation an. Eine
+Übernahme speichert den akzeptierten Wert als Korrekturschicht, nie im Block; Export und
+Dokumentansicht lesen sie dazu. Neuer Lauf oder geänderte Eingaben invalidieren offene
+Freigaben (wie Bestätigungen in der Gap-Analyse).
 
-**Vollständigkeitsprüfung**: Checklisten sind versionierte Stammdaten wie Rahmenwerke
-(Entwurf/veröffentlicht/archiviert, `content_hash`, Herkunfts- und Reuse-Hinweis,
-`contentClassification`). Positionen haben Referenz (z. B. „§ 285 Nr. 17 HGB“), Titel,
-Anforderungstext, Prüfaspekte, optionale Unterpositionen. Bewertung je Position genau wie
-die Gap-Analyse: Status, Begründung, exakte Zitate über `validateAndGroundAssessment`,
-Leermeldung bei fehlenden Belegen, keine Formulierungsvorschläge. Ein kleiner Demo-Seed
-(10–15 Positionen „HGB-Anhang und Lagebericht Kapitalgesellschaft (Demo)“, § 284 Abs. 2/3,
-§ 285 Nr. 1, 3, 7, 9, 10, 17, 33, 34, § 289 HGB), klar als `demo` markiert. Eigene
-Checklisten kommen per **Excel-Import in der Administration** als neues Release: einfaches,
-dokumentiertes Spaltenformat (`Schlüssel | Referenz | Titel | Anforderung | Prüfaspekte
-(durch `;` getrennt) | Übergeordnet | Reihenfolge`, erste Zeile Kopfzeile, ein Blatt),
-Validierung wie beim Veröffentlichen eines Rahmenwerks (doppelte Schlüssel, leere Texte,
-unbekannte Eltern), Vorschau vor dem Veröffentlichen. Das Format wird an der ersten echten
-Checkliste des Nutzers nachgeschärft; dokumentiere es in `docs/OPERATIONS.md` und lege eine
-Beispieldatei unter `assets/` ab.
+**Vollständigkeitsprüfung, Vorlagen-Modell:** Es gibt zwei Ebenen.
+
+- **Vorlagen** sind versionierte, veröffentlichte Stammdaten wie Rahmenwerke
+  (Entwurf/veröffentlicht/archiviert, `content_hash`, Herkunfts- und Reuse-Hinweis,
+  `contentClassification`). Nur Catalogue-Administratoren (`catalogue_administrators`,
+  `src/server/catalogue/administrator.ts`) legen sie an — per **Excel-Import in der
+  Administration** als neue Version: einfaches, dokumentiertes Spaltenformat (`Schlüssel |
+Referenz | Titel | Anforderung | Prüfaspekte (durch `;` getrennt) | Übergeordnet |
+Reihenfolge`, erste Zeile Kopfzeile, ein Blatt), Validierung wie beim Veröffentlichen
+  eines Rahmenwerks (doppelte Schlüssel, leere Texte, unbekannte Eltern), Vorschau vor dem
+  Veröffentlichen. Normale Nutzer importieren kein Excel. Ein kleiner Demo-Seed (10–15
+  Positionen „HGB-Anhang und Lagebericht Kapitalgesellschaft (Demo)“, § 284 Abs. 2/3,
+  § 285 Nr. 1, 3, 7, 9, 10, 17, 33, 34, § 289 HGB), klar als `demo` markiert, ist die
+  einzige Vorlage bis zum ersten echten Import. Das Format wird an der ersten echten
+  Checkliste des Betreibers nachgeschärft; dokumentiere es in `docs/OPERATIONS.md` und
+  lege eine Beispieldatei unter `assets/` ab.
+- **Eigene Checklisten** gehören dem Arbeitsbereich (Organisation). Sie entstehen
+  ausschließlich als Kopie einer Vorlage mit Herkunftsverweis (Vorlage, Version) und sind
+  bearbeitbar: Positionen ändern, hinzufügen, entfernen, umsortieren. Eine eigene
+  Checkliste ohne Vorlage gibt es nicht. Wird die Vorlage neu veröffentlicht, bleiben
+  abgeleitete Checklisten unverändert; die Oberfläche zeigt nur „neuere Vorlage
+  verfügbar“, kein automatisches Zusammenführen.
+- Beim Start einer Prüfung wählt der Nutzer eine Vorlage direkt oder eine eigene
+  Checkliste; die verwendeten Positionen werden als **Schnappschuss** in den Lauf kopiert.
+  Spätere Änderungen an Vorlage oder eigener Checkliste verändern alte Läufe nicht.
+- Positionen haben Referenz (z. B. „§ 285 Nr. 17 HGB“), Titel, Anforderungstext,
+  Prüfaspekte, optionale Unterpositionen. Bewertung je Position genau wie die
+  Gap-Analyse: Status, Begründung, exakte Zitate über `validateAndGroundAssessment`,
+  Leermeldung bei fehlenden Belegen, keine Formulierungsvorschläge.
 
 ## 8. Datenmodell (additiv, jetzt vollständig anlegen, `src/server/db/schema/disclosure.ts`)
 
@@ -373,7 +432,8 @@ ordinal)`). Die Reiter zeigen sie sofort.
 flat`).
 - `disclosure_runs` (case, kind `plausibility | completeness`, status, stage, eingefroren:
   Bericht-Version, Belegdateien, Checklisten-Release, Route/Modell, prompt_version,
-  extraction_version, `jev_assist` enum `off | on`, `ai_credential_id`,
+  extraction_version, `jev_assist` enum `on | off` (eingefrorener Effektivwert; ohne
+  TypeSafe-Schlüssel `off`), `ai_credential_id`,
   `assist_credential_id`, `workflow_run_id` unique, Zähler, failure_code/detail) und
   `disclosure_model_invocations` (unique `(run_id, batch_key)`, Anbieter `model | jev`).
 - `disclosure_checks` (run, kind, status `match | mismatch | uncertain`, subject_figure,
@@ -387,15 +447,22 @@ flat`).
   accepted_raw_text, reason, created_by, created_at; höchstens eine aktive je Finding,
   ersetzte bleiben mit `superseded_at`), `disclosure_finding_events` (append-only:
   finding, kind `ai_finding | comment | accepted | confirmed | released | rejected`,
-  actor_user_id, body ≤ 2.000, created_at) und `disclosure_finding_mentions` (event,
-  mentioned_user_id). Die Oberfläche darf minimal sein: der Verlauf im Popover, die
-  Erwähnung als Link auf den Namen; keine Benachrichtigungen.
-- Checklisten: `disclosure_checklists`, `disclosure_checklist_releases` (mit
-  `source_kind` `seed | excel_import`, `source_filename`, `content_hash`),
-  `disclosure_checklist_items` (parent_item_id für Unterpositionen);
-  `disclosure_completeness_results`, `_evidence`, `_overrides` nach dem Muster von
-  `analyses.ts`, plus dieselben Freigabefelder und `_events`/`_mentions` wie bei
-  Findings (gleiche Spalten, eigene Tabellen).
+  actor_user_id, body ≤ 2.000 optional, created_at; `rejected` ändert keinen Status) und
+  `disclosure_finding_mentions` (event, mentioned_user_id). Die Oberfläche darf minimal
+  sein: der Verlauf im Popover, die Erwähnung als Link auf den Namen; keine
+  Benachrichtigungen.
+- Vorlagen: `disclosure_checklist_templates`, `disclosure_checklist_template_releases`
+  (`source_kind` `seed | excel_import`, `source_filename`, `content_hash`, Status,
+  `published_by_user_id`), `disclosure_checklist_template_items` (parent_item_id für
+  Unterpositionen, `external_key`, `display_order`, `content_hash`). Eigene Checklisten:
+  `disclosure_checklists` (organization_id, title, `template_release_id` als Herkunft,
+  created_by) und `disclosure_checklist_items` (gleiche Spalten wie Vorlagenpositionen
+  plus `origin_template_item_id` nullable, bearbeitbar). Lauf-Schnappschuss:
+  `disclosure_run_checklist_items` (run, Kopie aller Positionsfelder, Herkunft
+  `template_release_id` oder `checklist_id`), gegen den `disclosure_completeness_results`,
+  `_evidence`, `_overrides` nach dem Muster von `analyses.ts` gespeichert werden, plus
+  dieselben Freigabefelder und `_events`/`_mentions` wie bei Findings (gleiche Spalten,
+  eigene Tabellen).
 - Enum `ai_credential_purpose` um `disclosure` und `disclosure_assist` erweitern (additiv).
   Migrationen nur per `pnpm db:generate`, danach `pnpm exec prettier --write drizzle/meta`
   — sonst scheitert `pnpm quality`. Bestehende Tabellen bleiben unverändert; Jev-Spalten
@@ -405,8 +472,9 @@ flat`).
 
 - Upload-Kette: `src/domain/policies/upload.ts`, `src/server/policies/upload-service.ts`,
   `src/app/api/uploads/policy/**`, Client `src/components/reviews/review-document-upload.tsx`
-  (Absicht → Blob-Direktupload → Abschluss → Ingestion). Für `.xlsx` (SuSa und
-  Checklisten-Import) eine eigene Intent-Route nach demselben Muster (Vercel-Body-Limit
+  (Absicht → Blob-Direktupload → Abschluss → Ingestion); für den Bericht mit einer
+  Bereichs-Einschränkung auf `.docx` in Client und Server. Für `.xlsx` (SuSa und
+  Vorlagen-Import) eine eigene Intent-Route nach demselben Muster (Vercel-Body-Limit
   4,5 MB, deshalb Direktupload), MIME
   `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, ZIP-Signatur plus
   `xl/workbook.xml` (Muster `hasDocxPackageEntries`), Limit 10 MB, Parsing mit `exceljs`
@@ -442,14 +510,21 @@ flat`).
 - E2E ohne Modell: `tests/e2e/contract-review.spec.ts` und `review-seed.ts` (fertigen Lauf
   direkt in die Testdatenbank schreiben); zwei Server `chromium-gated`/`chromium-bypass`.
   Für das Vier-Augen-Prinzip brauchen die Tests zwei Nutzer derselben Organisation mit
-  verschiedenen Rollen; prüfe, wie `LOCAL_AUTH_BYPASS` Nutzer bereitstellt, und erweitere
-  es um einen zweiten Testnutzer.
+  verschiedenen Rollen; prüfe, wie `LOCAL_AUTH_BYPASS` Nutzer bereitstellt, und lege den
+  zweiten Nutzer per Test-Fixture direkt in derselben Organisation an (Muster
+  `review-seed.ts`), etwa über einen wählbaren Bypass-Nutzer je Request oder Cookie. Keine
+  Einladungs-Oberfläche bauen.
+- Konverter-Skript: `scripts/generate-sample-policy.ts` und
+  `src/server/worker/serverless-ocr.ts` als Vorlagen für `scripts/disclosure-pdf-to-docx.ts`
+  (`package.json`-Skript `disclosure:pdf-to-docx`); Unit-Tests mit kleinen, im Test
+  erzeugten PDFs, keine Beispielberichte im Repository.
 - Beispieldokument: `scripts/generate-sample-policy.ts` als Vorlage für ein kleines
   synthetisches Beispiel „Prüfungsbericht (Demo)“ (DOCX, 2–3 Seiten Lagebericht mit
   Bilanz-Tabelle, einer eingebauten Richtungslüge und einer falschen Summe) plus die
   synthetische SuSa; beides erzeugt, nicht eingecheckt als Binärdatei, sofern das Skript
-  reproduzierbar ist. Die beiden echten PDFs bleiben **lokal**: trage
-  `docs/Prüfungsberichte/` in `.gitignore` ein (erster Commit), committe sie nie.
+  reproduzierbar ist. Die beiden echten PDFs und die daraus erzeugten DOCX bleiben
+  **lokal**: trage `docs/Prüfungsberichte/` in `.gitignore` ein (erster Commit), committe
+  sie nie.
 
 ## 10. Etappen
 
@@ -459,10 +534,11 @@ mit `pnpm quality`, eigenem Commit und Push nach `main` (erlaubt):
 
 1. Grundlagen: `.gitignore` für `docs/Prüfungsberichte/`, Entscheidung D-034 (Ausnahme
    Zahlenübernahme) und knappe Anpassung in `CLAUDE.md`, Sidebar-Punkt, Routen, Tabs
-   (line), Liste + Anlage einer Prüfung, Word-Upload des Berichts, Dokument-Reiter, DE/EN-
-   Texte, leere Zustände.
-2. PDF → DOCX-Konverter mit OCR gescannter Seiten, Lizenznachweis, Unit-Tests mit kleinen
-   PDFs; danach nur noch der DOCX-Parserpfad.
+   (line), Liste + Anlage einer Prüfung, DOCX-Upload des Berichts (PDF in Client und
+   Server abgelehnt), Dokument-Reiter, DE/EN-Texte, leere Zustände.
+2. Lokales Konverter-Skript `pnpm disclosure:pdf-to-docx` mit OCR gescannter Seiten,
+   Lizenznachweis, Unit-Tests mit kleinen PDFs; beide Beispielberichte damit lokal
+   umwandeln und die Abnahmefälle an den DOCX-Fassungen nachvollziehen.
 3. Erkennung und Arithmetik: Tokenizer, Richtungswörter, `bigint`-Arithmetik mit
    Toleranz, Unit-Tests für jeden Abnahmefall, Persistenz der Figures/Statements, graue
    Marken, Popover-Grundgerüst, Navigation.
@@ -471,20 +547,26 @@ mit `pnpm quality`, eigenem Commit und Push nach `main` (erlaubt):
    Fortschritt.
 5. Einordnung über das Nutzermodell (BYOK): Querverweise, offene Richtungssätze, kurze
    Kommentare, Einfrieren, Idempotenz, Schlüssellöschung im Finalize.
-6. Jev-Einordnung als eigener Commit: `DISCLOSURE_JEV_ASSIST`, Migration, Client,
-   Drosselung, Tests, die belegen, dass `off` keinen TypeSafe-Aufruf macht und dasselbe
-   Ergebnis-Schema liefert; Abnahmeleitfaden nach dem Muster von
-   `docs/JEV_ASSIST_ACCEPTANCE.md`.
+6. Jev-Einordnung als eigener Commit: `DISCLOSURE_JEV_ASSIST` (Default `on`), Migration,
+   Client, Drosselung, Tests, die belegen, dass `off` und ein fehlender TypeSafe-Schlüssel
+   keinen TypeSafe-Aufruf machen und dasselbe Ergebnis-Schema liefern; Abnahmeleitfaden
+   nach dem Muster von `docs/JEV_ASSIST_ACCEPTANCE.md`; D-Eintrag mit der Begründung,
+   warum dieser Bereich anders als die Gap-Analyse mit `on` startet.
 7. SuSa: Upload, Parser, Konten, Zuordnung, Beleg-Abgleich, Quelle im Popover, Beleg-Reiter.
 8. Übernahme, Freigabe, Kommentare: Korrekturschicht, zweistufiger Ablauf mit
-   Serverprüfung, Verlauf und @Erwähnungen im Popover, Anzeige im Dokument, Excel-Export.
-9. Vollständigkeitsprüfung: Checklisten-Schema, Demo-Seed, Excel-Import in der
-   Administration, Lauf mit Zitatprüfung, Ergebnis-Arbeitsplatz, Override, zweistufige
-   Freigabe je Position.
+   Serverprüfung, Ablehnung als Ereignis, gesperrter Zustand bei fehlender zweiter Person,
+   Verlauf und @Erwähnungen im Popover, Anzeige im Dokument, Excel-Export.
+9. Vollständigkeitsprüfung: Vorlagen- und Checklisten-Schema, Demo-Seed, Excel-Import der
+   Vorlagen in der Administration (nur Catalogue-Administratoren), eigene Checklisten
+   (Kopie aus Vorlage, Bearbeitungsseite, Hinweis auf neuere Vorlage), Schnappschuss beim
+   Start, Lauf mit Zitatprüfung, Ergebnis-Arbeitsplatz, Override, zweistufige Freigabe je
+   Position.
 10. Abschluss: E2E-Tests (beide Reiter, ohne Modellaufruf per Seed, Vier-Augen-Prinzip mit
-    zwei Nutzern), `docs/DECISIONS.md` (weitere Entscheidungen: Jev im Plausicheck,
-    PDF-Konvertierung), `docs/ARCHITECTURE.md`, `docs/AI_WORKER.md`,
-    `docs/PRODUCT_SPEC.md`, `docs/OPERATIONS.md`, `DESIGN.md`, `README.md`, `.env.example`.
+    zwei Nutzern aus der Test-Fixture, gesperrter Zustand mit nur einem Nutzer),
+    `docs/DECISIONS.md` (weitere Entscheidungen: Jev im Plausicheck mit `on`,
+    DOCX-Pflicht und lokales Konverter-Skript, Vorlagen-Modell), `docs/ARCHITECTURE.md`,
+    `docs/AI_WORKER.md`, `docs/PRODUCT_SPEC.md`, `docs/OPERATIONS.md`, `DESIGN.md`,
+    `README.md`, `.env.example`.
 
 ## 11. Leitplanken
 
@@ -504,15 +586,20 @@ mit `pnpm quality`, eigenem Commit und Push nach `main` (erlaubt):
 - BYOK ohne Betreiber-Schlüssel, kurzlebige Schlüssel je Lauf (Zwecke `disclosure`,
   `disclosure_assist`), Löschung im Finalize/Fehlerpfad, keine Secrets in URLs, Logs,
   Audit-Metadaten oder Workflow-Payloads. Workflow-Argumente enthalten nur IDs.
-- Jev bleibt abschaltbar (`DISCLOSURE_JEV_ASSIST=off` als Default, je Lauf eingefroren);
-  kein Pfad setzt TypeSafe voraus; Jev-Migrationen und -Commits getrennt, damit ein
+- Jev ist eingeschaltet (`DISCLOSURE_JEV_ASSIST=on` als Default), bleibt aber
+  abschaltbar und wird je Lauf eingefroren; ohne TypeSafe-Schlüssel oder bei `off`
+  übernimmt das Nutzermodell dieselbe Einordnung. Kein Pfad setzt TypeSafe voraus, die
+  Anwendung bleibt ohne Jev voll nutzbar; Jev-Migrationen und -Commits getrennt, damit ein
   `git revert` eine funktionierende Anwendung hinterlässt.
+- Berichte im Bereich Offenlegungspflicht nur als `.docx`, geprüft in Client und Server;
+  PDF-Konvertierung ausschließlich als lokales Skript, nie im Upload-Pfad.
 - Einfrieren beim Start (Berichtversion, Belege, Checkliste, Route, Modell, Jev-Schalter,
   Prompt- und Extraktionsversion). Wiederholung erzeugt keinen zweiten Lauf; unique Keys
   sind die Idempotenz. Ein dauerhaft fehlender Batch darf nicht alle anderen Ergebnisse
   verwerfen.
 - Vier-Augen-Prinzip serverseitig: zwei verschiedene Personen, Rollen aus der
-  Organisationsmitgliedschaft, jede Stufe mit Audit-Event.
+  Organisationsmitgliedschaft, jede Stufe mit Audit-Event; fehlt die zweite Person, ein
+  gesperrter Zustand statt eines Fehlers.
 - Hervorhebungen überlappen nie; die Erkennung ist versioniert und reproduzierbar.
 - Neue Bibliotheken nur mit MIT/BSD/Apache/ISC-Lizenz, exakt gepinnt, im Lizenzinventar
   vermerkt; kein Python, kein `pdf2docx`.
@@ -528,29 +615,40 @@ mit `pnpm quality`, eigenem Commit und Push nach `main` (erlaubt):
 
 ## 12. Nicht-Ziele
 
-Vorjahresbericht-Abgleich über Dokumente hinweg (die Rolle `prior_report` existiert, die
-Prüfung dagegen nicht); Word-/PDF-Export; Benachrichtigungen für @Erwähnungen; Admin-Editor
-zum Bearbeiten einzelner Checklistenpositionen (Import ersetzt ein ganzes Release);
-Kapitalflussrechnungs-Logik; Chat-Anbindung an Offenlegungsprüfungen.
+Prüfer und Manager im selben Arbeitsbereich per Einladung und gemeinsame Prüfungen
+(Regel, Datenmodell und Oberfläche beider Stufen werden gebaut, die Einladungs-Oberfläche
+nicht); Rücksprung-Workflow oder Benachrichtigung bei Ablehnung; PDF-Upload im Bereich
+Offenlegungspflicht und PDF-Konvertierung als Server-/Worker-Stufe; Excel-Import durch
+normale Nutzer; eigene Checklisten ohne Vorlage; automatisches Zusammenführen neuer
+Vorlagenversionen in abgeleitete Checklisten; Admin-Editor zum Bearbeiten einzelner
+Vorlagenpositionen (Import ersetzt eine ganze Version); Vorjahresbericht-Abgleich über
+Dokumente hinweg (die Rolle `prior_report` existiert, die Prüfung dagegen nicht);
+Word-/PDF-Export; Benachrichtigungen für @Erwähnungen; Kapitalflussrechnungs-Logik;
+Chat-Anbindung an Offenlegungsprüfungen.
 
 ## 13. Definition of Done
 
-- `pnpm quality` grün; `pnpm test:e2e` grün inklusive neuer Specs für beide Reiter und
-  das Vier-Augen-Prinzip mit zwei Nutzern.
+- `pnpm quality` grün; `pnpm test:e2e` grün inklusive neuer Specs für beide Reiter, das
+  Vier-Augen-Prinzip mit zwei Nutzern aus der Test-Fixture und den gesperrten Zustand mit
+  nur einem Nutzer; PDF-Upload wird im Test in Client und Server abgelehnt.
 - Unit-Tests belegen jedes Fachergebnis aus Abschnitt 2 an Textauszügen der Beispiele
   (rot/orange/grün wie gefordert, „gerundet“-Fälle grün, Zuordnungsfälle orange,
   fehlerhafte Zahlenformate erkannt), die Arithmetik ohne Float, die Serverregel
-  „Prüfer ≠ Manager“ und dass `DISCLOSURE_JEV_ASSIST=off` keinen TypeSafe-Aufruf auslöst.
-- Manuell durchgespielt mit echtem Schlüssel: beide PDFs hochgeladen und konvertiert
-  (gbs-Seiten 27–31 lesbar), Plausicheck gelaufen, die ICBC-Abweichung 774.491,78 /
-  774.391,78 und die gbs-Richtungslüge „Erhöhung der Bilanzsumme“ erscheinen rot mit
-  korrekter Quelle; Übernahme durch Prüfer und Freigabe durch Manager funktionieren, die
-  Korrektur steht im Dokument und im Export; SuSa-Abgleich zeigt eine rote und eine grüne
-  Markierung; Vollständigkeitsprüfung liefert Zitate, Override und Freigabe funktionieren;
-  zweiter Start erzeugt keinen zweiten Lauf; mit Jev `on` und einem TypeSafe-Schlüssel
-  läuft derselbe Bericht ebenfalls durch.
-- `docs/Prüfungsberichte/` ist ignoriert und nicht committet; neue Bibliotheken stehen
-  im Lizenzinventar.
+  „Prüfer ≠ Manager“, dass eine Ablehnung nur ein Ereignis erzeugt, dass der Schnappschuss
+  einer Checkliste spätere Änderungen nicht sieht, und dass `off` sowie ein fehlender
+  TypeSafe-Schlüssel keinen TypeSafe-Aufruf auslösen.
+- Manuell durchgespielt mit echtem Schlüssel: beide Beispielberichte per Skript nach DOCX
+  konvertiert (gbs-Seiten 27–31 lesbar) und hochgeladen, Plausicheck gelaufen — einmal mit
+  Jev `on` und TypeSafe-Schlüssel, einmal mit `off` ohne TypeSafe-Aufruf —, die
+  ICBC-Abweichung 774.491,78 / 774.391,78 und die gbs-Richtungslüge „Erhöhung der
+  Bilanzsumme“ erscheinen auf beiden Wegen rot mit korrekter Quelle; Übernahme durch
+  Prüfer und Freigabe durch Manager funktionieren, die Korrektur steht im Dokument und im
+  Export; SuSa-Abgleich zeigt eine rote und eine grüne Markierung;
+  Vollständigkeitsprüfung mit Vorlage und mit einer daraus abgeleiteten, geänderten
+  eigenen Checkliste liefert Zitate, Override und Freigabe funktionieren; zweiter Start
+  erzeugt keinen zweiten Lauf.
+- `docs/Prüfungsberichte/` ist ignoriert und nicht committet (PDF und DOCX); neue
+  Bibliotheken stehen im Lizenzinventar.
 - Dokumentation aktualisiert (D-034 und Folgeentscheidungen, `CLAUDE.md`-Absatz,
   Architektur, AI-Worker, Produktspezifikation, Operations mit Checklisten-Importformat,
   Design, README, `.env.example`), alle Etappen committet und gepusht, Abschlussbericht mit
