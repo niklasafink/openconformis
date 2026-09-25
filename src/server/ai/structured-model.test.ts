@@ -136,6 +136,14 @@ describe("withProviderErrorContext", () => {
     });
   });
 
+  it("keeps the billed usage, so the failed invocation is stored with its cost", () => {
+    const original = new ModelProviderError("MODEL_OUTPUT_INVALID", false);
+    original.usage = { providerRequestId: "generation-1", costMicrounits: 9_000 };
+    expect(withProviderErrorContext(original, "Art. 6")).toMatchObject({
+      usage: { providerRequestId: "generation-1", costMicrounits: 9_000 },
+    });
+  });
+
   it("leaves errors from outside the provider untouched", () => {
     const error = new Error("ANALYSIS_NOT_FOUND");
     expect(withProviderErrorContext(error, "Art. 6")).toBe(error);

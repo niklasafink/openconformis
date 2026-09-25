@@ -199,6 +199,43 @@ describe("OpenRouter structured adapter", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("carries the billed usage of a discarded answer, so the run reports what it cost", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "generation-billed",
+          model: "provider/model-v1",
+          choices: [{ message: { content: JSON.stringify({ wrong: true }) } }],
+          usage: { prompt_tokens: 2_000, completion_tokens: 450, cost: 0.0085 },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const error = await requestOpenRouterStructured(
+      {
+        apiKey: "test-key",
+        baseUrl: "https://openrouter.ai/api/v1",
+        modelId: "provider/model-v1",
+        system: "system",
+        user: "user",
+        schemaName: "answer",
+        jsonSchema: { type: "object" },
+        outputSchema,
+        maxOutputTokens: 1_000,
+      },
+      fetchMock,
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ModelProviderError);
+    expect((error as ModelProviderError).usage).toEqual({
+      providerRequestId: "generation-billed",
+      inputTokens: 2_000,
+      outputTokens: 450,
+      costMicrounits: 8_500,
+    });
+  });
+
   it("reports a truncated answer as an output limit, not a schema violation", async () => {
     // Sonnet 5 lief bei 4000 Tokens regelmässig gegen die Decke; die abgeschnittene
     // Antwort erschien als "kein gültiges Ergebnis nach dem Schema" und verdeckte,

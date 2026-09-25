@@ -10,6 +10,8 @@ import {
   invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  withBilledUsage,
+  type ProviderUsage,
   throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
@@ -101,30 +103,35 @@ export async function requestRequestyStructured<T>(
   if (!parsed.success) {
     throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
   }
-  if (parsed.data.status !== "completed") {
-    throw new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", parsed.data.status !== "failed");
-  }
-  const blocks = parsed.data.output.flatMap((item) => item.content ?? []);
-  if (blocks.some((block) => block.type === "refusal" || block.refusal)) {
-    throw new ModelProviderError("PROVIDER_REFUSAL", false);
-  }
-  const rawOutput = blocks
-    .filter((block) => block.type === "output_text" && block.text)
-    .map((block) => block.text)
-    .join("");
-  if (!rawOutput) throw invalidProviderResponse(`leere Antwort (Anfrage ${parsed.data.id})`);
-
-  return {
+  const usage: ProviderUsage = {
     providerRequestId: parsed.data.id,
-    requestedModelId: request.modelId,
-    resolvedModelId: parsed.data.model,
-    resolvedProvider: "requesty",
-    output: parseStructuredOutput(rawOutput, request.outputSchema),
-    rawOutput,
     inputTokens: parsed.data.usage?.input_tokens,
     cachedInputTokens: parsed.data.usage?.input_tokens_details?.cached_tokens,
     outputTokens: parsed.data.usage?.output_tokens,
     reasoningTokens: parsed.data.usage?.output_tokens_details?.reasoning_tokens,
     costMicrounits: dollarsToMicrounits(parsed.data.usage?.cost),
   };
+  return withBilledUsage(usage, () => {
+    if (parsed.data.status !== "completed") {
+      throw new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", parsed.data.status !== "failed");
+    }
+    const blocks = parsed.data.output.flatMap((item) => item.content ?? []);
+    if (blocks.some((block) => block.type === "refusal" || block.refusal)) {
+      throw new ModelProviderError("PROVIDER_REFUSAL", false);
+    }
+    const rawOutput = blocks
+      .filter((block) => block.type === "output_text" && block.text)
+      .map((block) => block.text)
+      .join("");
+    if (!rawOutput) throw invalidProviderResponse(`leere Antwort (Anfrage ${parsed.data.id})`);
+
+    return {
+      ...usage,
+      requestedModelId: request.modelId,
+      resolvedModelId: parsed.data.model,
+      resolvedProvider: "requesty",
+      output: parseStructuredOutput(rawOutput, request.outputSchema),
+      rawOutput,
+    };
+  });
 }

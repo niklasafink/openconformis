@@ -9,6 +9,8 @@ import {
   invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  withBilledUsage,
+  type ProviderUsage,
   throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
@@ -89,38 +91,43 @@ export async function requestGoogleStructured<T>(
   if (!parsed.success) {
     throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
   }
-  const candidate = parsed.data.candidates[0];
-  if (!candidate) throw invalidProviderResponse("keine Antwortkandidaten");
-  if (candidate.finishReason && candidate.finishReason !== "STOP") {
-    const refusalReasons = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"]);
-    throw new ModelProviderError(
-      refusalReasons.has(candidate.finishReason)
-        ? "PROVIDER_REFUSAL"
-        : "PROVIDER_OUTPUT_INCOMPLETE",
-      false,
-    );
-  }
-  const rawOutput = candidate.content.parts
-    .map((part) => part.text)
-    .filter((text): text is string => Boolean(text))
-    .join("");
-  if (!rawOutput) {
-    throw invalidProviderResponse(
-      `leere Antwort (finishReason: ${candidate.finishReason ?? "keiner"})`,
-    );
-  }
-
-  return {
+  const usage: ProviderUsage = {
     providerRequestId:
       parsed.data.responseId ?? response.headers.get("x-request-id") ?? "google-response",
-    requestedModelId: request.modelId,
-    resolvedModelId: parsed.data.modelVersion ?? request.modelId,
-    resolvedProvider: "google",
-    output: parseStructuredOutput(rawOutput, request.outputSchema),
-    rawOutput,
     inputTokens: parsed.data.usageMetadata?.promptTokenCount,
     cachedInputTokens: parsed.data.usageMetadata?.cachedContentTokenCount,
     outputTokens: parsed.data.usageMetadata?.candidatesTokenCount,
     reasoningTokens: parsed.data.usageMetadata?.thoughtsTokenCount,
   };
+  return withBilledUsage(usage, () => {
+    const candidate = parsed.data.candidates[0];
+    if (!candidate) throw invalidProviderResponse("keine Antwortkandidaten");
+    if (candidate.finishReason && candidate.finishReason !== "STOP") {
+      const refusalReasons = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"]);
+      throw new ModelProviderError(
+        refusalReasons.has(candidate.finishReason)
+          ? "PROVIDER_REFUSAL"
+          : "PROVIDER_OUTPUT_INCOMPLETE",
+        false,
+      );
+    }
+    const rawOutput = candidate.content.parts
+      .map((part) => part.text)
+      .filter((text): text is string => Boolean(text))
+      .join("");
+    if (!rawOutput) {
+      throw invalidProviderResponse(
+        `leere Antwort (finishReason: ${candidate.finishReason ?? "keiner"})`,
+      );
+    }
+
+    return {
+      ...usage,
+      requestedModelId: request.modelId,
+      resolvedModelId: parsed.data.modelVersion ?? request.modelId,
+      resolvedProvider: "google",
+      output: parseStructuredOutput(rawOutput, request.outputSchema),
+      rawOutput,
+    };
+  });
 }

@@ -40,6 +40,7 @@ import {
 import {
   ModelProviderError,
   withProviderErrorContext,
+  type ProviderUsage,
   type StructuredModelResponse,
 } from "@/server/ai/structured-model";
 import {
@@ -255,12 +256,23 @@ async function failInvocation(
   error: unknown,
   outputHash?: string,
   analysisId?: string,
+  /** Eine gültige Antwort, die erst die eigene Prüfung verworfen hat. */
+  billedResponse?: ProviderUsage,
 ) {
+  // Auch ein verworfener Aufruf ist abgerechnet. Ohne seinen Verbrauch wies ein
+  // Lauf mit Wiederholungen weniger Kosten aus, als der Anbieter berechnet hat.
+  const usage = billedResponse ?? (error instanceof ModelProviderError ? error.usage : undefined);
   await db
     .update(analysisModelInvocations)
     .set({
       status: "failed",
       outputHash,
+      providerRequestId: usage?.providerRequestId,
+      inputTokens: usage?.inputTokens,
+      cachedInputTokens: usage?.cachedInputTokens,
+      outputTokens: usage?.outputTokens,
+      reasoningTokens: usage?.reasoningTokens,
+      costMicrounits: usage?.costMicrounits,
       latencyMilliseconds: Date.now() - startedAt,
       errorCode: safeErrorCode(error),
       completedAt: new Date(),
@@ -462,6 +474,7 @@ async function assessItem(
     });
     const startedAt = Date.now();
     let outputHash: string | undefined;
+    let billedResponse: ProviderUsage | undefined;
     try {
       const response = await requestStructuredForAnalysis(analysis, {
         modelId: analysis.providerModelId,
@@ -473,6 +486,7 @@ async function assessItem(
         maxOutputTokens: truncated ? largerOutputBudget(analysis) : undefined,
       });
       outputHash = createContentHash(response.output);
+      billedResponse = response;
       if (response.output.status === "not_applicable") {
         throw new Error("MODEL_RETURNED_NOT_APPLICABLE_FOR_INCLUDED_SCOPE");
       }
@@ -512,7 +526,14 @@ async function assessItem(
         error,
         invocationContext(analysis, item, "assessment", attempt),
       );
-      await failInvocation(invocationId, startedAt, failure, outputHash, analysis.id);
+      await failInvocation(
+        invocationId,
+        startedAt,
+        failure,
+        outputHash,
+        analysis.id,
+        billedResponse,
+      );
       if (error instanceof ModelProviderError) {
         if (error.code === "PROVIDER_OUTPUT_INCOMPLETE" && attempt === 1) {
           truncated = true;

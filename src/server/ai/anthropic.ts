@@ -9,6 +9,8 @@ import {
   invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  withBilledUsage,
+  type ProviderUsage,
   throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
@@ -87,32 +89,37 @@ export async function requestAnthropicStructured<T>(
   if (!parsed.success) {
     throw invalidProviderResponse(`unerwartetes Format (${describeSchemaIssues(parsed.error)})`);
   }
-  if (parsed.data.stop_reason === "refusal") {
-    throw new ModelProviderError("PROVIDER_REFUSAL", false);
-  }
-  if (parsed.data.stop_reason === "max_tokens") {
-    throw new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", false);
-  }
-  const rawOutput = parsed.data.content
-    .filter((block) => block.type === "text" && block.text)
-    .map((block) => block.text)
-    .join("");
-  if (!rawOutput) {
-    throw invalidProviderResponse(
-      `leere Antwort (stop_reason: ${parsed.data.stop_reason ?? "keiner"}, Anfrage ${parsed.data.id})`,
-    );
-  }
-
-  return {
+  const usage: ProviderUsage = {
     providerRequestId: parsed.data.id,
-    requestedModelId: request.modelId,
-    resolvedModelId: parsed.data.model,
-    resolvedProvider: "anthropic",
-    output: parseStructuredOutput(rawOutput, request.outputSchema),
-    rawOutput,
     inputTokens: parsed.data.usage.input_tokens ?? undefined,
     cachedInputTokens: parsed.data.usage.cache_read_input_tokens ?? undefined,
     outputTokens: parsed.data.usage.output_tokens,
     reasoningTokens: parsed.data.usage.output_tokens_details?.thinking_tokens,
   };
+  return withBilledUsage(usage, () => {
+    if (parsed.data.stop_reason === "refusal") {
+      throw new ModelProviderError("PROVIDER_REFUSAL", false);
+    }
+    if (parsed.data.stop_reason === "max_tokens") {
+      throw new ModelProviderError("PROVIDER_OUTPUT_INCOMPLETE", false);
+    }
+    const rawOutput = parsed.data.content
+      .filter((block) => block.type === "text" && block.text)
+      .map((block) => block.text)
+      .join("");
+    if (!rawOutput) {
+      throw invalidProviderResponse(
+        `leere Antwort (stop_reason: ${parsed.data.stop_reason ?? "keiner"}, Anfrage ${parsed.data.id})`,
+      );
+    }
+
+    return {
+      ...usage,
+      requestedModelId: request.modelId,
+      resolvedModelId: parsed.data.model,
+      resolvedProvider: "anthropic",
+      output: parseStructuredOutput(rawOutput, request.outputSchema),
+      rawOutput,
+    };
+  });
 }
