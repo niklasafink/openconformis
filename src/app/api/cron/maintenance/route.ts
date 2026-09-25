@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { expireTemporaryCredentials } from "@/server/ai/credential-cleanup";
 import { purgeExpiredAiData } from "@/server/maintenance/ai-retention";
+import { purgeExpiredEvidenceOriginals } from "@/server/maintenance/evidence-retention";
 import { purgeExpiredPolicyData } from "@/server/maintenance/policy-retention";
 
 export const runtime = "nodejs";
@@ -13,13 +14,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const [credentials, ai, policies] = await Promise.all([
+  const [credentials, ai, policies, evidence] = await Promise.all([
     expireTemporaryCredentials(),
     purgeExpiredAiData(),
     purgeExpiredPolicyData(),
+    purgeExpiredEvidenceOriginals(),
   ]);
   return NextResponse.json(
-    { status: "ok", credentials, ai, policies },
+    { status: "ok", credentials, ai, policies, evidence },
     { headers: { "cache-control": "private, no-store" } },
   );
 }
