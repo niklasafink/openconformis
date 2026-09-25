@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   head: vi.fn(),
@@ -73,6 +73,10 @@ function head(overrides: Record<string, unknown> = {}) {
 }
 
 describe("review head route", () => {
+  // Der erste Import der Route ist kalt und dauert unter Volllast länger als ein Test.
+  beforeAll(async () => {
+    await import("./[reviewRunId]/route");
+  }, 30_000);
   beforeEach(() => vi.resetAllMocks());
 
   it("answers 304 when neither the change sequence nor the run changed", async () => {
