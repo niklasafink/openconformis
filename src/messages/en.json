@@ -1027,7 +1027,6 @@
       "jev": {
         "ready": "Jev classifies first, the selected model takes the rest.",
         "used": "Classified by Jev and the selected model.",
-        "usedRouter": "Classified by Jev Router (OpenRouter) and the selected model.",
         "notUsed": "Classification by the selected model, no Jev key.",
         "keyLabel": "TypeSafe key (Jev, optional)",
         "keyPlaceholder": "Paste key",

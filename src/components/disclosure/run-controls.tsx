@@ -135,7 +135,7 @@ export function RunControls({
       ? run.modelProfileId
         ? run.jevAssist === "on"
           ? run.jevRoute === "openrouter"
-            ? t("jev.usedRouter")
+            ? null
             : t("jev.used")
           : t("jev.notUsed")
         : null

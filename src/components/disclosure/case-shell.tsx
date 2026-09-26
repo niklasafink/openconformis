@@ -34,7 +34,6 @@ export async function CaseShell({
     <>
       <PageHeader
         title={title}
-        eyebrow={t("title")}
         actions={
           <>
             {actions}

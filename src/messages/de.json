@@ -1027,7 +1027,6 @@
       "jev": {
         "ready": "Jev ordnet zuerst ein, den Rest das gewählte Modell.",
         "used": "Eingeordnet durch Jev und das gewählte Modell.",
-        "usedRouter": "Eingeordnet durch den Jev Router (OpenRouter) und das gewählte Modell.",
         "notUsed": "Einordnung über das gewählte Modell, kein Jev-Schlüssel.",
         "keyLabel": "TypeSafe-Schlüssel (Jev, optional)",
         "keyPlaceholder": "Schlüssel einfügen",
