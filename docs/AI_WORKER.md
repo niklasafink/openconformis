@@ -7,7 +7,7 @@ The term “worker” in this project means the durable Vercel Workflow graph, n
 ```text
 freeze configuration
   → deterministic retrieval snapshot
-  → parallel assessment steps, one per requirement (blocks of ANALYSIS_REQUIREMENT_CONCURRENCY, default 8)
+  → parallel assessment steps, one per requirement (a pool of ANALYSIS_REQUIREMENT_CONCURRENCY, default 10)
       → schema validation
       → exact-quote grounding
       → selective independent verification
@@ -39,12 +39,33 @@ Model approval is an admin release decision. Quality evaluation should measure a
 
 Duration depends almost entirely on generated tokens, not on input. In a measured 10-requirement run with Claude Sonnet 5, each call took 11–42 s. The slowest verifications spent up to 3,000 reasoning tokens before writing JSON, while input stayed at about 4,000 tokens. Requirements ran one after another, so a run took 6–10 minutes. The workflow now works like this:
 
-- Requirements run in parallel blocks. Each block waits for all of its steps, so finished neighbours persist their results before a failure is recorded. Progress counts stored results and never decreases.
+- Requirements run in a pool of `ANALYSIS_REQUIREMENT_CONCURRENCY` (default 10): the next one starts as soon as any finishes. After a failure no new requirement starts, and running neighbours persist their results before the run is marked failed. Progress counts stored results and never decreases.
+- A result is visible as soon as it is stored. Progress and `updatedAt` change right after the result is persisted and again after its closing text, and the result page reloads on either change. Users can review the first requirement while the others are still running.
+- When a result is verified, its closing text is drafted at the same time as the verification, from exactly the fields that are stored if the verification confirms. The draft is used only if the prompt built from the stored result has the same hash. Otherwise it is discarded and the text is written from the stored state, as before. `ANALYSIS_SPECULATIVE_CONCLUSION=off` switches this off.
+- A provider call that has not answered after `ANALYSIS_HEDGE_AFTER_SECONDS` (default 30, `0` = off) gets an identical second request. The first answer wins and the other request is aborted. An early error is reported immediately and never hedged. The aborted request may still be billed by the provider, but it does not appear in the invocation log.
+- Models often turn a quoted clause into a sentence of their own, for example `organisiert:` becomes `organisiert.` and `die zweite Linie` becomes `Die zweite Linie`. Grounding resolves exactly these two deviations, trailing punctuation and the case of the first letter, and always stores the document's own wording. Any other difference is still `QUOTE_NOT_FOUND`. Without this, one of five DORA sample requirements ended as `Keine Einschätzung möglich` in 7 of 9 runs, after a second, equally failing attempt.
+- `OPENROUTER_PROVIDER_SORT=latency|throughput` makes OpenRouter prefer fast hosts of the same model. In the benchmark it made no measurable difference for GPT-5.6 Luna, so it stays unset.
 - Reasoning models on OpenRouter run with `BYOK_REASONING_EFFORT` (default `low`). The reasoning text is excluded from the response.
 - `BYOK_MAX_OUTPUT_TOKENS` (default 8000) includes reasoning tokens. A truncated answer is retried once with twice the limit (at most 32,000). If a verification is still truncated, its verdict becomes `uncertain` and the result goes to human review instead of failing the run.
 - Prompts ask for bullet-point explanations, one-sentence quotes and short lists.
 - OpenRouter's `402` for credit reserved by in-flight requests is retried. Missing credit is not.
 - Prompt caching is not used. Each requirement's input is about 4,000 tokens, parallel requests cannot read a cache that the others are still writing, and the shared system prompt is below the minimum cacheable size.
+
+### Measured (2026-09-26)
+
+`scripts/bench-gap-analysis.ts` runs the unchanged server code against the local database with real model calls. It uses the first N DORA requirements of the sample policy, GPT-5.6 Luna for assessment and Claude Sonnet 5 for verification:
+
+| Run                                                      | First result          | All results   | Including closing texts |
+| -------------------------------------------------------- | --------------------- | ------------- | ----------------------- |
+| 10 requirements, block scheduling, no draft/hedge/repair | 4.9 s (visible 7.8 s) | 22.1 s        | 26.1 s                  |
+| 10 requirements, current workflow (2 runs)               | 4.5 / 5.3 s           | 12.0 / 18.5 s | 15.5 / 18.6 s           |
+| 5 requirements, Claude Sonnet 5 for assessment           | 13.0 s                | 14.3 s        | 16.0 s                  |
+
+On Vercel, the workflow queue adds about 2–15 s before the first model call. A local `next dev` run against the remote Neon database was far slower: 33 s before the first call and 13–20 s between steps. The cause was a 200 ms round trip and a pool of one connection shared by all parallel requirements. Setting `DATABASE_CLIENT_MAX` in `.env.local` lets `next dev` use more connections. Tests always keep one.
+
+```bash
+BENCH_LABEL=current node --env-file=.env.local --conditions=react-server --import tsx scripts/bench-gap-analysis.ts
+```
 
 ## Failure behavior
 

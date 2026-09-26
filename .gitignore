@@ -48,3 +48,4 @@ certificates/
 # Echte Prüfungsberichte und ihre lokal erzeugten Word-Fassungen: vertraulich,
 # bleiben ausschließlich lokal (docs/OFFENLEGUNG_SESSION_PROMPT.md).
 docs/Prüfungsberichte/
+scripts/.bench-results/
