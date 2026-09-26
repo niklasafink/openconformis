@@ -83,6 +83,14 @@ function fixture(): AnalysisExportData {
         },
         evidence: [
           {
+            citationOrder: 2,
+            support: "context",
+            exactQuote: "Der Vorstand\ngenehmigt den Rahmen.",
+            blockTextHash: "block-hash-2",
+            pageNumber: 7,
+            paragraphNumber: 1,
+          },
+          {
             citationOrder: 1,
             support: "supports",
             exactQuote: "Die Richtlinie wird regelmäßig überprüft.",
@@ -91,34 +99,6 @@ function fixture(): AnalysisExportData {
             paragraphNumber: 2,
           },
         ],
-      },
-    ],
-    overrideHistory: [
-      {
-        regulatoryId: "Art. 5 Abs. 2 DORA",
-        status: "partially_fulfilled",
-        reason: "Nachweise wurden manuell geprüft.",
-        actorUserId: "reviewer-1",
-        createdAt: new Date("2026-08-22T10:20:00.000Z"),
-      },
-    ],
-    invocations: [
-      {
-        invocationStage: "assessment",
-        provider: "openrouter",
-        modelId: "anthropic/claude-test",
-        providerRequestId: "request-1",
-        status: "succeeded",
-        cacheHit: true,
-        inputTokens: 1_200,
-        cachedInputTokens: 900,
-        outputTokens: 220,
-        reasoningTokens: 50,
-        costMicrounits: 12_500,
-        latencyMilliseconds: 1_450,
-        errorCode: null,
-        startedAt: new Date("2026-08-22T10:02:00.000Z"),
-        completedAt: new Date("2026-08-22T10:02:02.000Z"),
       },
     ],
   };
@@ -132,47 +112,55 @@ describe("analysis Excel export", () => {
     expect(safeExcelText(7)).toBe(7);
   });
 
-  it("creates a localized workbook with result, evidence and audit sheets", async () => {
+  it("exports only the results sheet with the reviewed status and policy passages", async () => {
     const bytes = await buildAnalysisXlsx(fixture());
     expect(bytes.byteLength).toBeGreaterThan(1_000);
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(bytes as unknown as Parameters<typeof workbook.xlsx.load>[0]);
-    expect(workbook.worksheets.map(({ name }) => name)).toEqual([
-      "Übersicht",
-      "Ergebnisse",
-      "Belegstellen",
-      "Prüfpfad",
-      "Prüfhistorie",
-      "Modellaufrufe",
-    ]);
+    expect(workbook.worksheets.map(({ name }) => name)).toEqual(["Ergebnisse"]);
 
     const results = workbook.getWorksheet("Ergebnisse");
     expect(results?.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
     expect(results?.autoFilter).toBeTruthy();
+    const headers = (results?.getRow(1).values as unknown[]).slice(1);
+    expect(headers).toContain("Finaler Status");
+    expect(headers).not.toContain("Wirksamer Status");
+    for (const removed of [
+      "Menschlich bestätigt",
+      "Bestätigt am",
+      "Bestätigt von",
+      "Größenleitlinie",
+      "Prüfaspekte",
+      "Quelle",
+    ]) {
+      expect(headers).not.toContain(removed);
+    }
     expect(results?.getCell("A2").value).toBe("Art. 5 Abs. 2 DORA");
     expect(results?.getCell("C2").value).toBe('\'=HYPERLINK("https://example.invalid")');
     expect(results?.getCell("E2").value).toBe("Teilweise erfüllt");
+    expect(results?.getCell("F1").value).toBe("Finaler Status");
     expect(results?.getCell("F2").value).toBe("Teilweise erfüllt");
     expect(results?.getCell("G2").value).toBe("Nachweise wurden manuell geprüft.");
-    expect(results?.getCell("L1").value).toBe("Feststellung");
-    expect(results?.getCell("L2").value).toBe(
+    expect(results?.getCell("K1").value).toBe("Belegstellen in der Policy");
+    expect(results?.getCell("K2").value).toBe(
+      '\'- "Die Richtlinie wird regelmäßig überprüft." (S. 3)\n- "Der Vorstand genehmigt den Rahmen." (S. 7)',
+    );
+    expect(results?.getCell("M1").value).toBe("Feststellung");
+    expect(results?.getCell("M2").value).toBe(
       "Die Genehmigung des IKT-Risikomanagementrahmens durch das Leitungsorgan ist für den Prüfungszeitraum nicht dokumentiert.",
     );
-    expect(results?.getCell("M1").value).toBe("Auswirkung");
+    expect(results?.getCell("N1").value).toBe("Auswirkung");
+  });
 
-    const evidence = workbook.getWorksheet("Belegstellen");
-    expect(evidence?.getCell("E2").value).toBe("Die Richtlinie wird regelmäßig überprüft.");
-    expect(evidence?.getCell("H2").value).toBe("block-hash");
-
-    const reviewHistory = workbook.getWorksheet("Prüfhistorie");
-    expect(reviewHistory?.getCell("A2").value).toBe("Art. 5 Abs. 2 DORA");
-    expect(reviewHistory?.getCell("C2").value).toBe("Nachweise wurden manuell geprüft.");
-
-    const serializedValues = workbook.worksheets
-      .flatMap((sheet) => sheet.getSheetValues())
-      .join(" ");
-    expect(serializedValues).not.toContain("secret-canary");
+  it("marks a result without evidence explicitly in the passages column", async () => {
+    const data = fixture();
+    data.items[0]!.evidence = [];
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(
+      (await buildAnalysisXlsx(data)) as unknown as Parameters<typeof workbook.xlsx.load>[0],
+    );
+    expect(workbook.getWorksheet("Ergebnisse")?.getCell("K2").value).toBe("–");
   });
 
   it("creates an ASCII-safe stable download name", () => {

@@ -8,7 +8,6 @@ import { db } from "@/server/db/client";
 import {
   analyses,
   analysisEvidence,
-  analysisModelInvocations,
   analysisRequirementConclusions,
   analysisRequirementResults,
   analysisResultOverrides,
@@ -375,7 +374,7 @@ export async function getOwnedAnalysisExportData(input: {
     .orderBy(asc(analysisScopeItems.displayOrder));
 
   const resultIds = rows.map(({ result }) => result.id);
-  const [evidenceRows, overrideRows, invocationRows] = await Promise.all([
+  const [evidenceRows, overrideRows] = await Promise.all([
     resultIds.length === 0
       ? Promise.resolve([])
       : db
@@ -390,27 +389,6 @@ export async function getOwnedAnalysisExportData(input: {
           .from(analysisResultOverrides)
           .where(inArray(analysisResultOverrides.resultId, resultIds))
           .orderBy(asc(analysisResultOverrides.createdAt), asc(analysisResultOverrides.id)),
-    db
-      .select({
-        invocationStage: analysisModelInvocations.invocationStage,
-        provider: analysisModelInvocations.provider,
-        modelId: analysisModelInvocations.modelId,
-        providerRequestId: analysisModelInvocations.providerRequestId,
-        status: analysisModelInvocations.status,
-        cacheHit: analysisModelInvocations.cacheHit,
-        inputTokens: analysisModelInvocations.inputTokens,
-        cachedInputTokens: analysisModelInvocations.cachedInputTokens,
-        outputTokens: analysisModelInvocations.outputTokens,
-        reasoningTokens: analysisModelInvocations.reasoningTokens,
-        costMicrounits: analysisModelInvocations.costMicrounits,
-        latencyMilliseconds: analysisModelInvocations.latencyMilliseconds,
-        errorCode: analysisModelInvocations.errorCode,
-        startedAt: analysisModelInvocations.startedAt,
-        completedAt: analysisModelInvocations.completedAt,
-      })
-      .from(analysisModelInvocations)
-      .where(eq(analysisModelInvocations.analysisId, analysis.id))
-      .orderBy(asc(analysisModelInvocations.startedAt)),
   ]);
   const evidenceByResult = new Map<string, typeof evidenceRows>();
   for (const evidence of evidenceRows) {
@@ -420,9 +398,6 @@ export async function getOwnedAnalysisExportData(input: {
   }
   const latestOverrideByResult = new Map<string, (typeof overrideRows)[number]>();
   for (const override of overrideRows) latestOverrideByResult.set(override.resultId, override);
-  const regulatoryIdByResult = new Map(
-    rows.map(({ result, scope }) => [result.id, scope.regulatoryId] as const),
-  );
 
   return {
     id: analysis.id,
@@ -503,13 +478,5 @@ export async function getOwnedAnalysisExportData(input: {
         })),
       };
     }),
-    overrideHistory: overrideRows.map((override) => ({
-      regulatoryId: regulatoryIdByResult.get(override.resultId) ?? "",
-      status: override.status,
-      reason: override.reason,
-      actorUserId: override.actorUserId,
-      createdAt: override.createdAt,
-    })),
-    invocations: invocationRows,
   };
 }
