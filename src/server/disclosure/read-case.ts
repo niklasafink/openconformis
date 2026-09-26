@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/server/db/client";
 import { disclosureCaseDocuments, disclosureCases } from "@/server/db/schema/disclosure";
@@ -49,21 +50,33 @@ export type DisclosureBlock = {
 /** Eine Prüfung mit ihren Dokumenten in Reiter-Reihenfolge, oder `undefined`. */
 export async function getDisclosureCase(caseId: string) {
   const actor = await resolveDisclosureActor();
-  const found = await ownedCase(caseId, actor.organizationId);
+  if (!z.uuid().safeParse(caseId).success) return undefined;
+  // Prüfung und Dokumente zugleich: die Dokumentabfrage trägt die Zugehörigkeit zum
+  // Arbeitsbereich selbst, damit sie nicht auf die erste Abfrage warten muss.
+  const [found, documents] = await Promise.all([
+    ownedCase(caseId, actor.organizationId),
+    db
+      .select({
+        id: disclosureCaseDocuments.id,
+        role: disclosureCaseDocuments.role,
+        displayName: disclosureCaseDocuments.displayName,
+        ordinal: disclosureCaseDocuments.ordinal,
+        policyVersionId: disclosureCaseDocuments.policyVersionId,
+        parseStatus: policyVersions.parseStatus,
+      })
+      .from(disclosureCaseDocuments)
+      .innerJoin(disclosureCases, eq(disclosureCases.id, disclosureCaseDocuments.caseId))
+      .leftJoin(policyVersions, eq(policyVersions.id, disclosureCaseDocuments.policyVersionId))
+      .where(
+        and(
+          eq(disclosureCaseDocuments.caseId, caseId),
+          eq(disclosureCases.organizationId, actor.organizationId),
+          eq(disclosureCases.status, "active"),
+        ),
+      )
+      .orderBy(asc(disclosureCaseDocuments.ordinal)),
+  ]);
   if (!found) return undefined;
-  const documents = await db
-    .select({
-      id: disclosureCaseDocuments.id,
-      role: disclosureCaseDocuments.role,
-      displayName: disclosureCaseDocuments.displayName,
-      ordinal: disclosureCaseDocuments.ordinal,
-      policyVersionId: disclosureCaseDocuments.policyVersionId,
-      parseStatus: policyVersions.parseStatus,
-    })
-    .from(disclosureCaseDocuments)
-    .leftJoin(policyVersions, eq(policyVersions.id, disclosureCaseDocuments.policyVersionId))
-    .where(eq(disclosureCaseDocuments.caseId, found.id))
-    .orderBy(asc(disclosureCaseDocuments.ordinal));
   return {
     id: found.id,
     title: found.title,

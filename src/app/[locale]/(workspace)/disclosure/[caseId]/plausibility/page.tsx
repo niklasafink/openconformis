@@ -67,11 +67,31 @@ function formatCheck(check: ViewCheck, figure: ViewFigure | undefined): MarkChec
 export default async function PlausibilityPage({ params }: PageProps) {
   const { locale, caseId, found } = await loadCasePage(params);
   if (!found) return <CaseNotFound locale={locale} />;
-  const t = await getTranslations("Disclosure");
-  const plausibilityT = await getTranslations("Disclosure.plausibility");
-  const resultsT = await getTranslations("ResultsPreview");
+  const [t, plausibilityT, resultsT] = await Promise.all([
+    getTranslations("Disclosure"),
+    getTranslations("Disclosure.plausibility"),
+    getTranslations("ResultsPreview"),
+  ]);
   const report = found.documents.find((document) => document.role === "report");
   const priorReport = found.documents.find((document) => document.role === "prior_report");
+
+  // Eine neue Prüfung hat noch keinen Bericht: nur der Upload, ohne Katalog, Schlüssel,
+  // Belege und Lauf — sonst wartet das Anlegen auf Abfragen, die nichts anzeigen.
+  if (!report) {
+    return (
+      <CaseShell locale={locale} caseId={caseId} title={found.title} area="plausibility">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6">
+          <ReportUpload
+            locale={locale}
+            caseId={caseId}
+            prepareDraft={prepareReportDraft}
+            attachReport={attachReport}
+            errorMessages={t.raw("errors") as Record<string, string>}
+          />
+        </div>
+      </CaseShell>
+    );
+  }
   const [
     blocks,
     recognition,
@@ -86,10 +106,10 @@ export default async function PlausibilityPage({ params }: PageProps) {
         document.policyVersionId ? [document.policyVersionId] : [],
       ),
     ),
-    report ? readRecognition(report.id) : Promise.resolve(undefined),
+    readRecognition(report.id),
     // Liest den Stand und startet eine hängengebliebene Erkennung des Vorjahresberichts neu.
     priorReport ? readRecognition(priorReport.id) : Promise.resolve(undefined),
-    report ? readLatestRun(found.id, locale) : Promise.resolve(null),
+    readLatestRun(found.id, locale),
     getAnalysisModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
     listSavedCredentials().catch(() => []),
     readCaseEvidence(found.id),
@@ -221,86 +241,74 @@ export default async function PlausibilityPage({ params }: PageProps) {
         ) : undefined
       }
     >
-      {report ? (
-        <PlausibilityWorkspace
-          documents={found.documents}
-          blocksByDocument={Object.fromEntries(
-            found.documents.map((document) => [
-              document.id,
-              blocks.get(document.policyVersionId ?? "") ?? [],
-            ]),
-          )}
-          contexts={recognition?.contexts ?? {}}
-          marks={marks}
-          recognition={recognition?.status ?? "pending"}
-          checksBySubject={checksBySubject}
-          findings={findings}
-          summary={summary}
-          live={open || evidenceBusy}
-          checked={finished}
-          reviews={reviews}
-          members={reviewData.members.map((member) => ({
-            userId: member.userId,
-            name: member.name,
-          }))}
-          canPrepare={found.permissions.canPrepare}
-          reviewErrors={
-            (await getTranslations("Disclosure.review")).raw("errors") as Record<string, string>
-          }
-          priorUpload={
-            !priorReport && found.permissions.canPrepare ? (
-              <ReportUpload
-                variant="prior"
-                locale={locale}
-                caseId={caseId}
-                prepareDraft={prepareReportDraft}
-                attachReport={attachPriorReport}
-                errorMessages={t.raw("errors") as Record<string, string>}
-              />
-            ) : undefined
-          }
-          evidence={{
-            caseId,
-            files: evidenceFiles,
-            canUpload: found.permissions.canPrepare,
-            errorMessages: t.raw("evidenceErrors") as Record<string, string>,
-          }}
-          controls={
-            <RunControls
+      <PlausibilityWorkspace
+        documents={found.documents}
+        blocksByDocument={Object.fromEntries(
+          found.documents.map((document) => [
+            document.id,
+            blocks.get(document.policyVersionId ?? "") ?? [],
+          ]),
+        )}
+        contexts={recognition?.contexts ?? {}}
+        marks={marks}
+        recognition={recognition?.status ?? "pending"}
+        checksBySubject={checksBySubject}
+        findings={findings}
+        summary={summary}
+        live={open || evidenceBusy}
+        checked={finished}
+        reviews={reviews}
+        members={reviewData.members.map((member) => ({
+          userId: member.userId,
+          name: member.name,
+        }))}
+        canPrepare={found.permissions.canPrepare}
+        reviewErrors={
+          (await getTranslations("Disclosure.review")).raw("errors") as Record<string, string>
+        }
+        priorUpload={
+          !priorReport && found.permissions.canPrepare ? (
+            <ReportUpload
+              variant="prior"
+              locale={locale}
               caseId={caseId}
-              ready={
-                recognition?.status === "ready" &&
-                (!priorReport || priorRecognition?.status === "ready")
-              }
-              canStart={found.permissions.canPrepare}
-              run={{
-                status: run?.status ?? "none",
-                storedCheckCount: run?.storedCheckCount ?? 0,
-                plannedCheckCount: run?.plannedCheckCount ?? null,
-                failureCode: run?.failureCode ?? null,
-                modelProfileId: run?.modelProfileId ?? null,
-                jevAssist: run?.jevAssist ?? "off",
-                jevRoute: run?.jevRoute ?? null,
-              }}
-              catalogue={catalogue}
-              savedCredentials={savedCredentials}
-              jevEnabled={disclosureJevAssist() === "on"}
-              errorMessages={plausibilityT.raw("errors") as Record<string, string>}
-              keyErrorMessages={resultsT.raw("keyErrors") as Record<string, string>}
+              prepareDraft={prepareReportDraft}
+              attachReport={attachPriorReport}
+              errorMessages={t.raw("errors") as Record<string, string>}
             />
-          }
-        />
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6">
-          <ReportUpload
-            locale={locale}
+          ) : undefined
+        }
+        evidence={{
+          caseId,
+          files: evidenceFiles,
+          canUpload: found.permissions.canPrepare,
+          errorMessages: t.raw("evidenceErrors") as Record<string, string>,
+        }}
+        controls={
+          <RunControls
             caseId={caseId}
-            prepareDraft={prepareReportDraft}
-            attachReport={attachReport}
-            errorMessages={t.raw("errors") as Record<string, string>}
+            ready={
+              recognition?.status === "ready" &&
+              (!priorReport || priorRecognition?.status === "ready")
+            }
+            canStart={found.permissions.canPrepare}
+            run={{
+              status: run?.status ?? "none",
+              storedCheckCount: run?.storedCheckCount ?? 0,
+              plannedCheckCount: run?.plannedCheckCount ?? null,
+              failureCode: run?.failureCode ?? null,
+              modelProfileId: run?.modelProfileId ?? null,
+              jevAssist: run?.jevAssist ?? "off",
+              jevRoute: run?.jevRoute ?? null,
+            }}
+            catalogue={catalogue}
+            savedCredentials={savedCredentials}
+            jevEnabled={disclosureJevAssist() === "on"}
+            errorMessages={plausibilityT.raw("errors") as Record<string, string>}
+            keyErrorMessages={resultsT.raw("keyErrors") as Record<string, string>}
           />
-        </div>
-      )}
+        }
+      />
     </CaseShell>
   );
 }

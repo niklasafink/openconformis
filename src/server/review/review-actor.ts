@@ -1,6 +1,7 @@
 import "server-only";
 
 import { asc, eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { requireAuthenticatedSessionUser } from "@/server/auth/session-user";
 import { ensurePersonalWorkspaceForUser } from "@/server/auth/personal-workspace";
@@ -31,7 +32,11 @@ async function readMembership(userId: string) {
   return membership;
 }
 
-export async function resolveReviewActor(): Promise<ReviewActor> {
+/**
+ * Eine Auflösung pro Anfrage: Seite, Hülle und Lesefunktionen fragten die
+ * Mitgliedschaft sonst je einzeln ab — ein Datenbankaufruf pro Wiederholung.
+ */
+export const resolveReviewActor = cache(async (): Promise<ReviewActor> => {
   const user = await requireAuthenticatedSessionUser();
   let membership = await readMembership(user.id);
   if (!membership) {
@@ -45,7 +50,7 @@ export async function resolveReviewActor(): Promise<ReviewActor> {
     organizationId: membership.organizationId,
     roles: parseApplicationRoles(membership.role),
   };
-}
+});
 
 export class ReviewAccessError extends Error {
   constructor(
