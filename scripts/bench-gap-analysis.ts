@@ -39,6 +39,22 @@ const profile = (process.env.BENCH_PROFILE ?? "institution") as "auditor" | "ins
 const concurrency = Number.parseInt(process.env.BENCH_CONCURRENCY ?? "8", 10);
 const label = process.env.BENCH_LABEL ?? "run";
 
+// Zählt die tatsächlich gesendeten Anbieteranfragen. Eine Zweitanfrage nach
+// ANALYSIS_HEDGE_AFTER_SECONDS erscheint nicht im Aufrufprotokoll, nur hier.
+const providerRequests = { sent: 0, aborted: 0 };
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!url.includes("/chat/completions")) return originalFetch(input, init);
+  providerRequests.sent += 1;
+  try {
+    return await originalFetch(input, init);
+  } catch (error) {
+    if (init?.signal?.aborted) providerRequests.aborted += 1;
+    throw error;
+  }
+};
+
 const { and, asc, eq, sql } = await import("drizzle-orm");
 const { db, postgresClient } = await import("../src/server/db/client");
 const schema = await import("../src/server/db/schema");
@@ -329,6 +345,8 @@ const summary = {
   allCompleteS: completeTimes.length === rows.length ? Math.max(...completeTimes) : null,
   wallS: seconds(finishedAt),
   modelCalls: invocations.length,
+  providerRequests: providerRequests.sent,
+  hedgedAborted: providerRequests.aborted,
   failedCalls: invocations.filter(({ status }) => status === "failed").length,
   costUsd: Math.round(invocations.reduce((sum, { cost }) => sum + (cost ?? 0), 0) / 1_000) / 1_000,
 };

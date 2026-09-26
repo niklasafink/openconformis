@@ -16,12 +16,14 @@ type AnalysisCredentialBinding = {
 };
 
 /**
- * Nach wie vielen Sekunden ein zweiter, identischer Aufruf startet. Die Bewertungen
- * stehen üblicherweise nach 5–20 s, Verifikationen nach 5–30 s; ein hängender
- * Anbieter bestimmte sonst allein die Dauer des ganzen Laufs. `0` schaltet ab.
+ * Nach wie vielen Sekunden ein zweiter, identischer Aufruf startet. Gemessen (2026-09-26):
+ * alle Aufrufe über 20 s rechneten tatsächlich — 2.000 bis 3.700 Tokens, längster 42 s —,
+ * ein Zweitaufruf wäre genauso lang und doppelt bezahlt. Nur ein hängender Anbieter
+ * (83 s für eine sonst 5-s-Bewertung) profitiert. 60 s fängt ihn ab, ohne je einen
+ * rechnenden Aufruf zu verdoppeln. `0` schaltet ab.
  */
 function hedgeAfterMilliseconds() {
-  const seconds = Number.parseInt(process.env.ANALYSIS_HEDGE_AFTER_SECONDS?.trim() || "30", 10);
+  const seconds = Number.parseInt(process.env.ANALYSIS_HEDGE_AFTER_SECONDS?.trim() || "60", 10);
   return Number.isInteger(seconds) && seconds > 0 ? seconds * 1_000 : 0;
 }
 
