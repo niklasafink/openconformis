@@ -15,6 +15,7 @@ import { StopRunButton } from "@/components/disclosure/stop-run-button";
 import { Button } from "@/components/ui/button";
 import { formatAmount } from "@/domain/disclosure/checks/comments";
 import { editableValue } from "@/domain/disclosure/correction";
+import { recognizeDocumentDates } from "@/domain/disclosure/dates";
 import { markStatuses } from "@/domain/disclosure/checks/findings";
 import { getAnalysisModelCatalogue } from "@/server/ai/model-catalogue";
 import { listSavedCredentials } from "@/server/ai/saved-credential-service";
@@ -40,6 +41,12 @@ function describeFigure(figure: ViewFigure) {
     return `${figure.raw} ${unit}`;
   }
   return figure.raw;
+}
+
+/** „22.04.2021“ aus dem ISO-Datum. */
+function describeDate(iso: string) {
+  const [year, month, day] = iso.split("-");
+  return `${day}.${month}.${year}`;
 }
 
 /** Ist und Soll in der Darstellung der geprüften Zahl. */
@@ -172,6 +179,52 @@ export default async function PlausibilityPage({ params }: PageProps) {
         issue: null,
       })),
   ];
+  // Datumsangaben zum Abstimmen mit den Unterlagen: aus den Blöcken des Berichts gelesen,
+  // nie über einer Zahl oder einem Richtungswort.
+  if (recognition?.status === "ready") {
+    const contexts = recognition.contexts;
+    const occupied = new Map<string, FigureMark[]>();
+    for (const mark of marks)
+      occupied.set(mark.blockId, [...(occupied.get(mark.blockId) ?? []), mark]);
+    const dates = recognizeDocumentDates(
+      (blocks.get(report.policyVersionId ?? "") ?? []).map((block) => {
+        const context = contexts[block.id];
+        return {
+          id: block.id,
+          blockType: block.blockType,
+          text: block.canonicalText,
+          cell: context?.table
+            ? {
+                table: context.table.index,
+                row: context.table.row,
+                column: context.table.column,
+                header: context.table.header,
+              }
+            : undefined,
+          technical: context?.technical ?? false,
+          header: context?.table?.header ?? false,
+        };
+      }),
+      recognition.reportYear,
+    );
+    for (const date of dates) {
+      const overlaps = (occupied.get(date.blockId) ?? []).some(
+        (mark) => mark.start < date.end && date.start < mark.end,
+      );
+      if (overlaps) continue;
+      marks.push({
+        id: `date:${date.blockId}:${date.start}`,
+        blockId: date.blockId,
+        start: date.start,
+        end: date.end,
+        kind: "date",
+        raw: date.raw,
+        status: "pending",
+        display: describeDate(date.iso),
+        issue: null,
+      });
+    }
+  }
 
   // Freigaben gibt es erst für gespeicherte Feststellungen eines beendeten Laufs.
   const reviewData =

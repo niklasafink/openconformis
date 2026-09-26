@@ -1,6 +1,7 @@
 import type { TableCellPosition } from "@/domain/policies/document-structure";
 
 import type { FigureUnit, PeriodHint } from "./figures";
+import { tableOfContentsBlockIds } from "./table-of-contents";
 
 /**
  * Leitet aus den Blöcken eines Berichts den Kontext ab, den die Zahlenerkennung und
@@ -31,6 +32,8 @@ export type BlockContext = {
   pageNumber: number | null;
   tz: string | null;
   technical: boolean;
+  /** Steht in einem Inhaltsverzeichnis; seine Seitenzahlen sind keine Berichtszahlen. */
+  toc: boolean;
   table: {
     index: number;
     row: number;
@@ -180,6 +183,7 @@ function tableColumns(cells: readonly Cell[], reportYear: number | null) {
 
 export function deriveDocumentContext(blocks: readonly ContextInputBlock[]) {
   const reportYear = detectReportYear(blocks);
+  const tocIds = tableOfContentsBlockIds(blocks);
   const contexts = new Map<string, BlockContext>();
   const tables = new Map<number, Cell[]>();
   const captions = new Map<number, string>();
@@ -224,7 +228,14 @@ export function deriveDocumentContext(blocks: readonly ContextInputBlock[]) {
     } else if (!technical) {
       lastParagraph = block.blockType === "heading" ? null : text;
     }
-    contexts.set(block.id, { blockId: block.id, pageNumber: page, tz, technical, table: null });
+    contexts.set(block.id, {
+      blockId: block.id,
+      pageNumber: page,
+      tz,
+      technical,
+      toc: tocIds.has(block.id),
+      table: null,
+    });
   }
 
   // Eine Tabelle ohne eigene Kopfzeile direkt nach einer gleich breiten Tabelle derselben

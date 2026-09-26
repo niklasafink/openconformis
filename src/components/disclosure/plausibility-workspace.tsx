@@ -42,7 +42,8 @@ export type FigureMark = {
   blockId: string;
   start: number;
   end: number;
-  kind: "figure" | "statement" | "year";
+  /** Datumsangaben werden nicht geprüft, nur zum Abstimmen mit den Unterlagen markiert. */
+  kind: "figure" | "statement" | "year" | "date";
   raw: string;
   status: MarkStatus;
   /** „4.416,4 TEUR“ bzw. „Erhöhung“ — was die Marke erkannt hat. */
@@ -399,6 +400,7 @@ export function PlausibilityWorkspace({
 
   const figures = marks.filter((mark) => mark.kind === "figure").length;
   const statements = marks.filter((mark) => mark.kind === "statement").length;
+  const dates = marks.filter((mark) => mark.kind === "date").length;
   const unreadable = marks.filter((mark) => mark.issue).length;
   const summary =
     recognition !== "ready"
@@ -416,6 +418,7 @@ export function PlausibilityWorkspace({
         : [
             t("summary.figures", { count: figures }),
             t("summary.statements", { count: statements }),
+            dates > 0 ? t("summary.dates", { count: dates }) : null,
             unreadable > 0 ? t("summary.unreadable", { count: unreadable }) : null,
           ]
             .filter(Boolean)
@@ -734,11 +737,13 @@ export function PlausibilityWorkspace({
                 </ol>
               ) : (
                 <p className="border-t border-border px-3 py-2 text-meta text-muted-foreground">
-                  {activeMark.issue
-                    ? t("popover.unreadable")
-                    : checked
-                      ? t("noRelation")
-                      : t("popover.notChecked")}
+                  {activeMark.kind === "date"
+                    ? t("popover.dateHint")
+                    : activeMark.issue
+                      ? t("popover.unreadable")
+                      : checked
+                        ? t("noRelation")
+                        : t("popover.notChecked")}
                 </p>
               )}
               {activeReview ? (

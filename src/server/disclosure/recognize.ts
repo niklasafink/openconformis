@@ -188,7 +188,8 @@ export async function recognizeCaseDocument(caseDocumentId: string, workflowRunI
       tableCaption: table?.caption ?? null,
       technical: context.technical,
     });
-    if (context.technical || table?.header) continue;
+    // Seitenzahlen eines Inhaltsverzeichnisses sind keine Berichtszahlen.
+    if (context.technical || context.toc || table?.header) continue;
     // In einer Tabelle zählt nur, was in einer Wertespalte steht; das Label ist Text.
     const isLabelCell = table !== null && table.column === 0;
     const column = table?.columnInfo;

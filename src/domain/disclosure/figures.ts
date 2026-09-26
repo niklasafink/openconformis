@@ -6,7 +6,8 @@ import { microPerUnit } from "./arithmetic";
  * normalisiert sie exakt (`bigint`). Datumsangaben, Jahreszahlen, Normzitate,
  * Randziffern und Seitenzahlen sind keine Zahlen im Sinne der Prüfung.
  */
-export const figureExtractionVersion = "disclosure-figures-v2";
+/** v3: Inhaltsverzeichnisse werden übersprungen (`table-of-contents.ts`). */
+export const figureExtractionVersion = "disclosure-figures-v3";
 
 export type FigureUnit = "EUR" | "percent" | "count" | "unknown";
 export type PeriodHint = "current" | "prior" | "other";

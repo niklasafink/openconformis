@@ -101,6 +101,7 @@ export async function readRecognition(caseDocumentId: string) {
       figures: [],
       statements: [],
       tableStructure: false,
+      reportYear: null,
     };
   }
 
@@ -125,6 +126,7 @@ export async function readRecognition(caseDocumentId: string) {
     status: document.status,
     errorCode: null,
     tableStructure: document.tableStructure,
+    reportYear: document.reportYear,
     contexts: Object.fromEntries(
       contexts.map((context): [string, ViewBlockContext] => [
         context.documentBlockId,
