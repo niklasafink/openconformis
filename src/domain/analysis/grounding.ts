@@ -27,6 +27,29 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/gu, " ").trim();
 }
 
+function withFirstLetterCase(value: string, upper: boolean) {
+  const first = value.charAt(0);
+  return (upper ? first.toLocaleUpperCase("de") : first.toLocaleLowerCase("de")) + value.slice(1);
+}
+
+/**
+ * Sucht das Zitat wörtlich im Block. Modelle schließen einen zitierten Teilsatz gern
+ * als eigenen Satz ab: aus „organisiert:" wird „organisiert.", aus „die zweite
+ * Linie" wird „Die zweite Linie". Genau diese zwei Abweichungen werden aufgelöst —
+ * Satzzeichen am Ende und die Schreibung des ersten Buchstabens. Zurück kommt immer
+ * der Wortlaut des Dokuments, nie der des Modells; alles andere bleibt ein Fehler.
+ */
+function locateQuote(canonicalText: string, quote: string): string | undefined {
+  if (canonicalText.includes(quote)) return quote;
+  const withoutEndPunctuation = quote.replace(/[.:;,!?]+$/u, "").trimEnd();
+  const variants = [quote, withoutEndPunctuation].flatMap((variant) => [
+    variant,
+    withFirstLetterCase(variant, true),
+    withFirstLetterCase(variant, false),
+  ]);
+  return variants.find((variant) => variant.length > 0 && canonicalText.includes(variant));
+}
+
 export function validateAndGroundAssessment(
   value: unknown,
   candidateBlocks: readonly GroundingBlock[],
@@ -38,11 +61,11 @@ export function validateAndGroundAssessment(
     const block = blocksByKey.get(citation.blockKey);
     if (!block) throw new GroundingValidationError("UNKNOWN_BLOCK");
 
-    const quote = normalizeWhitespace(citation.exactQuote);
-    const canonicalText = normalizeWhitespace(block.canonicalText);
-    if (!canonicalText.includes(quote)) {
-      throw new GroundingValidationError("QUOTE_NOT_FOUND");
-    }
+    const quote = locateQuote(
+      normalizeWhitespace(block.canonicalText),
+      normalizeWhitespace(citation.exactQuote),
+    );
+    if (!quote) throw new GroundingValidationError("QUOTE_NOT_FOUND");
 
     return {
       ...citation,

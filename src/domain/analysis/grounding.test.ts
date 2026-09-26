@@ -64,6 +64,43 @@ describe("assessment grounding", () => {
     ).toThrowError(new GroundingValidationError("QUOTE_NOT_FOUND"));
   });
 
+  function groundQuote(canonicalText: string, exactQuote: string) {
+    return validateAndGroundAssessment(
+      {
+        status: "partially_fulfilled",
+        explanation: "- Die Aufgaben sind nach drei Verteidigungslinien getrennt.",
+        confidencePercent: 70,
+        evidence: [{ blockKey: "policy-2-1", exactQuote, support: "supports" }],
+        missingInformation: ["Nachweis der Umsetzung"],
+      },
+      [{ ...blocks[0]!, canonicalText }],
+    ).evidence[0]?.exactQuote;
+  }
+
+  const linesOfDefence =
+    "Die Aufgaben sind nach dem Modell der drei Verteidigungslinien organisiert: Die erste Linie bilden die Fachbereiche, die zweite Linie das CISO-Office.";
+
+  it("stores the document's wording when the model closed a clause with its own period", () => {
+    expect(
+      groundQuote(
+        linesOfDefence,
+        "Die Aufgaben sind nach dem Modell der drei Verteidigungslinien organisiert.",
+      ),
+    ).toBe("Die Aufgaben sind nach dem Modell der drei Verteidigungslinien organisiert");
+  });
+
+  it("stores the document's lower-case start when the model capitalised a clause", () => {
+    expect(groundQuote(linesOfDefence, "Die zweite Linie das CISO-Office.")).toBe(
+      "die zweite Linie das CISO-Office.",
+    );
+  });
+
+  it("still rejects a quote whose words differ from the document", () => {
+    expect(() =>
+      groundQuote(linesOfDefence, "Die zweite Linie bildet das CISO-Office."),
+    ).toThrowError(new GroundingValidationError("QUOTE_NOT_FOUND"));
+  });
+
   it("requires missing information for a non-assessable result", () => {
     const result = noAssessmentPossible(
       "Die bereitgestellten Inhalte reichen für eine belastbare Bewertung nicht aus.",
