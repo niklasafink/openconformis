@@ -1,6 +1,7 @@
 import { abs, compareWithTolerance, directionOf, ratioPercentMicro } from "../arithmetic";
 import type { PeriodHint } from "../figures";
 
+import { percentChangeLabel } from "./calculation";
 import { formatAmount, formatDifference } from "./comments";
 import type { Resolved, Resolver } from "./facts";
 import { findPostenMentions, postenByKey, type Posten, type PostenMention } from "./posten";
@@ -1005,11 +1006,11 @@ function groupChecks(
             sourceKind: fromTables ? "table" : "text",
             sourceFigureIds: sources,
             sourceBlockIds: [context.block.id],
-            sourceLabel: "Veränderung / Vorjahr",
+            sourceLabel: percentChangeLabel,
             comment: {
               code: ratioComparison.status === "match" ? "ratio_matches" : "ratio_differs",
               params: {
-                formula: "Veränderung / Vorjahr",
+                formula: percentChangeLabel,
                 expected: formatAmount(signedRatio, percentReference),
                 difference: formatDifference(ratioComparison.difference, percentReference),
                 rounded: ratioComparison.rounded ? "1" : "0",

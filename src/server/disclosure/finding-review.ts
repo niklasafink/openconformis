@@ -33,7 +33,8 @@ import {
 
 /**
  * Übernahme, Freigabe und Kommentare einer Feststellung des Plausichecks (D-034). Stufe 1
- * übernimmt den Soll-Wert als Korrektur oder bestätigt den Ist-Wert mit Begründung; das
+ * übernimmt den Soll-Wert als Korrektur oder bestätigt den Ist-Wert, je mit einem Klick und
+ * ohne Pflichtkommentar; das
  * Vier-Augen-Prinzip selbst — Rollen, Sperre, Prüfer ≠ Manager, Ablehnung als Ereignis —
  * steht in `review-core.ts` und gilt ebenso für die Vollständigkeitsprüfung.
  */
@@ -49,7 +50,7 @@ const preparerSchemas = [
     value: z.string().trim().max(40).optional(),
     reason: text(2_000).optional(),
   }),
-  z.object({ action: z.literal("confirm"), reason: text(2_000) }),
+  z.object({ action: z.literal("confirm"), reason: text(2_000).optional() }),
 ] as const;
 
 export const findingReviewSchema = z.discriminatedUnion("action", [
@@ -150,7 +151,7 @@ const findingStore: ReviewStore<FindingRow, PreparerInput> = {
     if (input.action === "confirm") {
       return {
         eventKind: "confirmed",
-        body: input.reason,
+        body: input.reason ?? null,
         attachmentId: null,
         auditAction: "confirmed",
         auditMetadata: { correction: false },

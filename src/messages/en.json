@@ -940,8 +940,7 @@
         "date": "Date",
         "dateHint": "Not checked automatically. Reconcile with the uploaded documents.",
         "close": "Close",
-        "subject": "Jump to the checked figure",
-        "aiFinding": "AI finding"
+        "subject": "Jump to the checked figure"
       },
       "source": {
         "page": "Page {page}",
@@ -1087,15 +1086,15 @@
         "prepared": "prepared",
         "reviewed": "reviewed"
       },
-      "aiFinding": "AI finding",
+      "aiFinding": "Conformis AI",
       "actual": "Actual",
       "expected": "Expected",
       "event": {
         "accepted": "accepted {value}",
         "confirmed": "confirmed the actual value",
-        "released": "released",
-        "rejected": "rejected",
-        "comment": "commented",
+        "released": "Released",
+        "rejected": "Rejected",
+        "comment": "Comment",
         "overridden": "set the status to “{value}”",
         "confirmedAssessment": "confirmed the assessment"
       },
@@ -1105,17 +1104,6 @@
       "release": "Release",
       "reject": "Reject",
       "cancel": "Cancel",
-      "value": "Accepted value",
-      "reasonRequired": "Reason (required)",
-      "reasonOptional": "Reason (optional)",
-      "rejectComment": "Comment (optional)",
-      "submit": {
-        "accept": "Accept",
-        "confirm": "Confirm",
-        "reject": "Reject",
-        "idle": "Send",
-        "override": "Override"
-      },
       "secondPersonRequired": "Confirmation by a second person required",
       "managerRequired": "Waiting for release by a manager",
       "comment": "Comment",
@@ -1141,7 +1129,8 @@
       },
       "override": "Override",
       "overrideStatus": "New status",
-      "reasonOverride": "Reason (required, at least 8 characters)"
+      "reasonOverride": "Reason (required, at least 8 characters)",
+      "submitOverride": "Override"
     },
     "checklists": {
       "eyebrow": "Disclosure review · Own checklist",

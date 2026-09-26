@@ -940,8 +940,7 @@
         "date": "Datum",
         "dateHint": "Nicht automatisch geprüft. Mit den hochgeladenen Unterlagen abstimmen.",
         "close": "Schließen",
-        "subject": "Zur geprüften Zahl springen",
-        "aiFinding": "KI-Befund"
+        "subject": "Zur geprüften Zahl springen"
       },
       "source": {
         "page": "Seite {page}",
@@ -1087,17 +1086,17 @@
         "prepared": "vorbereitet",
         "reviewed": "geprüft"
       },
-      "aiFinding": "KI-Befund",
+      "aiFinding": "Conformis AI",
       "actual": "Ist",
       "expected": "Soll",
       "event": {
-        "accepted": "hat {value} übernommen",
-        "confirmed": "hat den Ist-Wert bestätigt",
-        "released": "hat freigegeben",
-        "rejected": "hat abgelehnt",
-        "comment": "hat kommentiert",
-        "overridden": "hat den Status auf „{value}“ gesetzt",
-        "confirmedAssessment": "hat die Bewertung bestätigt"
+        "accepted": "{value} übernommen",
+        "confirmed": "Ist-Wert bestätigt",
+        "released": "Freigegeben",
+        "rejected": "Abgelehnt",
+        "comment": "Kommentar",
+        "overridden": "Status auf „{value}“ gesetzt",
+        "confirmedAssessment": "Bewertung bestätigt"
       },
       "reviewed": "Geprüft",
       "accept": "Übernehmen",
@@ -1105,17 +1104,6 @@
       "release": "Freigeben",
       "reject": "Ablehnen",
       "cancel": "Abbrechen",
-      "value": "Übernommener Wert",
-      "reasonRequired": "Begründung (Pflicht)",
-      "reasonOptional": "Begründung (optional)",
-      "rejectComment": "Kommentar (optional)",
-      "submit": {
-        "accept": "Übernehmen",
-        "confirm": "Bestätigen",
-        "reject": "Ablehnen",
-        "idle": "Senden",
-        "override": "Überschreiben"
-      },
       "secondPersonRequired": "Bestätigung durch eine zweite Person erforderlich",
       "managerRequired": "Wartet auf Freigabe durch einen Manager",
       "comment": "Kommentar",
@@ -1141,7 +1129,8 @@
       },
       "override": "Überschreiben",
       "overrideStatus": "Neuer Status",
-      "reasonOverride": "Begründung (Pflicht, mindestens 8 Zeichen)"
+      "reasonOverride": "Begründung (Pflicht, mindestens 8 Zeichen)",
+      "submitOverride": "Überschreiben"
     },
     "checklists": {
       "eyebrow": "Offenlegungspflicht · Eigene Checkliste",

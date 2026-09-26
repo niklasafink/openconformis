@@ -710,12 +710,14 @@ suite("disclosure plausibility runs against a real database", () => {
         review.reviewFinding(arithmetic.id, { action: "release" }),
       ).rejects.toMatchObject({ code: "DISCLOSURE_FINDING_REVIEWED" });
 
-      // Ein Richtungswort hat keinen Wert zum Übernehmen, nur Bestätigen mit Begründung.
+      // Ein Richtungswort hat keinen Wert zum Übernehmen, nur Bestätigen — ohne Pflichttext.
       actAs(userId, ["owner"]);
       await expect(review.reviewFinding(direction.id, { action: "accept" })).rejects.toMatchObject({
         code: "DISCLOSURE_VALUE_NOT_AVAILABLE",
       });
-      await review.reviewFinding(direction.id, { action: "confirm", reason: "Text bleibt so." });
+      expect(await review.reviewFinding(direction.id, { action: "confirm" })).toEqual({
+        status: "prepared",
+      });
 
       // Eine Erwähnung nur von Mitgliedern; die Leseseite zeigt den gesperrten Zustand.
       await review.reviewFinding(direction.id, {

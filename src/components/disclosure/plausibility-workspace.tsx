@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Bot,
   CircleCheck,
   ChevronDown,
   ChevronUp,
@@ -27,9 +26,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { calculationSteps, type CalculationStep } from "@/domain/disclosure/checks/calculation";
+import type { CheckKind } from "@/domain/disclosure/checks/types";
 
 import { EvidencePanel, type EvidenceFileView } from "./evidence-panel";
-import { FindingReviewPanel, type FindingReview, type ReviewMember } from "./finding-review-panel";
+import {
+  FindingReviewPanel,
+  ReviewTimeline,
+  type FindingReview,
+  type ReviewMember,
+} from "./finding-review-panel";
 import {
   DocumentView,
   type DocumentBlockContext,
@@ -58,7 +64,7 @@ export type FigureMark = {
 /** Eine Prüfung im Popover, bereits formatiert. */
 export type MarkCheck = Readonly<{
   id: string;
-  kind: string;
+  kind: CheckKind;
   status: "match" | "mismatch" | "uncertain";
   actual: string | null;
   expected: string | null;
@@ -196,6 +202,47 @@ function FigureChip({
     >
       {mark.display}
     </button>
+  );
+}
+
+const valueTone = {
+  match: "bg-[var(--status-met-bg)]",
+  mismatch: "bg-[var(--status-not-met-bg)]",
+  uncertain: "bg-[var(--status-partial-bg)]",
+  expected: "bg-[var(--status-met-bg)]",
+} as const;
+
+/** „Ist −0,6 Mio. EUR“: der Wert farbig hinterlegt, anklickbar, wenn er im Bericht steht. */
+function ValueChip({
+  label,
+  value,
+  tone,
+  jumpLabel,
+  onJump,
+}: Readonly<{
+  label: string;
+  value: string;
+  tone: keyof typeof valueTone;
+  jumpLabel: string;
+  onJump: (() => void) | null;
+}>) {
+  const chip = `rounded-sm px-1 font-medium tabular-nums ${valueTone[tone]}`;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-muted-foreground">{label}</span>
+      {onJump ? (
+        <button
+          type="button"
+          className={`${chip} underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring`}
+          aria-label={jumpLabel}
+          onClick={onJump}
+        >
+          {value}
+        </button>
+      ) : (
+        <span className={chip}>{value}</span>
+      )}
+    </span>
   );
 }
 
@@ -505,103 +552,173 @@ export function PlausibilityWorkspace({
   );
 
   const activeChecks = activeMark ? (checksBySubject[activeMark.id] ?? []) : [];
-  // Die schwerste Prüfung ist der Befund; die übrigen stehen als Einzeiler darunter.
+  // Die schwerste Prüfung ist der Befund; die übrigen stehen als Einzeiler darunter,
+  // sofern sie etwas anderes sagen.
   const primaryCheck = [...activeChecks].sort(
     (a, b) => statusRank[b.status] - statusRank[a.status],
   )[0];
-  const otherChecks = activeChecks.filter((check) => check !== primaryCheck);
+  const otherChecks = activeChecks.filter(
+    (check) =>
+      check !== primaryCheck &&
+      !(
+        primaryCheck &&
+        check.kind === primaryCheck.kind &&
+        check.status === primaryCheck.status &&
+        check.reason === primaryCheck.reason &&
+        check.expected === primaryCheck.expected
+      ),
+  );
   const activeReview = activeMark ? reviews[activeMark.id] : undefined;
   const activeFinding = activeMark ? findingBySubject.get(activeMark.id) : undefined;
   const ActiveIcon = activeMark ? statusIcon[activeMark.status] : CircleDashed;
   const sourceText = activeMark ? locationOf(activeMark.blockId) : "";
 
-  /** Begründung, Berechnung mit Bezugszahlen und Ist/Soll einer Prüfung. */
-  const renderCheck = (check: MarkCheck, detailed: boolean) => {
-    const CheckIcon = statusIcon[check.status];
-    const terms = check.sourceFigureIds.map((id, index) => ({
-      id,
-      mark: markById.get(id),
-      sign: check.sourceSigns ? (check.sourceSigns[index] ?? 1) : null,
-    }));
-    const known = terms.filter((term) => term.mark);
-    const withSigns = check.sourceSigns !== null && known.length === terms.length;
+  /** Ist und Soll: Ist springt zur geprüften Zahl, Soll zu ihrer Bezugszahl oder in die Belege. */
+  const renderValues = (check: MarkCheck, steps: CalculationStep[] | null) => {
+    if (!check.actual && !check.expected) return null;
+    const single =
+      steps === null && check.sourceFigureIds.length === 1
+        ? markById.get(check.sourceFigureIds[0]!)
+        : undefined;
+    const expectedJump = single
+      ? () => jumpTo(single.id)
+      : check.accountIds.length > 0 && evidence
+        ? () => showInEvidence(check.accountIds)
+        : null;
     return (
-      <div className="grid gap-1.5">
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        {check.actual && activeMark ? (
+          <ValueChip
+            label={t("check.actual")}
+            value={check.actual}
+            tone={check.status}
+            jumpLabel={t("check.jumpTo", { value: check.actual })}
+            onJump={() => jumpTo(activeMark.id)}
+          />
+        ) : null}
+        {check.actual && check.expected ? (
+          <span aria-hidden="true" className="text-muted-foreground">
+            ·
+          </span>
+        ) : null}
+        {check.expected ? (
+          <ValueChip
+            label={t("check.expected")}
+            value={check.expected}
+            tone="expected"
+            jumpLabel={
+              single ? t("check.jumpTo", { value: check.expected }) : t("check.showEvidence")
+            }
+            onJump={expectedJump}
+          />
+        ) : null}
+      </p>
+    );
+  };
+
+  /** Der Rechenweg als Mini-Tabelle: Operator, Bezugszahl (anklickbar), Zeile; unten das Ergebnis. */
+  const renderCalculation = (check: MarkCheck, steps: CalculationStep[] | null) => {
+    const rows = (
+      steps ?? check.sourceFigureIds.map((figureId) => ({ operator: null, figureId }))
+    ).map((step) => ({
+      step,
+      mark: "figureId" in step ? markById.get(step.figureId) : undefined,
+    }));
+    const shown = rows.filter((row) => !("figureId" in row.step) || row.mark);
+    // Eine einzelne Bezugszahl ohne Rechenweg erreicht man über den Soll-Wert.
+    const table = steps !== null || shown.length > 1;
+    const complete = steps !== null && shown.length === rows.length;
+    const evidenceLink =
+      check.accountIds.length > 0 && evidence ? (
+        <p>
+          <span className="text-muted-foreground">{check.source}</span>{" "}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-meta"
+            onClick={() => showInEvidence(check.accountIds)}
+          >
+            {t("check.showEvidence")}
+          </Button>
+        </p>
+      ) : null;
+    if (!table || shown.length === 0) return evidenceLink;
+    return (
+      <>
+        <table className="w-full border-collapse" aria-label={t("check.calculation")}>
+          {steps === null ? (
+            <caption className="pb-0.5 text-left text-muted-foreground">{check.source}</caption>
+          ) : null}
+          <tbody>
+            {shown.map((row, index) => (
+              <tr key={index}>
+                <td className="w-4 pr-1 text-right text-muted-foreground tabular-nums">
+                  {row.step.operator ?? ""}
+                </td>
+                <td className="pr-2 text-right whitespace-nowrap tabular-nums">
+                  {row.mark ? (
+                    <FigureChip
+                      mark={row.mark}
+                      label={t("check.jumpTo", { value: row.mark.display })}
+                      onJump={jumpTo}
+                    />
+                  ) : (
+                    <span className="font-medium">
+                      {"constant" in row.step ? row.step.constant : ""}
+                    </span>
+                  )}
+                </td>
+                <td className="w-full max-w-0 truncate text-muted-foreground">
+                  {row.mark ? termLabel(row.mark.blockId) : ""}
+                </td>
+              </tr>
+            ))}
+            {complete && check.expected ? (
+              <tr className="border-t border-border">
+                <td className="pt-0.5 pr-1 text-right text-muted-foreground">=</td>
+                <td className="pt-0.5 pr-2 text-right font-medium whitespace-nowrap tabular-nums">
+                  {check.expected}
+                </td>
+                <td />
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+        {evidenceLink}
+      </>
+    );
+  };
+
+  /** Der Befund: ein Satz, Ist und Soll, der Rechenweg. Weitere Prüfungen als Einzeiler. */
+  const renderCheck = (check: MarkCheck, primary: boolean) => {
+    if (!primary) {
+      const CheckIcon = statusIcon[check.status];
+      return (
         <p className="flex items-start gap-1.5">
-          {detailed ? null : (
-            <CheckIcon
-              aria-hidden="true"
-              className={`mt-0.5 size-3.5 shrink-0 ${statusTone[check.status]}`}
-            />
-          )}
+          <CheckIcon
+            aria-hidden="true"
+            className={`mt-0.5 size-3.5 shrink-0 ${statusTone[check.status]}`}
+          />
           <span>
-            {detailed ? null : <span className="font-medium">{t(`kind.${check.kind}`)} · </span>}
-            {check.reason}
-            {check.model ? ` · ${t("check.model")}` : ""}
+            <span className="font-medium">{t(`kind.${check.kind}`)}</span> · {check.reason}
+            {check.expected ? ` · ${t("check.expected")} ${check.expected}` : ""}
           </span>
         </p>
-        {detailed && (known.length > 0 || check.accountIds.length > 0) ? (
-          <div className="grid gap-0.5" aria-label={t("check.calculation")}>
-            {known.map((term, index) => (
-              <div key={term.id} className="grid grid-cols-[0.75rem_1fr] items-baseline gap-x-1.5">
-                <span className="text-right text-muted-foreground tabular-nums">
-                  {term.sign === null ? "" : term.sign < 0 ? "−" : index === 0 ? "" : "+"}
-                </span>
-                <span className="min-w-0">
-                  <FigureChip
-                    mark={term.mark}
-                    label={t("check.jumpTo", { value: term.mark!.display })}
-                    onJump={jumpTo}
-                  />{" "}
-                  <span className="text-muted-foreground">{termLabel(term.mark!.blockId)}</span>
-                </span>
-              </div>
-            ))}
-            {withSigns && check.expected ? (
-              <div className="mt-0.5 grid grid-cols-[0.75rem_1fr] items-baseline gap-x-1.5 border-t border-border pt-1">
-                <span className="text-right text-muted-foreground">=</span>
-                <span className="font-medium tabular-nums">{check.expected}</span>
-              </div>
-            ) : null}
-            {check.accountIds.length > 0 && evidence ? (
-              <div className="grid grid-cols-[0.75rem_1fr] items-baseline gap-x-1.5">
-                <span />
-                <span>
-                  <span className="text-muted-foreground">{check.source}</span>{" "}
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-meta"
-                    onClick={() => showInEvidence(check.accountIds)}
-                  >
-                    {t("check.showEvidence")}
-                  </Button>
-                </span>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-        {detailed && (check.actual || check.expected) ? (
-          <p className="flex flex-wrap items-center gap-1.5 tabular-nums">
-            {check.actual ? (
-              <span
-                className={`rounded-sm px-1 ${
-                  check.status === "mismatch" ? "bg-[var(--status-not-met-bg)]" : "bg-muted"
-                }`}
-              >
-                <span className="text-muted-foreground">{t("check.actual")}</span>{" "}
-                <span className="font-medium">{check.actual}</span>
-              </span>
-            ) : null}
-            {check.expected ? (
-              <span className="rounded-sm bg-[var(--status-met-bg)] px-1">
-                <span className="text-muted-foreground">{t("check.expected")}</span>{" "}
-                <span className="font-medium">{check.expected}</span>
-              </span>
-            ) : null}
-          </p>
-        ) : null}
+      );
+    }
+    const steps = calculationSteps({
+      kind: check.kind,
+      sourceFigureIds: check.sourceFigureIds,
+      sourceSigns: check.sourceSigns,
+      sourceLabel: check.source,
+    });
+    return (
+      <div className="grid gap-1.5">
+        <p>{check.reason}</p>
+        {renderValues(check, steps)}
+        {renderCalculation(check, steps)}
+        {check.model ? <p className="text-muted-foreground">{t("check.model")}</p> : null}
       </div>
     );
   };
@@ -896,17 +1013,8 @@ export function PlausibilityWorkspace({
                   errorMessages={reviewErrors}
                 />
               ) : (
-                <div className="px-3 py-2.5 text-meta">
-                  <ol className="grid gap-2.5 border-l border-border pl-3">
-                    <li className="relative grid gap-1">
-                      <Bot
-                        aria-hidden="true"
-                        className="absolute top-0.5 -left-[19px] size-3.5 bg-popover"
-                      />
-                      <span className="font-medium">{t("popover.aiFinding")}</span>
-                      {aiEntry}
-                    </li>
-                  </ol>
+                <div className="px-3 py-3 text-meta">
+                  <ReviewTimeline aiEntry={aiEntry} history={[]} reviewed={false} />
                 </div>
               )}
             </PopoverContent>
