@@ -26,15 +26,38 @@ type ReportUploadProps = Readonly<{
 
 type UploadState =
   | { phase: "idle"; error?: string }
-  /** `percent`: hochgeladene Bytes; null, solange der Anteil noch unbekannt ist. */
-  | { phase: "uploading"; name: string; percent: number | null }
-  | { phase: "processing"; name: string };
+  /** `percent`: Gesamtfortschritt über Upload, Aufbereitung und Übernahme (0–100). */
+  | { phase: "uploading" | "processing"; name: string; percent: number };
 
 type IntentResponse = {
   intentId: string;
   policyVersionId: string;
   upload: { pathname: string; handleUploadUrl: string };
 };
+
+/**
+ * Anteile der Schritte am Gesamtbalken. Der Byte-Upload ist meist schnell; die
+ * Aufbereitung dauert länger und meldet nur Stufen, daher nähert sich der Balken
+ * innerhalb einer Stufe schrittweise ihrer Obergrenze, ohne sie zu überholen.
+ */
+const uploadStart = 5;
+const uploadEnd = 60;
+const processingStages: Readonly<Record<string, number>> = {
+  uploaded: 70,
+  validating: 75,
+  parsing: 80,
+};
+const processingCeiling = 95;
+
+export function uploadPercent(percentage: number) {
+  return uploadStart + ((uploadEnd - uploadStart) * Math.min(100, Math.max(0, percentage))) / 100;
+}
+
+export function processingPercent(previous: number, parseStatus: string | undefined) {
+  const stageFloor = parseStatus ? (processingStages[parseStatus] ?? 0) : 0;
+  const base = Math.max(previous, stageFloor);
+  return Math.min(processingCeiling, base + (processingCeiling - base) * 0.08);
+}
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -70,7 +93,12 @@ export function ReportUpload({
     if (inputRef.current) inputRef.current.value = "";
     if (!isDocxFile(file.name)) return setState({ phase: "idle", error: t("docxOnly") });
     if (file.size > maximumPolicyBytes) return setState({ phase: "idle", error: t("tooLarge") });
-    setState({ phase: "uploading", name: file.name, percent: null });
+    let percent = 1;
+    const report = (phase: "uploading" | "processing", next: number) => {
+      percent = Math.max(percent, next);
+      setState({ phase, name: file.name, percent: Math.round(percent) });
+    };
+    report("uploading", 1);
     try {
       const draft = await prepareDraft({ locale });
       if (!draft.ok) throw new Error(draft.code);
@@ -89,14 +117,14 @@ export function ReportUpload({
         throw new Error(body.code ?? "UPLOAD_INTENT");
       }
       const intent = (await intentResponse.json()) as IntentResponse;
+      report("uploading", uploadStart);
       await upload(intent.upload.pathname, file, {
         access: "private",
         contentType: docxMimeType,
         handleUploadUrl: intent.upload.handleUploadUrl,
         clientPayload: JSON.stringify({ intentId: intent.intentId, draftId: draft.draftId }),
         multipart: true,
-        onUploadProgress: ({ percentage }) =>
-          setState({ phase: "uploading", name: file.name, percent: Math.round(percentage) }),
+        onUploadProgress: ({ percentage }) => report("uploading", uploadPercent(percentage)),
       });
       const completeResponse = await fetch(`/api/uploads/policy/${intent.intentId}/complete`, {
         method: "POST",
@@ -105,7 +133,7 @@ export function ReportUpload({
       });
       if (!completeResponse.ok) throw new Error("UPLOAD_COMPLETE");
 
-      setState({ phase: "processing", name: file.name });
+      report("processing", 65);
       let ready = false;
       for (let attempt = 0; attempt < 150 && !ready; attempt += 1) {
         const response = await fetch(
@@ -113,19 +141,26 @@ export function ReportUpload({
           { credentials: "same-origin", cache: "no-store" },
         );
         if (response.ok) {
-          const status = (await response.json()) as { ready: boolean; failed: boolean };
+          const status = (await response.json()) as {
+            ready: boolean;
+            failed: boolean;
+            parseStatus?: string;
+          };
           if (status.failed) throw new Error("PROCESSING_FAILED");
           ready = status.ready;
+          if (!ready) report("processing", processingPercent(percent, status.parseStatus));
         }
         if (!ready) await sleep(2_000);
       }
       if (!ready) throw new Error("PROCESSING_FAILED");
+      report("processing", 97);
       const attached = await attachReport({
         caseId,
         policyVersionId: intent.policyVersionId,
         draftId: draft.draftId,
       });
       if (!attached.ok) throw new Error(attached.code);
+      report("processing", 100);
       router.refresh();
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
@@ -185,14 +220,12 @@ export function ReportUpload({
             </p>
             <div className="flex items-center gap-3">
               <Progress
-                value={state.phase === "uploading" ? state.percent : null}
+                value={state.percent}
                 aria-label={state.phase === "uploading" ? t("uploading") : t("processing")}
               />
-              {state.phase === "uploading" && state.percent !== null ? (
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {state.percent} %
-                </span>
-              ) : null}
+              <span className="w-9 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                {state.percent} %
+              </span>
             </div>
           </div>
         ) : (
