@@ -745,7 +745,6 @@
   },
   "Disclosure": {
     "title": "Disclosure review",
-    "listEyebrow": "Audit reports",
     "newCase": "Review name",
     "newCasePlaceholder": "e.g. Audit report gbs 2021",
     "create": "Create review",

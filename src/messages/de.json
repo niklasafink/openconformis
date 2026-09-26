@@ -745,7 +745,6 @@
   },
   "Disclosure": {
     "title": "Offenlegungspflicht",
-    "listEyebrow": "Prüfungsberichte",
     "newCase": "Name der Prüfung",
     "newCasePlaceholder": "z. B. Prüfungsbericht gbs 2021",
     "create": "Prüfung anlegen",

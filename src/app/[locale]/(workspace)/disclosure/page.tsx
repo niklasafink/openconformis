@@ -40,7 +40,6 @@ export default async function DisclosureListPage({ params }: DisclosureListPageP
     <>
       <PageHeader
         title={t("title")}
-        eyebrow={t("listEyebrow")}
         actions={<LanguageMenu locale={locale} pathname="/disclosure" />}
       />
       <div className="workspace-content min-w-0">
