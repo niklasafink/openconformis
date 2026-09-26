@@ -17,6 +17,8 @@ export type AnalysisRunState = {
   status: AnalysisStatus;
   stage: AnalysisStage;
   progressPercent: number;
+  /** Ändert sich mit jedem gespeicherten Ergebnis und jedem nachgereichten Abschlusstext. */
+  updatedAt?: string;
 };
 
 type AnalysisRunLiveProps = {
@@ -77,12 +79,14 @@ export function useAnalysisRunState(analysisId: string, initialState: AnalysisRu
         const next = (await response.json()) as AnalysisRunState;
         if (disposed) return;
         setPollingFailed(false);
-        const advanced = next.progressPercent !== state.progressPercent;
+        const advanced =
+          next.progressPercent !== state.progressPercent || next.updatedAt !== state.updatedAt;
         setState(next);
         // Auch beim Fehlschlag neu laden: die Begründung des Anbieters wird
         // erst beim Scheitern geschrieben und steckt in der Serverantwort,
         // nicht im Statusabruf. Bei Fortschritt ebenso: der Worker schreibt die
-        // Bewertungen einzeln, und jede fertige ersetzt eine Vorabeinschätzung.
+        // Bewertungen einzeln, und jede fertige ersetzt eine Vorabeinschätzung;
+        // ein nachgereichter Abschlusstext ändert nur `updatedAt`.
         if (terminalStatuses.has(next.status) || advanced) router.refresh();
         if (!terminalStatuses.has(next.status)) schedule();
       } catch {
@@ -97,7 +101,7 @@ export function useAnalysisRunState(analysisId: string, initialState: AnalysisRu
       disposed = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [analysisId, router, state.progressPercent, state.status]);
+  }, [analysisId, router, state.progressPercent, state.status, state.updatedAt]);
 
   return { state, pollingFailed };
 }

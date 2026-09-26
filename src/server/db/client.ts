@@ -17,6 +17,20 @@ function maximumClientConnections() {
   return configured;
 }
 
+/**
+ * Tests behalten genau eine Verbindung: ein `db` innerhalb einer Transaktion bleibt
+ * dort sofort hängen, statt unbemerkt eine zweite Verbindung zu nehmen. `next dev`
+ * darf mit gesetztem DATABASE_CLIENT_MAX mehr — gegen eine entfernte Datenbank
+ * warteten sonst alle parallel bewerteten Anforderungen auf dieselbe Verbindung.
+ */
+function clientConnectionLimit() {
+  if (process.env.NODE_ENV === "production") return maximumClientConnections();
+  if (process.env.NODE_ENV === "development" && process.env.DATABASE_CLIENT_MAX?.trim()) {
+    return maximumClientConnections();
+  }
+  return 1;
+}
+
 type GlobalDatabase = typeof globalThis & {
   conformisPostgresClient?: ReturnType<typeof postgres>;
 };
@@ -28,7 +42,7 @@ export const postgresClient =
   postgres(connectionString, {
     connect_timeout: 10,
     idle_timeout: 20,
-    max: process.env.NODE_ENV === "production" ? maximumClientConnections() : 1,
+    max: clientConnectionLimit(),
     prepare: false,
   });
 

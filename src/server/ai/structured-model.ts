@@ -22,7 +22,18 @@ export type StructuredModelRequest<T> = {
   /** Denktiefe für Modelle mit Reasoning; Anbieter ohne Steuerung ignorieren sie. */
   reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
   timeoutMilliseconds?: number;
+  /** Bricht den Aufruf ab, etwa wenn ein abgesicherter Zweitaufruf schneller war. */
+  signal?: AbortSignal;
 };
+
+/** Das Zeitlimit eines Anbieteraufrufs, verbunden mit einem optionalen Abbruch. */
+export function providerRequestSignal(
+  request: Pick<StructuredModelRequest<unknown>, "signal">,
+  timeoutMilliseconds: number,
+) {
+  const timeout = AbortSignal.timeout(timeoutMilliseconds);
+  return request.signal ? AbortSignal.any([timeout, request.signal]) : timeout;
+}
 
 export type StructuredModelResponse<T> = {
   providerRequestId: string;

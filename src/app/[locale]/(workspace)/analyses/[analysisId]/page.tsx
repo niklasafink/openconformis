@@ -139,6 +139,7 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
           status: analysis.status,
           stage: analysis.stage,
           progressPercent: analysis.progressPercent,
+          updatedAt: analysis.updatedAt.toISOString(),
         }}
         labels={runHeaderLabels}
       >
@@ -212,6 +213,7 @@ export default async function AnalysisPage({ params, searchParams }: AnalysisPag
                 status: analysis.status,
                 stage: analysis.stage,
                 progressPercent: analysis.progressPercent,
+                updatedAt: analysis.updatedAt.toISOString(),
               }}
               labels={liveLabels}
             />

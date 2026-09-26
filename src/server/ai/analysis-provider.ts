@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AiRouteProvider } from "@/domain/ai/provider";
+import { hedgedRequest } from "./hedged-request";
 import { getAnalysisProviderConfiguration, requestProviderStructured } from "./provider-routing";
 import { TemporaryCredentialError, withTemporaryCredential } from "./temporary-credential-service";
 import type { StructuredModelRequest } from "./structured-model";
@@ -13,6 +14,16 @@ type AnalysisCredentialBinding = {
   routeProvider: AiRouteProvider;
   sourceDraftId: string;
 };
+
+/**
+ * Nach wie vielen Sekunden ein zweiter, identischer Aufruf startet. Die Bewertungen
+ * stehen üblicherweise nach 5–20 s, Verifikationen nach 5–30 s; ein hängender
+ * Anbieter bestimmte sonst allein die Dauer des ganzen Laufs. `0` schaltet ab.
+ */
+function hedgeAfterMilliseconds() {
+  const seconds = Number.parseInt(process.env.ANALYSIS_HEDGE_AFTER_SECONDS?.trim() || "30", 10);
+  return Number.isInteger(seconds) && seconds > 0 ? seconds * 1_000 : 0;
+}
 
 export async function requestStructuredForAnalysis<T>(
   analysis: AnalysisCredentialBinding,
@@ -39,13 +50,18 @@ export async function requestStructuredForAnalysis<T>(
       requiredModelId: analysis.providerModelId,
     },
     (apiKey) =>
-      requestProviderStructured(analysis.routeProvider, {
-        ...request,
-        baseUrl: provider.baseUrl,
-        maxOutputTokens: request.maxOutputTokens ?? provider.maxOutputTokens,
-        reasoningEffort: provider.reasoningEffort,
-        zeroDataRetention: provider.zeroDataRetention,
-        apiKey,
-      }),
+      hedgedRequest(
+        (signal) =>
+          requestProviderStructured(analysis.routeProvider, {
+            ...request,
+            baseUrl: provider.baseUrl,
+            maxOutputTokens: request.maxOutputTokens ?? provider.maxOutputTokens,
+            reasoningEffort: provider.reasoningEffort,
+            zeroDataRetention: provider.zeroDataRetention,
+            apiKey,
+            signal,
+          }),
+        hedgeAfterMilliseconds(),
+      ),
   );
 }

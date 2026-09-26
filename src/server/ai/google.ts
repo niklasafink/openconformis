@@ -14,6 +14,7 @@ import {
   throwIfProviderErrorPayload,
   type StructuredModelRequest,
   type StructuredModelResponse,
+  providerRequestSignal,
 } from "./structured-model";
 
 const responseSchema = z.object({
@@ -82,7 +83,7 @@ export async function requestGoogleStructured<T>(
           responseJsonSchema: request.jsonSchema,
         },
       }),
-      signal: AbortSignal.timeout(request.timeoutMilliseconds ?? 120_000),
+      signal: providerRequestSignal(request, request.timeoutMilliseconds ?? 120_000),
     },
     fetchImplementation,
   );

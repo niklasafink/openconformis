@@ -779,9 +779,181 @@ async function persistItemResult(input: {
  * eindeutige Zuordnung je Ergebnis wiederholbar: ein abgebrochener Lauf setzt
  * hier fort, ohne einen zweiten Text zu erzeugen.
  */
-async function ensureItemConclusion(analysis: AnalysisRecord, item: ScopeRecord) {
+type ConclusionInput = {
+  assessment: {
+    status: RequirementAssessment["status"];
+    explanation: string;
+    missingInformation: string[];
+    confidencePercent: number;
+  };
+  citations: {
+    citationOrder: number;
+    support: RequirementAssessment["evidence"][number]["support"];
+    exactQuote: string;
+    pageNumber: number | null;
+    paragraphNumber: number | null;
+  }[];
+};
+
+function conclusionPromptFor(analysis: AnalysisRecord, item: ScopeRecord, input: ConclusionInput) {
   const instruction = analysis.conclusionInstruction;
-  if (!instruction || !analysis.conclusionPromptVersion) return;
+  if (!instruction || !analysis.conclusionPromptVersion) return undefined;
+  const scope = item.scope;
+  const prompt = buildConclusionPrompt(
+    {
+      profile: analysis.analysisProfile,
+      locale: analysis.locale,
+      institutionSize: analysis.institutionSize,
+      organizationContext: analysis.organizationContext,
+      requirement: {
+        regulatoryId: scope.regulatoryId,
+        title: scope.title,
+        legalText: scope.legalText,
+        assessmentAspects: scope.assessmentAspects,
+        sizeGuidance: scope.sizeGuidance,
+        subrequirements: scope.subrequirements.map((subrequirement) => ({
+          regulatoryId: subrequirement.regulatoryId,
+          title: subrequirement.title,
+          legalText: subrequirement.legalText,
+          assessmentAspects: subrequirement.assessmentAspects,
+        })),
+      },
+      assessment: input.assessment,
+      citations: input.citations,
+    },
+    instruction.instruction,
+  );
+  const inputHash = createContentHash({
+    promptVersion: analysis.conclusionPromptVersion,
+    profile: analysis.analysisProfile,
+    modelId: analysis.providerModelId,
+    system: prompt.system,
+    user: prompt.user,
+    schema: prompt.jsonSchema,
+  });
+  return { prompt, inputHash };
+}
+
+type ConclusionPrompt = NonNullable<ReturnType<typeof conclusionPromptFor>>;
+
+/**
+ * Der Modellaufruf des Abschlusstexts mit seinen zwei Versuchen. Gibt `undefined`
+ * zurück, wenn beide Antworten unbrauchbar waren; die Bewertung steht dann ohne Text.
+ */
+async function requestConclusion(
+  analysis: AnalysisRecord,
+  item: ScopeRecord,
+  { prompt, inputHash }: ConclusionPrompt,
+) {
+  let truncated = false;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const invocationId = await startInvocation({
+      analysisId: analysis.id,
+      scopeItemId: item.scope.id,
+      stage: `conclusion_attempt_${attempt}`,
+      provider: analysis.routeProvider,
+      modelId: analysis.providerModelId,
+      inputHash,
+    });
+    const startedAt = Date.now();
+    try {
+      const response = await requestStructuredForAnalysis(analysis, {
+        modelId: analysis.providerModelId,
+        system:
+          attempt === 1
+            ? prompt.system
+            : truncated
+              ? `${prompt.system}\n${truncatedRetryInstruction}`
+              : `${prompt.system}\nA prior output failed schema validation. Return every required field exactly once.`,
+        user: prompt.user,
+        schemaName: prompt.schemaName,
+        jsonSchema: { ...prompt.jsonSchema },
+        outputSchema: prompt.outputSchema,
+        maxOutputTokens: truncated ? largerOutputBudget(analysis) : undefined,
+      });
+      const outputHash = createContentHash(response.output);
+      await finishInvocation(invocationId, startedAt, response, outputHash);
+      return { output: response.output, resolvedModelId: response.resolvedModelId, outputHash };
+    } catch (error) {
+      const failure = withProviderErrorContext(
+        error,
+        invocationContext(analysis, item, "conclusion", attempt),
+      );
+      await failInvocation(invocationId, startedAt, failure, undefined, analysis.id);
+      if (error instanceof ModelProviderError) {
+        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
+          truncated = true;
+          continue;
+        }
+        // Eine gesperrte Route oder ein ungültiger Schlüssel betrifft den ganzen
+        // Lauf und muss ihn beenden. Eine unbrauchbare Antwort dagegen kostet
+        // nur diesen Text: die Bewertung samt Belegen steht bereits.
+        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
+        truncated = false;
+        continue;
+      }
+      throw error;
+    }
+  }
+  return undefined;
+}
+
+type ConclusionResponse = NonNullable<Awaited<ReturnType<typeof requestConclusion>>>;
+
+/**
+ * Vorgezogener Abschlusstext: läuft gleichzeitig mit der Verifikation, aus genau den
+ * Feldern, die danach gespeichert werden, wenn die Verifikation bestätigt. Übernommen
+ * wird er nur, wenn der Prompt aus dem gespeicherten Ergebnis zeichengleich ist —
+ * sonst verfällt er, und der Text entsteht wie bisher aus dem gespeicherten Stand.
+ */
+type SpeculativeConclusion = {
+  prompt: ConclusionPrompt;
+  response: Promise<ConclusionResponse | undefined>;
+};
+
+function speculativeConclusionEnabled() {
+  return process.env.ANALYSIS_SPECULATIVE_CONCLUSION?.trim().toLowerCase() !== "off";
+}
+
+function startSpeculativeConclusion(
+  analysis: AnalysisRecord,
+  item: ScopeRecord,
+  proposed: Awaited<ReturnType<typeof assessItem>>,
+): SpeculativeConclusion | undefined {
+  if (!speculativeConclusionEnabled() || !requiresConclusion(proposed.assessment.status)) {
+    return undefined;
+  }
+  const prompt = conclusionPromptFor(analysis, item, {
+    assessment: {
+      status: proposed.assessment.status,
+      explanation: proposed.assessment.explanation,
+      missingInformation: proposed.assessment.missingInformation,
+      confidencePercent: proposed.assessment.confidencePercent,
+    },
+    citations: proposed.evidence.map((evidence, index) => ({
+      citationOrder: index + 1,
+      support: evidence.support,
+      exactQuote: evidence.exactQuote,
+      pageNumber: evidence.pageNumber,
+      paragraphNumber: evidence.paragraphNumber,
+    })),
+  });
+  if (!prompt) return undefined;
+  // Ein Fehler hier kostet nur den Vorgriff; der reguläre Aufruf danach meldet ihn.
+  const response = requestConclusion(analysis, item, prompt).catch(() => undefined);
+  return { prompt, response };
+}
+
+function samePrompt(left: ConclusionPrompt, right: ConclusionPrompt) {
+  return left.inputHash === right.inputHash;
+}
+
+async function ensureItemConclusion(
+  analysis: AnalysisRecord,
+  item: ScopeRecord,
+  speculative?: SpeculativeConclusion,
+) {
+  if (!analysis.conclusionInstruction || !analysis.conclusionPromptVersion) return;
 
   const [result] = await db
     .select({
@@ -813,108 +985,33 @@ async function ensureItemConclusion(analysis: AnalysisRecord, item: ScopeRecord)
     .where(eq(analysisEvidence.resultId, result.id))
     .orderBy(asc(analysisEvidence.citationOrder));
 
-  const scope = item.scope;
-  const prompt = buildConclusionPrompt(
-    {
-      profile: analysis.analysisProfile,
-      locale: analysis.locale,
-      institutionSize: analysis.institutionSize,
-      organizationContext: analysis.organizationContext,
-      requirement: {
-        regulatoryId: scope.regulatoryId,
-        title: scope.title,
-        legalText: scope.legalText,
-        assessmentAspects: scope.assessmentAspects,
-        sizeGuidance: scope.sizeGuidance,
-        subrequirements: scope.subrequirements.map((subrequirement) => ({
-          regulatoryId: subrequirement.regulatoryId,
-          title: subrequirement.title,
-          legalText: subrequirement.legalText,
-          assessmentAspects: subrequirement.assessmentAspects,
-        })),
-      },
-      assessment: {
-        status: result.status,
-        explanation: result.explanation,
-        missingInformation: result.missingInformation,
-        confidencePercent: Math.round(result.confidenceBasisPoints / 100),
-      },
-      citations,
+  const prompt = conclusionPromptFor(analysis, item, {
+    assessment: {
+      status: result.status,
+      explanation: result.explanation,
+      missingInformation: result.missingInformation,
+      confidencePercent: Math.round(result.confidenceBasisPoints / 100),
     },
-    instruction.instruction,
-  );
-  const inputHash = createContentHash({
-    promptVersion: analysis.conclusionPromptVersion,
-    profile: analysis.analysisProfile,
-    modelId: analysis.providerModelId,
-    resultOutputHash: result.id,
-    system: prompt.system,
-    user: prompt.user,
-    schema: prompt.jsonSchema,
+    citations,
   });
+  if (!prompt) return;
 
-  let truncated = false;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const invocationId = await startInvocation({
-      analysisId: analysis.id,
-      scopeItemId: scope.id,
-      stage: `conclusion_attempt_${attempt}`,
-      provider: analysis.routeProvider,
-      modelId: analysis.providerModelId,
-      inputHash,
-    });
-    const startedAt = Date.now();
-    try {
-      const response = await requestStructuredForAnalysis(analysis, {
-        modelId: analysis.providerModelId,
-        system:
-          attempt === 1
-            ? prompt.system
-            : truncated
-              ? `${prompt.system}\n${truncatedRetryInstruction}`
-              : `${prompt.system}\nA prior output failed schema validation. Return every required field exactly once.`,
-        user: prompt.user,
-        schemaName: prompt.schemaName,
-        jsonSchema: { ...prompt.jsonSchema },
-        outputSchema: prompt.outputSchema,
-        maxOutputTokens: truncated ? largerOutputBudget(analysis) : undefined,
-      });
-      const outputHash = createContentHash(response.output);
-      await finishInvocation(invocationId, startedAt, response, outputHash);
-      await db
-        .insert(analysisRequirementConclusions)
-        .values({
-          resultId: result.id,
-          profile: analysis.analysisProfile,
-          ...conclusionRecord(analysis.analysisProfile, response.output),
-          modelId: response.resolvedModelId,
-          promptVersion: analysis.conclusionPromptVersion,
-          inputHash,
-          outputHash,
-        })
-        .onConflictDoNothing({ target: analysisRequirementConclusions.resultId });
-      return;
-    } catch (error) {
-      const failure = withProviderErrorContext(
-        error,
-        invocationContext(analysis, item, "conclusion", attempt),
-      );
-      await failInvocation(invocationId, startedAt, failure, undefined, analysis.id);
-      if (error instanceof ModelProviderError) {
-        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
-          truncated = true;
-          continue;
-        }
-        // Eine gesperrte Route oder ein ungültiger Schlüssel betrifft den ganzen
-        // Lauf und muss ihn beenden. Eine unbrauchbare Antwort dagegen kostet
-        // nur diesen Text: die Bewertung samt Belegen steht bereits.
-        if (error.retryable || error.code !== "MODEL_OUTPUT_INVALID") throw failure;
-        truncated = false;
-        continue;
-      }
-      throw error;
-    }
-  }
+  const drafted =
+    speculative && samePrompt(speculative.prompt, prompt) ? await speculative.response : undefined;
+  const response = drafted ?? (await requestConclusion(analysis, item, prompt));
+  if (!response) return;
+  await db
+    .insert(analysisRequirementConclusions)
+    .values({
+      resultId: result.id,
+      profile: analysis.analysisProfile,
+      ...conclusionRecord(analysis.analysisProfile, response.output),
+      modelId: response.resolvedModelId,
+      promptVersion: analysis.conclusionPromptVersion,
+      inputHash: prompt.inputHash,
+      outputHash: response.outputHash,
+    })
+    .onConflictDoNothing({ target: analysisRequirementConclusions.resultId });
 }
 
 /** Der Schlüssel des Nutzers lebt nur so lange wie der Lauf, der ihn braucht. */
@@ -939,7 +1036,7 @@ async function deleteAnalysisCredential(
 
 /** Wie viele Anforderungen eines Laufs gleichzeitig beim Anbieter liegen. */
 function requirementConcurrency() {
-  const value = Number.parseInt(process.env.ANALYSIS_REQUIREMENT_CONCURRENCY?.trim() || "8", 10);
+  const value = Number.parseInt(process.env.ANALYSIS_REQUIREMENT_CONCURRENCY?.trim() || "10", 10);
   if (!Number.isInteger(value) || value < 1 || value > 20) {
     throw new Error("ANALYSIS_CONCURRENCY_INVALID");
   }
@@ -997,6 +1094,27 @@ export async function prepareAnalysisExecution(analysisId: string, workflowRunId
   };
 }
 
+/**
+ * Parallel bewertete Anforderungen enden in beliebiger Reihenfolge. Der Fortschritt
+ * zählt deshalb gespeicherte Ergebnisse und fällt nie zurück; `updatedAt` ändert sich
+ * bei jedem Aufruf, damit die Seite auch einen nachgereichten Abschlusstext lädt.
+ */
+async function recordProgress(analysisId: string, total: number) {
+  const [processed] = await db
+    .select({ count: sql<number>`count(*)::integer` })
+    .from(analysisRequirementResults)
+    .where(eq(analysisRequirementResults.analysisId, analysisId));
+  const progressPercent = 35 + Math.round((Math.min(processed?.count ?? 0, total) / total) * 55);
+  await db
+    .update(analyses)
+    .set({
+      stage: "verification",
+      progressPercent: sql`greatest(${analyses.progressPercent}, ${progressPercent})`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(analyses.id, analysisId), eq(analyses.status, "running")));
+}
+
 export async function executeAnalysisScopeItem(input: {
   analysisId: string;
   scopeItemId: string;
@@ -1014,6 +1132,7 @@ export async function executeAnalysisScopeItem(input: {
     .from(analysisRequirementResults)
     .where(eq(analysisRequirementResults.scopeItemId, item.scope.id))
     .limit(1);
+  let speculative: SpeculativeConclusion | undefined;
   if (!existing) {
     const loadedCandidates = await loadCandidates(analysis, item);
     // Jev ist optional: ohne eingefrorene Stufe oder Schlüssel ist `ask` undefiniert,
@@ -1074,6 +1193,10 @@ export async function executeAnalysisScopeItem(input: {
       reasons = reasonsAfterTriage(reasons, waived);
     }
 
+    // Der Abschlusstext wartet sonst auf die Verifikation, obwohl er bei einer
+    // Bestätigung genau dieselbe Eingabe bekommt.
+    speculative =
+      reasons.length > 0 ? startSpeculativeConclusion(analysis, item, proposed) : undefined;
     const verification =
       reasons.length > 0
         ? await verifyItem(analysis, item, candidates, proposed.assessment)
@@ -1086,27 +1209,15 @@ export async function executeAnalysisScopeItem(input: {
       selectionReasons: reasons,
       citationNeedsReview: citationOutcome?.needsReview,
     });
+    // Sofort sichtbar machen: die Ergebnisseite lädt nach, sobald sich der Stand
+    // ändert, und der Nutzer kann mit der Prüfung beginnen, während der
+    // Abschlusstext noch entsteht.
+    await recordProgress(analysis.id, input.total);
   }
   // Nach dem gespeicherten Ergebnis, damit ein fortgesetzter Lauf den fehlenden
   // Abschlusstext nachholt, statt die Anforderung ohne ihn zu lassen.
-  await ensureItemConclusion(analysis, item);
-
-  // Parallel bewertete Anforderungen enden in beliebiger Reihenfolge. Der
-  // Fortschritt zählt deshalb gespeicherte Ergebnisse und fällt nie zurück.
-  const [processed] = await db
-    .select({ count: sql<number>`count(*)::integer` })
-    .from(analysisRequirementResults)
-    .where(eq(analysisRequirementResults.analysisId, analysis.id));
-  const progressPercent =
-    35 + Math.round((Math.min(processed?.count ?? 0, input.total) / input.total) * 55);
-  await db
-    .update(analyses)
-    .set({
-      stage: "verification",
-      progressPercent: sql`greatest(${analyses.progressPercent}, ${progressPercent})`,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(analyses.id, analysis.id), eq(analyses.status, "running")));
+  await ensureItemConclusion(analysis, item, speculative);
+  await recordProgress(analysis.id, input.total);
   return { status: "processed" as const, scopeItemId: item.scope.id };
 }
 

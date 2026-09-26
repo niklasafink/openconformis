@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import { openRouterUrl } from "./openrouter-route";
+import { openRouterProviderSort, openRouterUrl } from "./openrouter-route";
 
 import {
   assertStructuredRequest,
@@ -11,6 +11,7 @@ import {
   invalidProviderResponse,
   ModelProviderError,
   parseStructuredOutput,
+  providerRequestSignal,
   providerRequestTimeoutMilliseconds,
   readProviderErrorDetail,
   throwIfProviderErrorPayload,
@@ -117,9 +118,11 @@ export async function requestOpenRouterStructured<T>(
           // Konstanten. Werden sie nicht verlangt, dürfen sie die Routenwahl
           // auch nicht einschränken.
           ...(request.zeroDataRetention ? { data_collection: "deny", zdr: true } : {}),
+          ...(openRouterProviderSort() ? { sort: openRouterProviderSort() } : {}),
         },
       }),
-      signal: AbortSignal.timeout(
+      signal: providerRequestSignal(
+        request,
         request.timeoutMilliseconds ?? providerRequestTimeoutMilliseconds,
       ),
     },

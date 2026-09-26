@@ -14,6 +14,18 @@ export function openRouterZeroDataRetention() {
   return process.env.OPENROUTER_ZDR?.trim().toLowerCase() === "true";
 }
 
+const providerSorts = new Set(["latency", "throughput", "price"]);
+
+/**
+ * Wie OpenRouter unter den Hosts desselben Modells wählt. Ohne Angabe gewichtet
+ * OpenRouter nach Preis; `latency` oder `throughput` bevorzugen schnelle Hosts. Das
+ * Modell bleibt dasselbe, nur der ausführende Anbieter wechselt.
+ */
+export function openRouterProviderSort() {
+  const value = process.env.OPENROUTER_PROVIDER_SORT?.trim().toLowerCase();
+  return value && providerSorts.has(value) ? value : undefined;
+}
+
 export function openRouterModelsUrl(
   input: { baseUrl: string; zeroDataRetention: boolean },
   user = false,

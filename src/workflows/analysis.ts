@@ -75,27 +75,36 @@ export async function analysisWorkflow(analysisId: string) {
     const prepared = await prepareAnalysisStep(analysisId, workflowRunId);
     if (prepared.status !== "running") return prepared;
     const { scopeItemIds, concurrency } = prepared;
-    // Anforderungen sind voneinander unabhängig. Nacheinander bewertet dauerte ein
-    // Lauf mit zehn Anforderungen sechs bis zehn Minuten; parallel bestimmt die
-    // langsamste Anforderung eines Blocks die Dauer.
-    for (let start = 0; start < scopeItemIds.length; start += concurrency) {
-      const settled = await Promise.allSettled(
-        scopeItemIds
-          .slice(start, start + concurrency)
-          .map((scopeItemId, offset) =>
-            analyzeRequirementStep(analysisId, scopeItemId, start + offset, scopeItemIds.length),
-          ),
-      );
-      // Erst den ganzen Block abwarten: laufende Nachbarn sollen ihr Ergebnis
-      // speichern, bevor der Lauf als fehlgeschlagen markiert wird.
-      const failed = settled.find((result) => result.status === "rejected");
-      if (failed) throw failed.reason;
-      // Gestoppt: keine weiteren Anforderungen bewerten, nichts als Fehler melden.
-      const cancelled = settled.find(
-        (result) => result.status === "fulfilled" && result.value.status === "cancelled",
-      );
-      if (cancelled?.status === "fulfilled") return cancelled.value;
-    }
+    // Anforderungen sind voneinander unabhängig. Ein fortlaufender Pool startet die
+    // nächste, sobald eine fertig ist; feste Blöcke warteten stets auf die
+    // langsamste ihres Blocks, bevor der nächste begann.
+    let next = 0;
+    let failure: { reason: unknown } | undefined;
+    let cancelled: Awaited<ReturnType<typeof analyzeRequirementStep>> | undefined;
+    const lane = async () => {
+      while (next < scopeItemIds.length && !failure && !cancelled) {
+        const index = next;
+        next += 1;
+        try {
+          const result = await analyzeRequirementStep(
+            analysisId,
+            scopeItemIds[index]!,
+            index,
+            scopeItemIds.length,
+          );
+          // Gestoppt: keine weiteren Anforderungen bewerten, nichts als Fehler melden.
+          if (result.status === "cancelled") cancelled ??= result;
+        } catch (reason) {
+          failure ??= { reason };
+        }
+      }
+    };
+    // Laufende Nachbarn speichern ihr Ergebnis, bevor der Lauf als fehlgeschlagen gilt.
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, scopeItemIds.length) }, () => lane()),
+    );
+    if (failure) throw failure.reason;
+    if (cancelled) return cancelled;
     return await finalizeAnalysisStep(analysisId);
   } catch (error) {
     // Die Begründung des Anbieters mitschreiben, damit die Ergebnisseite den
