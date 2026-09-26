@@ -13,6 +13,15 @@ import {
 import { documentBlocks } from "@/server/db/schema/documents";
 
 /**
+ * Zuletzt geladene Dokumente je Instanz. Jeder Schritt eines Laufs braucht dasselbe
+ * Dokument; über eine entfernte Datenbank kostet das Laden Sekunden. Der Schlüssel
+ * enthält den Zeitpunkt der Erkennung: eine neue Erkennung lädt neu.
+ */
+const cache = new Map<string, { loadedAt: number; document: EngineDocument }>();
+const cacheLimit = 6;
+const cacheLifetimeMilliseconds = 15 * 60_000;
+
+/**
  * Das Dokument, wie die Prüfungen es sehen: die unveränderlichen Blöcke eines Berichts
  * mit ihrem Kontext und die gespeicherten Zahlen und Richtungswörter. Die IDs sind die
  * der Datenbank, damit jede Prüfung auf eine gespeicherte Zahl verweist.
@@ -22,11 +31,31 @@ export async function loadEngineDocument(caseDocumentId: string): Promise<Engine
     .select({
       policyVersionId: disclosureCaseDocuments.policyVersionId,
       reportYear: disclosureCaseDocuments.reportYear,
+      recognizedAt: disclosureCaseDocuments.recognizedAt,
+      recognitionVersion: disclosureCaseDocuments.recognitionVersion,
     })
     .from(disclosureCaseDocuments)
     .where(eq(disclosureCaseDocuments.id, caseDocumentId))
     .limit(1);
   if (!document?.policyVersionId) return null;
+  const key = `${caseDocumentId}:${document.recognitionVersion}:${document.recognizedAt?.getTime() ?? 0}`;
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.loadedAt < cacheLifetimeMilliseconds) return cached.document;
+  const loaded = await loadUncached(caseDocumentId, document.policyVersionId, document.reportYear);
+  for (const stale of cache.keys()) {
+    if (stale.startsWith(`${caseDocumentId}:`)) cache.delete(stale);
+  }
+  cache.set(key, { loadedAt: Date.now(), document: loaded });
+  while (cache.size > cacheLimit) cache.delete(cache.keys().next().value!);
+  return loaded;
+}
+
+async function loadUncached(
+  caseDocumentId: string,
+  policyVersionId: string,
+  reportYear: number | null,
+): Promise<EngineDocument> {
+  const document = { policyVersionId, reportYear };
 
   const [blocks, contexts, figures, statements] = await Promise.all([
     db

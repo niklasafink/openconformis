@@ -176,12 +176,17 @@ describe("Jev im Plausicheck", () => {
     expect(result.answer).toEqual(answer);
     expect(mocks.structured).toHaveBeenCalledWith(
       routerRun,
-      expect.objectContaining({ user: expect.stringContaining("⟦54⟧") }),
+      expect.objectContaining({
+        user: expect.stringContaining("⟦54⟧"),
+        timeoutMilliseconds: expect.any(Number),
+      }),
       {
         credentialId: "credential-2",
         routeProvider: "openrouter",
         modelId: jevRouterModelId,
         purpose: "disclosure_assist",
+        // Der Router lehnt einen vorgegebenen Denkaufwand mit HTTP 400 ab.
+        omitReasoningEffort: true,
       },
     );
     expect(mocks.systemOne).not.toHaveBeenCalled();

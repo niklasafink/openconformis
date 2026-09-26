@@ -202,10 +202,8 @@ export default async function PlausibilityPage({ params }: PageProps) {
               }
             : undefined,
           technical: context?.technical ?? false,
-          header: context?.table?.header ?? false,
         };
       }),
-      recognition.reportYear,
     );
     for (const date of dates) {
       const overlaps = (occupied.get(date.blockId) ?? []).some(
@@ -347,8 +345,9 @@ export default async function PlausibilityPage({ params }: PageProps) {
             canStart={found.permissions.canPrepare}
             run={{
               status: run?.status ?? "none",
-              storedCheckCount: run?.storedCheckCount ?? 0,
-              plannedCheckCount: run?.plannedCheckCount ?? null,
+              checkedFigureCount: run?.checkedFigureCount ?? null,
+              // Vor den Regeln kennt der Lauf die Zahl noch nicht; die Erkennung schon.
+              figureCount: run?.figureCount || recognition?.figures.length || 0,
               failureCode: run?.failureCode ?? null,
               modelProfileId: run?.modelProfileId ?? null,
               jevAssist: run?.jevAssist ?? "off",

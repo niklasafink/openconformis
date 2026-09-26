@@ -1,0 +1,1 @@
+ALTER TABLE "disclosure_runs" ADD COLUMN "checked_figure_count" integer;

@@ -6,8 +6,12 @@ import { microPerUnit } from "./arithmetic";
  * normalisiert sie exakt (`bigint`). Datumsangaben, Jahreszahlen, Normzitate,
  * Randziffern und Seitenzahlen sind keine Zahlen im Sinne der Prüfung.
  */
-/** v3: Inhaltsverzeichnisse werden übersprungen (`table-of-contents.ts`). */
-export const figureExtractionVersion = "disclosure-figures-v3";
+/**
+ * v3: Inhaltsverzeichnisse werden übersprungen (`table-of-contents.ts`).
+ * v4: Verweisketten („§ 63 Abs 4 BWG“, „§ 56 (2) und (3)“, „AFRAC 30 Rz 12“),
+ * Hausnummern und Telefonnummern sind keine Zahlen.
+ */
+export const figureExtractionVersion = "disclosure-figures-v4";
 
 export type FigureUnit = "EUR" | "percent" | "count" | "unknown";
 export type PeriodHint = "current" | "prior" | "other";
@@ -54,7 +58,7 @@ const candidatePattern =
 
 /** Wörter vor einer Zahl, nach denen sie ein Verweis und kein Betrag ist. */
 const referencePrefix =
-  /(?:§§?|Abs\.|Absatz|Nr\.|Art\.|Artikel|Satz|S\.|Ziffer|Z|Tz\.?|Teil|Titel|Kapitel|Punkt|Anlage|Beilage|Seite|Seiten|Posten|Aktivposten|Passivposten|HRB|HRA|UR-Nr\.|PS|ISA|IFRS|IAS|IDW|CRR|Verordnung \(EU\)|\(EU\)|Richtlinie|Mandant|Buchungskreis|Tel\.:?|Fax:?|Anhang S\.|Stufe)\s*$/u;
+  /(?:§§?|Abs\.?|Absatz|Nr\.|Art\.|Artikel|Satz|S\.|Ziffer|Ziff\.|Z|Tz\.?|Rz\.?|lit\.|AFRAC|KFS\/\w+|Teil|Titel|Kapitel|Punkt(?:es)?\.?|Abschnitte?s?|Absätze?n?|Absatzes|ARTIKEL|Anlage|Beilage|Seite|Seiten|Posten|Aktivposten|Passivposten|HRB|HRA|UR-Nr\.|PS|ISA|IFRS|IAS|IDW|CRR|Verordnung \(EU\)|\(EU\)|Richtlinie|Mandant|Buchungskreis|Tel\.:?|Fax:?|Anhang S\.|Stufe)\s*$/u;
 
 /** Wörter, nach denen ein abgesetzter Strich ein Minuszeichen ist („Steuern von - 380 TEUR“). */
 const signPrefix =
@@ -79,10 +83,46 @@ const suffixUnits: Array<{ pattern: RegExp; unit: FigureUnit; scale: 1 | 1_000 |
   { pattern: /^\s*(?:%|Prozent|%-Punkte|Prozentpunkte)/u, unit: "percent", scale: 1 },
 ];
 
-function isExcludedContext(text: string, start: number, end: number, raw: string) {
+/**
+ * Fortsetzung einer Verweiskette: „§ 56 (2) und (3)“, „§ 63 Abs 4 und 5“,
+ * „Art. 4 Abs. 1 Nr. 3“. Nach dem Verweiswort folgen nur Nummern, geklammerte Absätze,
+ * Buchstaben und Bindewörter bis zur Zahl.
+ */
+const referenceChain = new RegExp(
+  `${referencePrefix.source.replace(/\\s\*\$$/u, "")}\\s*(?:(?:\\d+[a-z]?\\.?|\\(\\s*\\d+[a-z]?\\s*\\)|[a-z]\\)|und|bis|sowie|oder|[-–]|iVm|i\\.\\s?V\\.\\s?m\\.|ff?\\.|,|Abs\\.?|Z|Rz\\.?|lit\\.|Satz|S\\.|Nr\\.)\\s*)*\\(?\\s*$`,
+  "u",
+);
+
+/** Hausnummer nach einem Straßennamen („Wagramer Straße 19“, „Hauptstr. 4“). */
+const streetPrefix = /(?:[Ss]tra(?:ß|ss)e|[Ss]tr\.|[Gg]asse|[Ww]eg|[Pp]latz|[Aa]llee)\s*$/u;
+
+/** Ziffern einer Telefon- oder Faxnummer („Tel.: [43] (1) 211 70“). */
+const phonePrefix = /(?<!\p{L})(?:Tel(?:efon)?|Fax|Mobil|Phone)\.?\s*:?\s*[\d\s()[\]+/.-]*$/iu;
+
+function isExcludedContext(
+  text: string,
+  start: number,
+  end: number,
+  raw: string,
+  tableCell: boolean,
+) {
   const before = text.slice(Math.max(0, start - 40), start);
   const after = text.slice(end, end + 30);
   if (referencePrefix.test(before)) return true;
+  if (referenceChain.test(text.slice(Math.max(0, start - 60), start))) return true;
+  if (streetPrefix.test(before) && /^\d{1,4}$/u.test(raw) && !/^\s*(?:TEUR|EUR|€|%)/u.test(after)) {
+    return true;
+  }
+  if (phonePrefix.test(text.slice(Math.max(0, start - 50), start))) return true;
+  // Absatzmarken und ihre Bereiche: „(2) bekannt gegeben“, „(7) bis (9)“, „(2)-(4)“.
+  // In Tabellen sind Klammerwerte Vorjahres- oder davon-Werte.
+  if (!tableCell && /^\d{1,2}$/u.test(raw) && text[start - 1] === "(" && text[end] === ")") {
+    if (start === 1) return true;
+    if (/^\)\s*(?:bis|und|oder|,|[-–])\s*\(\d/u.test(text.slice(end, end + 12))) return true;
+    if (/\(\d{1,2}\)\s*(?:bis|und|oder|,|[-–])\s*\($/u.test(before)) return true;
+  }
+  // Teil eines Wortes: „12-Monats-Verlust“, „3-Jahres-Zeitraum“.
+  if (/^[-–]\p{L}/u.test(after)) return true;
   // Datumsangaben: 31.12.2021, 31. Dezember 2021, 1.1.2022, 0.00 Uhr
   if (/^\d{1,2}\.\d{1,2}\.(?:\d{2,4})?$/u.test(raw.replace(/\s/gu, ""))) return true;
   if (new RegExp(`^\\s*\\.?\\s*(?:${monthNames})\\b`, "iu").test(after)) return true;
@@ -197,11 +237,23 @@ function displayUnitOf(decimals: number, scale: number) {
   return (microPerUnit * BigInt(scale)) / 10n ** BigInt(decimals);
 }
 
+/**
+ * Seitenzahl am Ende einer kurzen Gliederungszeile, die die Erkennung des
+ * Inhaltsverzeichnisses nicht erfasst hat: „Erteilte Auskünfte 3“,
+ * „Bestätigungsvermerk 4-11“. Gibt den Beginn dieser Seitenangabe zurück.
+ */
+function trailingPageStart(text: string, tableCell: boolean) {
+  if (tableCell || text.length > 120 || /[.;:!?]\s/u.test(text)) return null;
+  const match = /(?<=[\p{L})]\s{1,6})\d{1,3}(?:\s?[-–]\s?\d{1,3})?\s*$/u.exec(text);
+  return match ? match.index : null;
+}
+
 /** Alle Zahlen eines Blocks, ohne Überlappung, in Textreihenfolge. */
 export function recognizeFigures(text: string, context: FigureContext): RecognizedFigure[] {
   if (/^PDF-Seite \d+$/u.test(text.trim())) return [];
   const figures: RecognizedFigure[] = [];
   const tableCell = context.blockType === "table_cell";
+  const pageStart = trailingPageStart(text, tableCell);
   for (const match of text.matchAll(candidatePattern)) {
     const signText = match[1] ?? "";
     const numberText = match[2]!;
@@ -215,7 +267,8 @@ export function recognizeFigures(text: string, context: FigureContext): Recogniz
     const signWord = signPrefix.test(text.slice(Math.max(0, start - 24), start));
     const negative =
       signText !== "" && (signWord || !(precededByWord && /\s/u.test(text[start + 1] ?? "")));
-    if (isExcludedContext(text, numberStart, end, trimmedNumber)) continue;
+    if (isExcludedContext(text, numberStart, end, trimmedNumber, tableCell)) continue;
+    if (pageStart !== null && numberStart >= pageStart) continue;
     // Randziffern und Gliederungsnummern am Blockanfang („62 Insgesamt …“, „1. Umsatzerlöse“).
     if (
       start === 0 &&

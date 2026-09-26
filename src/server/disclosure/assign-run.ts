@@ -5,14 +5,18 @@ import { and, eq, sql } from "drizzle-orm";
 import { systemOneCostMicrounits } from "@/domain/ai/system-one";
 import {
   assignmentAnswerSchema,
+  assignmentChunk,
+  assignmentChunkCount,
   assignmentConfidenceThresholdBp,
   buildAssignmentPrompt,
+  checkedFigureFrontier,
   planAssignmentBatches,
   readAssignments,
   type AssignmentAnswer,
   type AssignmentBatch,
 } from "@/domain/disclosure/assignment";
 import { modelAssignmentChecks, runDeterministicChecks } from "@/domain/disclosure/checks/run";
+import type { EngineDocument } from "@/domain/disclosure/checks/types";
 import {
   disclosureJevPromptVersionFor,
   jevAnswerFor as jevAnswerForBatch,
@@ -34,8 +38,9 @@ import {
 import { requestStructuredForDisclosure } from "./model-route";
 
 /**
- * Einordnung der offenen Fundstellen über das Nutzermodell. Die Batches entstehen bei
- * jedem Schritt neu aus der eingefrorenen Erkennung — dieselben Eingaben ergeben
+ * Einordnung der offenen Fundstellen über Jev und das Nutzermodell, Abschnitt für
+ * Abschnitt von oben nach unten. Die Batches entstehen bei jedem Schritt neu aus der
+ * eingefrorenen Erkennung — dieselben Eingaben ergeben
  * dieselben Batches und Schlüssel. Eine gespeicherte Antwort wird nie ein zweites Mal
  * bezahlt: `(run_id, batch_key)` ist eindeutig und trägt die Antwort.
  */
@@ -84,15 +89,29 @@ async function storedJevAnswers(runId: string) {
   return answers;
 }
 
-/**
- * Die Batches einer Stufe. Das Nutzermodell bekommt nur, was Jev nicht sicher
- * eingeordnet hat; dieselben gespeicherten Jev-Antworten ergeben dieselben Batches.
- */
-async function planFor(run: Run, stage: "jev" | "model" = "model") {
+/** Die Regelprüfungen je geladenem Dokument; jeder Schritt braucht nur ihre offenen Fundstellen. */
+const deterministic = new WeakMap<EngineDocument, ReturnType<typeof runDeterministicChecks>>();
+
+async function checkedDocument(run: Run) {
   const document = await loadEngineDocument(run.reportCaseDocumentId);
   if (!document) throw new Error("DISCLOSURE_REPORT_MISSING");
-  const result = runDeterministicChecks(document);
-  const jevBatches = jevBatchesFor(run, result.pending);
+  let result = deterministic.get(document);
+  if (!result) {
+    result = runDeterministicChecks(document);
+    deterministic.set(document, result);
+  }
+  return { document, result };
+}
+
+/**
+ * Die Batches eines Abschnitts. Das Nutzermodell bekommt nur, was Jev in diesem
+ * Abschnitt nicht sicher eingeordnet hat; dieselben gespeicherten Jev-Antworten ergeben
+ * dieselben Batches.
+ */
+async function planFor(run: Run, chunk: number, stage: "jev" | "model" = "model") {
+  const { document, result } = await checkedDocument(run);
+  const mentions = assignmentChunk(result.pending, chunk);
+  const jevBatches = jevBatchesFor(run, mentions);
   if (stage === "jev") return { document, result, batches: jevBatches };
   const resolved = new Set<string>();
   if (jevBatches.length > 0) {
@@ -105,35 +124,63 @@ async function planFor(run: Run, stage: "jev" | "model" = "model") {
   const batches =
     run.providerModelId && run.promptVersion
       ? planAssignmentBatches(
-          result.pending.filter((mention) => !resolved.has(mention.figureId)),
+          mentions.filter((mention) => !resolved.has(mention.figureId)),
           { providerModelId: run.providerModelId, promptVersion: run.promptVersion },
         )
       : [];
   return { document, result, batches };
 }
 
-/** Anzahl der Jev-Batches; vor den Modell-Batches, weil diese von Jevs Antworten abhängen. */
-export async function planDisclosureJev(runId: string) {
+/**
+ * Anzahl der Abschnitte. Sie laufen von oben nach unten nacheinander, damit die ersten
+ * Einordnungen früh erscheinen und der Fortschritt dem Dokument folgt.
+ */
+export async function planDisclosureChunks(runId: string) {
+  const run = await loadRun(runId);
+  if (run.status !== "running" || !run.routeProvider) return { chunks: 0 };
+  const { result } = await checkedDocument(run);
+  return { chunks: assignmentChunkCount(result.pending.length) };
+}
+
+/** Jev-Batches eines Abschnitts; vor dessen Modell-Batches, weil diese von Jev abhängen. */
+export async function planDisclosureJev(runId: string, chunk: number) {
   const run = await loadRun(runId);
   if (run.status !== "running" || !disclosureJevActive(run)) return { batches: 0 };
-  const { batches } = await planFor(run, "jev");
+  const { batches } = await planFor(run, chunk, "jev");
+  if (run.stage !== "jev") {
+    await db
+      .update(disclosureRuns)
+      .set({ stage: "jev", updatedAt: new Date() })
+      .where(eq(disclosureRuns.id, runId));
+  }
+  return { batches: batches.length };
+}
+
+/** Modell-Batches eines Abschnitts. */
+export async function planDisclosureAssignment(runId: string, chunk: number) {
+  const run = await loadRun(runId);
+  if (run.status !== "running" || !run.routeProvider) return { batches: 0 };
+  const { batches } = await planFor(run, chunk);
   await db
     .update(disclosureRuns)
-    .set({ stage: "jev", updatedAt: new Date() })
+    .set({ stage: "assignment", updatedAt: new Date() })
     .where(eq(disclosureRuns.id, runId));
   return { batches: batches.length };
 }
 
-/** Anzahl der Batches; im Lauf gespeichert, damit Fortschritt und Abschluss sie kennen. */
-export async function planDisclosureAssignment(runId: string) {
+/** Nach einem Abschnitt: alle Zahlen bis zum nächsten Abschnitt sind fertig geprüft. */
+export async function recordDisclosureProgress(runId: string, chunk: number) {
   const run = await loadRun(runId);
-  if (run.status !== "running" || !run.routeProvider) return { batches: 0 };
-  const { batches } = await planFor(run);
+  if (run.status !== "running") return;
+  const { document, result } = await checkedDocument(run);
+  const checked = checkedFigureFrontier(document, result.pending, chunk + 1);
   await db
     .update(disclosureRuns)
-    .set({ assignmentBatchCount: batches.length, stage: "assignment", updatedAt: new Date() })
+    .set({
+      checkedFigureCount: sql`greatest(coalesce(${disclosureRuns.checkedFigureCount}, 0), ${checked})`,
+      updatedAt: new Date(),
+    })
     .where(eq(disclosureRuns.id, runId));
-  return { batches: batches.length };
 }
 
 /**
@@ -222,10 +269,10 @@ async function storedOrFreshJevAnswer(run: Run, batch: AssignmentBatch) {
  * Ein Jev-Batch: nur sichere Zuordnungen werden nachgerechnet und als Prüfungen mit
  * Herkunft `jev` gespeichert. Der Rest bleibt offen für das Nutzermodell.
  */
-export async function assignDisclosureJevBatch(runId: string, index: number) {
+export async function assignDisclosureJevBatch(runId: string, chunk: number, index: number) {
   const run = await loadRun(runId);
   if (run.status !== "running") return { state: "ended" as const, stored: 0 };
-  const { document, result, batches } = await planFor(run, "jev");
+  const { document, result, batches } = await planFor(run, chunk, "jev");
   const batch = batches[index];
   if (!batch) return { state: "running" as const, stored: 0 };
   const answer = await storedOrFreshJevAnswer(run, batch);
@@ -329,13 +376,13 @@ async function answerFor(run: Run, batch: AssignmentBatch) {
  * Ein Batch: Antwort holen (oder aus dem Replay lesen), Zuordnungen nachrechnen und als
  * Prüfungen speichern. Ein gestoppter oder beendeter Lauf ruft kein Modell mehr auf.
  */
-export async function assignDisclosureBatch(runId: string, index: number) {
+export async function assignDisclosureBatch(runId: string, chunk: number, index: number) {
   const run = await loadRun(runId);
   if (run.status !== "running") return { state: "ended" as const, stored: 0 };
   if (run.credentialDeadlineAt && run.credentialDeadlineAt.getTime() < Date.now()) {
     throw new Error("DISCLOSURE_CREDENTIAL_EXPIRED");
   }
-  const { document, result, batches } = await planFor(run);
+  const { document, result, batches } = await planFor(run, chunk);
   const batch = batches[index];
   if (!batch) return { state: "running" as const, stored: 0 };
   const answer = await answerFor(run, batch);

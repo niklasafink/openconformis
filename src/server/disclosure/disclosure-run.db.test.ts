@@ -370,7 +370,8 @@ suite("disclosure plausibility runs against a real database", () => {
     });
     const stage = await execute.runDeterministicStage(run.runId);
     expect(stage.pending).toBeGreaterThan(0);
-    const { batches } = await assign.planDisclosureAssignment(run.runId);
+    expect(await assign.planDisclosureChunks(run.runId)).toEqual({ chunks: 1 });
+    const { batches } = await assign.planDisclosureAssignment(run.runId, 0);
     expect(batches).toBe(1);
     mocks.model.mockImplementation(async (_run: unknown, request: { user: string }) => {
       expect(request.user).toContain("⟦54⟧");
@@ -391,8 +392,8 @@ suite("disclosure plausibility runs against a real database", () => {
         costMicrounits: 100,
       };
     });
-    const first = await assign.assignDisclosureBatch(run.runId, 0);
-    const replay = await assign.assignDisclosureBatch(run.runId, 0);
+    const first = await assign.assignDisclosureBatch(run.runId, 0, 0);
+    const replay = await assign.assignDisclosureBatch(run.runId, 0, 0);
     expect(first.stored).toBeGreaterThan(0);
     expect(replay.stored).toBe(first.stored);
     expect(mocks.model).toHaveBeenCalledTimes(1);
@@ -455,15 +456,21 @@ suite("disclosure plausibility runs against a real database", () => {
     const prepared = await execute.prepareDisclosureRun(run.runId, `wf-${run.runId}`);
     expect(prepared).toMatchObject({ status: "running", jev: options.jev });
     await execute.runDeterministicStage(run.runId);
-    if (prepared.status === "running" && prepared.jev) {
-      const { batches } = await assign.planDisclosureJev(run.runId);
-      for (let index = 0; index < batches; index += 1) {
-        await assign.assignDisclosureJevBatch(run.runId, index);
+    const { chunks } = await assign.planDisclosureChunks(run.runId);
+    let modelBatches = 0;
+    for (let chunk = 0; chunk < chunks; chunk += 1) {
+      if (prepared.status === "running" && prepared.jev) {
+        const { batches } = await assign.planDisclosureJev(run.runId, chunk);
+        for (let index = 0; index < batches; index += 1) {
+          await assign.assignDisclosureJevBatch(run.runId, chunk, index);
+        }
       }
-    }
-    const { batches } = await assign.planDisclosureAssignment(run.runId);
-    for (let index = 0; index < batches; index += 1) {
-      await assign.assignDisclosureBatch(run.runId, index);
+      const { batches } = await assign.planDisclosureAssignment(run.runId, chunk);
+      modelBatches += batches;
+      for (let index = 0; index < batches; index += 1) {
+        await assign.assignDisclosureBatch(run.runId, chunk, index);
+      }
+      await assign.recordDisclosureProgress(run.runId, chunk);
     }
     await execute.finalizeDisclosureRun(run.runId);
     const checks = await db
@@ -478,7 +485,7 @@ suite("disclosure plausibility runs against a real database", () => {
       .select()
       .from(schema.disclosureRuns)
       .where(eq(schema.disclosureRuns.id, run.runId));
-    return { runId: run.runId, checks, invocations, stored: stored!, modelBatches: batches };
+    return { runId: run.runId, checks, invocations, stored: stored!, modelBatches };
   }
 
   const outcome = (checks: Array<{ kind: string; status: string; subjectKey: string }>) =>
@@ -563,7 +570,7 @@ suite("disclosure plausibility runs against a real database", () => {
     const jevRow = result.invocations.find((row) => row.provider === "jev")!;
     expect(jevRow.status).toBe("failed");
     expect(result.invocations.find((row) => row.provider === "model")!.itemCount).toBe(2);
-    await assign.assignDisclosureJevBatch(result.runId, 0);
+    await assign.assignDisclosureJevBatch(result.runId, 0, 0);
     expect(mocks.jev).toHaveBeenCalledTimes(1);
   });
 

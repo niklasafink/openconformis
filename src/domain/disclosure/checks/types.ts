@@ -158,6 +158,11 @@ export type CheckDraft = {
   rounded: boolean;
   sourceKind: "table" | "text" | "formula" | "evidence" | "prior_report";
   sourceFigureIds: string[];
+  /**
+   * Vorzeichen je Bezugszahl, wenn der Soll-Wert ihre Summe ist (+1 addiert, −1 zieht ab);
+   * gleiche Länge wie `sourceFigureIds`. Fehlt bei Bezugszahlen ohne Rechenweg.
+   */
+  sourceSigns?: Array<1 | -1>;
   sourceBlockIds: string[];
   /** Konten einer Belegdatei (SuSa), gegen die geprüft wurde. */
   sourceAccountIds?: string[];

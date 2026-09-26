@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -475,6 +476,8 @@ export const disclosureRuns = pgTable(
     plannedCheckCount: integer("planned_check_count"),
     assignmentBatchCount: integer("assignment_batch_count").default(0).notNull(),
     failedBatchCount: integer("failed_batch_count").default(0).notNull(),
+    // Zahlen in Dokumentreihenfolge, bis zu denen alle Prüfungen feststehen (Fortschritt).
+    checkedFigureCount: integer("checked_figure_count"),
     mismatchCount: integer("mismatch_count").default(0).notNull(),
     uncertainCount: integer("uncertain_count").default(0).notNull(),
     failureCode: text("failure_code"),
@@ -544,6 +547,8 @@ export const disclosureChecks = pgTable(
       .array()
       .default(sql`'{}'::uuid[]`)
       .notNull(),
+    /** +1/−1 je Bezugszahl, wenn der Soll-Wert ihre Summe ist; sonst leer. */
+    sourceSigns: smallint("source_signs").array(),
     sourceBlockIds: uuid("source_block_ids")
       .array()
       .default(sql`'{}'::uuid[]`)

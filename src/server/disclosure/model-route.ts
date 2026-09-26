@@ -88,6 +88,11 @@ export type DisclosureFixedModel = {
   routeProvider: string;
   modelId: string;
   purpose: "disclosure_assist";
+  /**
+   * Ohne Denkaufwand anfragen. Der Jev Router lehnt `reasoning.effort` der Route mit
+   * HTTP 400 ab („No configured model/effort candidate …“) und wählt selbst.
+   */
+  omitReasoningEffort?: boolean;
 };
 
 /**
@@ -125,7 +130,7 @@ export async function requestStructuredForDisclosure<T>(
         modelId,
         baseUrl: route.baseUrl,
         maxOutputTokens: route.maxOutputTokens,
-        reasoningEffort: route.reasoningEffort,
+        reasoningEffort: fixed?.omitReasoningEffort ? undefined : route.reasoningEffort,
         zeroDataRetention: route.zeroDataRetention,
         apiKey,
       }),

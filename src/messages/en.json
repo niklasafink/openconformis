@@ -949,7 +949,7 @@
         "starting": "Starting …",
         "restart": "Check again",
         "preparing": "Preparing checks …",
-        "progress": "{stored} of {planned} checks",
+        "progress": "{checked} of {total} figures checked",
         "completed": "Checked",
         "completedWithGaps": "Checked, with gaps",
         "failed": "Run failed ({code}). You can start again.",

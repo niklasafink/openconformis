@@ -3,12 +3,14 @@ import { z } from "zod";
 import { createContentHash } from "@/domain/frameworks/content-hash";
 
 import {
+  assignmentAnswerLimit,
   assignmentBatchSize,
   assignmentConcurrency,
   assignmentConfidenceThresholdBp,
 } from "./assignment-limits";
 
 import type { PendingMention } from "./checks/text";
+import type { EngineDocument } from "./checks/types";
 
 /**
  * Einordnung über das Nutzermodell: für Zahlen im Fließtext, die die Regeln keinem
@@ -72,6 +74,45 @@ export function planAssignmentBatches(
   return batches;
 }
 
+/** Fundstellen je Abschnitt: ein paralleler Block von Batches. */
+export const assignmentChunkSize = assignmentBatchSize * assignmentConcurrency;
+
+export function assignmentChunkCount(pending: number) {
+  return Math.ceil(pending / assignmentChunkSize);
+}
+
+/** Die Fundstellen eines Abschnitts, in Dokumentreihenfolge. */
+export function assignmentChunk<T>(pending: readonly T[], chunk: number): T[] {
+  return pending.slice(chunk * assignmentChunkSize, (chunk + 1) * assignmentChunkSize);
+}
+
+/**
+ * Fortschritt von oben nach unten: die Zahl der erkannten Zahlen in Dokumentreihenfolge
+ * vor der ersten Fundstelle des Abschnitts `nextChunk`. Alles davor ist fertig geprüft;
+ * gibt es keinen solchen Abschnitt mehr, sind es alle Zahlen.
+ */
+export function checkedFigureFrontier(
+  document: Pick<EngineDocument, "blocks" | "figures">,
+  pending: readonly Pick<PendingMention, "figureId">[],
+  nextChunk: number,
+) {
+  const next = pending[nextChunk * assignmentChunkSize];
+  if (!next) return document.figures.length;
+  const ordinal = new Map(document.blocks.map((block) => [block.id, block.ordinal]));
+  const position = (figure: EngineDocument["figures"][number]) =>
+    [ordinal.get(figure.blockId) ?? 0, figure.start] as const;
+  const target = document.figures.find((figure) => figure.id === next.figureId);
+  if (!target) return 0;
+  const [targetOrdinal, targetStart] = position(target);
+  return document.figures.filter((figure) => {
+    const [figureOrdinal, figureStart] = position(figure);
+    return (
+      figureOrdinal < targetOrdinal ||
+      (figureOrdinal === targetOrdinal && figureStart < targetStart)
+    );
+  }).length;
+}
+
 export const assignmentAnswerSchema = z.object({
   assignments: z
     .array(
@@ -83,7 +124,7 @@ export const assignmentAnswerSchema = z.object({
         comment: z.string().trim().max(160),
       }),
     )
-    .max(assignmentBatchSize),
+    .max(assignmentAnswerLimit),
 });
 
 export type AssignmentAnswer = z.infer<typeof assignmentAnswerSchema>;
@@ -94,7 +135,7 @@ export const assignmentAnswerJsonSchema = {
   properties: {
     assignments: {
       type: "array",
-      maxItems: assignmentBatchSize,
+      maxItems: assignmentAnswerLimit,
       items: {
         type: "object",
         additionalProperties: false,

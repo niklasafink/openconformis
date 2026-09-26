@@ -230,9 +230,47 @@ describe("recognizeFigures exclusions", () => {
     expect(
       recognizeFigures("gbs - Gesellschaft für Banksysteme GmbH 40880 Ratingen", paragraph),
     ).toEqual([]);
-    expect(recognizeFigures("1220 Wien, Wagramer Straße 19", paragraph).map((f) => f.raw)).toEqual([
-      "19",
-    ]);
+    expect(recognizeFigures("1220 Wien, Wagramer Straße 19", paragraph)).toEqual([]);
+  });
+
+  it("skips reference chains, house numbers and phone numbers (ICBC 2025)", () => {
+    const raws = (text: string) => recognizeFigures(text, paragraph).map((figure) => figure.raw);
+    expect(
+      raws("Ernst & Young m.b.H. 1220 Wien, Wagramer Straße 19, IZD-Tower Tel.: [43] (1) 211 70"),
+    ).toEqual([]);
+    expect(
+      raws("die Prüfung gemäß § 63 Abs 4 BWG auch die Einhaltung. Gemäß § 63 Abs 5 BWG ist"),
+    ).toEqual([]);
+    expect(raws("Tatsachen gemäß § 63 Abs 3 BWG festgestellt.")).toEqual([]);
+    expect(raws("dem Rückzahlungsbetrag gemäß § 56 (2) und (3) BWG zeitanteilig")).toEqual([]);
+    expect(raws("gemäß AFRAC 30 Rz 12 Z 1 mit passiven latenten Steuern verrechnet")).toEqual([]);
+  });
+
+  it("skips engagement-term references, compound words and page numbers of outline lines", () => {
+    const raws = (text: string) => recognizeFigures(text, paragraph).map((figure) => figure.raw);
+    expect(raws("unbeschadet Punkt 4. (3), diesfalls nur für")).toEqual([]);
+    expect(raws("(siehe auch Punkt. 4 (4) und (5)). Das Erlöschen")).toEqual([]);
+    expect(raws("Vorstehende Absätze (2) bis (4) gelten nicht")).toEqual([]);
+    expect(raws("(2) bekannt gegeben werden")).toEqual([]);
+    expect(raws("die Abschnitte 301 und 232. Wichtig ist")).toEqual([]);
+    expect(raws("Standardansatz im Sinne der Art. 111 – 141, CRR an.")).toEqual([]);
+    expect(raws("in Höhe des erwarteten 12-Monats-Verlusts")).toEqual([]);
+    expect(raws("Erteilte Auskünfte 3")).toEqual([]);
+    expect(raws("Bestätigungsvermerk 4-11")).toEqual([]);
+    expect(raws("ANGABEN ZUR OFFENLEGUNG GEM. ARTIKEL 431 CRR 17")).toEqual([]);
+  });
+
+  it("keeps head counts and their prior-year values", () => {
+    const raws = (text: string) => recognizeFigures(text, paragraph).map((figure) => figure.raw);
+    expect(raws("Die Bank hat 37 Mitarbeiter inklusive 3 Geschäftsführern (Vorjahr: 37).")).toEqual(
+      ["37", "3", "37"],
+    );
+  });
+
+  it("keeps amounts next to words that only end like a phone or street keyword", () => {
+    const raws = (text: string) => recognizeFigures(text, paragraph).map((figure) => figure.raw);
+    expect(raws("Die liquiden Mittel 500 TEUR stiegen.")).toEqual(["500"]);
+    expect(raws("gemäß § 56 BWG betrugen die Zinsen EUR 31.610,95")).toEqual(["31.610,95"]);
   });
 });
 

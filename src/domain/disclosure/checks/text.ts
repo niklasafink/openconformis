@@ -939,6 +939,10 @@ function groupChecks(
         ...(a.id ? [a.id] : tableA ? tableA.sources.map((source) => source.id) : []),
         ...(c.id ? [c.id] : tableC ? tableC.sources.map((source) => source.id) : []),
       ];
+      // Rechenweg nur, wenn beide Bezugszahlen einzeln im Text stehen: Berichtsjahr minus
+      // Vorjahr; ohne Vorzeichen im Satz so herum, dass der Betrag positiv bleibt.
+      const sourceSigns: Array<1 | -1> | undefined =
+        a.id && c.id ? (signedB || change >= 0n ? [-1, 1] : [1, -1]) : undefined;
       const reference = referenceOf(b);
       const status =
         comparison.status === "match"
@@ -957,6 +961,7 @@ function groupChecks(
         rounded: comparison.rounded,
         sourceKind: fromTables ? "table" : "text",
         sourceFigureIds: sources,
+        ...(sourceSigns ? { sourceSigns } : {}),
         sourceBlockIds: [context.block.id],
         sourceLabel: fromTables
           ? [tableA?.sourceLabel, tableC?.sourceLabel].filter(Boolean).join(" / ").slice(0, 200)

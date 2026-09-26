@@ -150,6 +150,145 @@ const templates: Record<CommentCode, Record<Locale, string>> = {
   },
 };
 
+/**
+ * Warum eine Prüfung so ausgeht, in einem Satz ohne Beträge: die Beträge zeigt die
+ * Berechnung daneben. Kurz genug für die erste Zeile eines Befunds.
+ */
+const reasons: Record<CommentCode, Record<Locale, string>> = {
+  sum_matches: { de: "Summe der Tabellenzeile stimmt.", en: "The table total adds up." },
+  sum_differs: {
+    de: "Summe aus der Tabelle stimmt nicht.",
+    en: "The table total does not add up.",
+  },
+  sum_ambiguous: {
+    de: "Die Posten der Summe sind nicht sicher bestimmbar.",
+    en: "The items of the total cannot be determined reliably.",
+  },
+  balance_matches: {
+    de: "Aktiva und Passiva sind gleich.",
+    en: "Assets and liabilities are equal.",
+  },
+  balance_differs: {
+    de: "Aktiva und Passiva sind nicht gleich.",
+    en: "Assets and liabilities are not equal.",
+  },
+  horizontal_matches: {
+    de: "Gesamtspalte stimmt mit den Spalten überein.",
+    en: "The total column matches the columns.",
+  },
+  horizontal_differs: {
+    de: "Gesamtspalte stimmt nicht mit den Spalten überein.",
+    en: "The total column does not match the columns.",
+  },
+  horizontal_incomplete: { de: "Zeile nicht vollständig lesbar.", en: "Row not fully readable." },
+  change_matches: {
+    de: "Veränderung entspricht Berichtsjahr minus Vorjahr.",
+    en: "Change equals current year minus prior year.",
+  },
+  change_differs: {
+    de: "Veränderung entspricht nicht Berichtsjahr minus Vorjahr.",
+    en: "Change does not equal current year minus prior year.",
+  },
+  arithmetic_matches: {
+    de: "Rechnung im Satz geht auf.",
+    en: "The arithmetic in the sentence adds up.",
+  },
+  arithmetic_differs: {
+    de: "Rechnung im Satz geht nicht auf.",
+    en: "The arithmetic in the sentence does not add up.",
+  },
+  direction_matches: {
+    de: "Richtungswort passt zu den Zahlen.",
+    en: "The direction word fits the figures.",
+  },
+  direction_contradicts: {
+    de: "Richtungswort widerspricht den Zahlen.",
+    en: "The direction word contradicts the figures.",
+  },
+  direction_unclear: {
+    de: "Veränderung liegt innerhalb der Rundung.",
+    en: "The change is within rounding.",
+  },
+  reference_matches: {
+    de: "Zahl stimmt mit der anderen Stelle im Bericht überein.",
+    en: "Figure agrees with the other place in the report.",
+  },
+  reference_differs: {
+    de: "Zahl steht an anderer Stelle im Bericht und ist dort anders.",
+    en: "The figure appears elsewhere in the report with a different value.",
+  },
+  reference_sign: {
+    de: "Zahl steht an anderer Stelle im Bericht mit anderem Vorzeichen.",
+    en: "The figure appears elsewhere in the report with the opposite sign.",
+  },
+  reference_candidates: {
+    de: "Mehrere Stellen im Bericht kommen infrage, mit verschiedenen Werten.",
+    en: "Several places in the report qualify, with different values.",
+  },
+  reference_structure: {
+    de: "Andere Gliederung an der anderen Stelle; Vergleich nicht eindeutig.",
+    en: "Different structure at the other place; comparison not conclusive.",
+  },
+  prior_matches: {
+    de: "Vorjahreswert stimmt mit der anderen Stelle im Bericht überein.",
+    en: "Prior-year figure agrees with the other place in the report.",
+  },
+  prior_differs: {
+    de: "Vorjahreswert steht an anderer Stelle im Bericht und ist dort anders.",
+    en: "The prior-year figure appears elsewhere in the report with a different value.",
+  },
+  prior_ambiguous: {
+    de: "Vorjahresangabe nach „um“ ist mehrdeutig.",
+    en: "Prior-year figure after a change is ambiguous.",
+  },
+  derived_matches: { de: "Formel ergibt den Wert.", en: "The formula gives this value." },
+  derived_differs: {
+    de: "Formel ergibt einen anderen Wert.",
+    en: "The formula gives a different value.",
+  },
+  ratio_matches: {
+    de: "Quote ergibt sich aus den Zahlen.",
+    en: "The ratio follows from the figures.",
+  },
+  ratio_differs: {
+    de: "Quote ergibt sich nicht aus den Zahlen.",
+    en: "The ratio does not follow from the figures.",
+  },
+  model_unsure: {
+    de: "Zuordnung durch das Modell unsicher.",
+    en: "Assignment by the model uncertain.",
+  },
+  evidence_matches: {
+    de: "Zahl stimmt mit der SuSa überein.",
+    en: "Figure agrees with the trial balance.",
+  },
+  evidence_differs: {
+    de: "Zahl weicht von der SuSa ab.",
+    en: "Figure differs from the trial balance.",
+  },
+  year_suspect: {
+    de: "Jahreszahl passt nicht zum Berichtsjahr.",
+    en: "Year does not fit the report year.",
+  },
+  year_not_rolled: {
+    de: "Jahreszahl wurde nicht fortgeschrieben.",
+    en: "Year was not rolled forward.",
+  },
+  prior_report_matches: {
+    de: "Vorjahreswert stimmt mit dem Vorjahresbericht überein.",
+    en: "Prior-year figure agrees with the prior-year report.",
+  },
+  prior_report_differs: {
+    de: "Vorjahreswert weicht vom Vorjahresbericht ab.",
+    en: "Prior-year figure differs from the prior-year report.",
+  },
+};
+
+/** Die kurze Begründung eines Befunds, ohne Beträge. */
+export function renderReason(code: CommentCode, locale: Locale = "de") {
+  return reasons[code]?.[locale] ?? reasons[code]?.de ?? "";
+}
+
 const roundedSuffix: Record<Locale, string> = { de: ", gerundet", en: ", rounded" };
 
 function clip(text: string, limit: number) {

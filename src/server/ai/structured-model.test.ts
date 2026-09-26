@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import {
   fetchProviderJson,
   ModelProviderError,
+  parseStructuredOutput,
   readProviderErrorDetail,
   readProviderJson,
   retryableProviderStatus,
@@ -190,5 +192,24 @@ describe("fetchProviderJson", () => {
     } catch (error) {
       expect((error as ModelProviderError).detail).toContain("nicht geantwortet");
     }
+  });
+});
+
+describe("parseStructuredOutput", () => {
+  const schema = z.object({ assignments: z.array(z.object({ ref: z.string() })) });
+
+  it("reads JSON inside a code fence, as the Jev Router sometimes answers", () => {
+    expect(parseStructuredOutput('```json\n{"assignments":[{"ref":"F1"}]}\n```', schema)).toEqual({
+      assignments: [{ ref: "F1" }],
+    });
+  });
+
+  it("still refuses prose around the JSON and answers outside the schema", () => {
+    expect(() => parseStructuredOutput('Hier: {"assignments":[]}', schema)).toThrow(
+      ModelProviderError,
+    );
+    expect(() => parseStructuredOutput('```json\n{"assignments":[{}]}\n```', schema)).toThrow(
+      ModelProviderError,
+    );
   });
 });

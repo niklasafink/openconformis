@@ -22,8 +22,9 @@ import { TypesafeKeyField } from "./typesafe-key-field";
 export type RunControlsState = Readonly<{
   status:
     "none" | "queued" | "running" | "completed" | "completed_with_gaps" | "failed" | "cancelled";
-  storedCheckCount: number;
-  plannedCheckCount: number | null;
+  /** Fertig geprüfte Zahlen von oben nach unten; `null`, solange die Regeln rechnen. */
+  checkedFigureCount: number | null;
+  figureCount: number;
   failureCode: string | null;
   modelProfileId: string | null;
   /** Eingefroren beim Start: Jev hat eingeordnet. */
@@ -50,7 +51,7 @@ type RunControlsProps = Readonly<{
  * Start, Modell und Fortschritt des Plausichecks oben in der linken Spalte. Start ist
  * der einzige Primärbutton. Mit gespeichertem Schlüssel ordnet das gewählte Modell
  * offene Fundstellen ein; ohne Schlüssel laufen nur die Regeln. Der Fortschritt zählt
- * nur gespeicherte Prüfungen und sinkt nie.
+ * die Zahlen, die von oben nach unten fertig geprüft sind, und sinkt nie.
  */
 export function RunControls({
   caseId,
@@ -114,9 +115,9 @@ export function RunControls({
   }
 
   const status = open
-    ? run.plannedCheckCount === null
+    ? run.figureCount === 0
       ? t("run.preparing")
-      : t("run.progress", { stored: run.storedCheckCount, planned: run.plannedCheckCount })
+      : t("run.progress", { checked: run.checkedFigureCount ?? 0, total: run.figureCount })
     : run.status === "completed"
       ? t("run.completed")
       : run.status === "completed_with_gaps"
@@ -223,9 +224,9 @@ export function RunControls({
       {open ? (
         <Progress
           value={
-            run.plannedCheckCount === null || run.plannedCheckCount === 0
+            run.figureCount === 0
               ? null
-              : Math.round((run.storedCheckCount / run.plannedCheckCount) * 100)
+              : Math.round(((run.checkedFigureCount ?? 0) / run.figureCount) * 100)
           }
           aria-label={status ?? undefined}
         />

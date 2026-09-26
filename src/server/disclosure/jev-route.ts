@@ -188,6 +188,8 @@ export async function requestJevForBatch(
   return result;
 }
 
+const jevRouterTimeoutMilliseconds = 30_000;
+
 export type JevRouterResult = {
   answer: AssignmentAnswer;
   inputTokens: number | null;
@@ -206,12 +208,18 @@ export async function requestJevRouterForBatch(
   batch: AssignmentBatch,
 ): Promise<JevRouterResult> {
   if (!disclosureJevViaRouter(run)) throw new ModelProviderError("INVALID_PROVIDER_ROUTE", false);
-  const response = await requestStructuredForDisclosure(run, buildJevRouterPrompt(batch), {
-    credentialId: run.assistCredentialId!,
-    routeProvider: "openrouter",
-    modelId: jevRouterModelId,
-    purpose: "disclosure_assist",
-  }).catch((error: unknown) => {
+  const response = await requestStructuredForDisclosure(
+    run,
+    // Jev ist nur eine Abkürzung: antwortet der Router nicht rasch, ordnet das Nutzermodell ein.
+    { ...buildJevRouterPrompt(batch), timeoutMilliseconds: jevRouterTimeoutMilliseconds },
+    {
+      credentialId: run.assistCredentialId!,
+      routeProvider: "openrouter",
+      modelId: jevRouterModelId,
+      purpose: "disclosure_assist",
+      omitReasoningEffort: true,
+    },
+  ).catch((error: unknown) => {
     if (error instanceof TemporaryCredentialError) {
       throw new ModelProviderError("PROVIDER_UNAVAILABLE", false);
     }

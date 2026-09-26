@@ -1,9 +1,9 @@
 /**
  * Datumsangaben eines Berichts („Gesellschafterversammlung vom 22. April 2021“,
  * „Vertrag vom 8.12.2021“). Sie sind keine Berichtszahlen, werden aber markiert, damit
- * der Prüfer sie gegen die Unterlagen abstimmen kann. Die Stichtage des Berichtsjahres
- * und des Vorjahres (31.12. und 1.1.) stehen in fast jedem Satz und bleiben unmarkiert.
- * Reine Funktion; die Marken entstehen beim Lesen aus den unveränderlichen Blöcken.
+ * der Prüfer sie gegen die Unterlagen abstimmen kann — auch die Stichtage und die
+ * Spaltenköpfe von Tabellen („31.12.2025 (in EUR)“), denn ein falsches Jahr im Kopf
+ * ist ein Fehler des Berichts. Reine Funktion; die Marken entstehen beim Lesen aus den unveränderlichen Blöcken.
  */
 
 import type { ContextInputBlock } from "./document-context";
@@ -59,12 +59,8 @@ function daysIn(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-export function recognizeDates(
-  text: string,
-  options: Readonly<{ reportYear?: number | null }> = {},
-): RecognizedDate[] {
+export function recognizeDates(text: string): RecognizedDate[] {
   const found: RecognizedDate[] = [];
-  const reportYear = options.reportYear ?? null;
   for (const match of text.matchAll(datePattern)) {
     const day = Number(match[1]);
     const month = match[2] ? Number(match[2]) : months[match[4]!.toLowerCase()]!;
@@ -72,13 +68,6 @@ export function recognizeDates(
     const year = yearText.length === 2 ? 2000 + Number(yearText) : Number(yearText);
     if (month < 1 || month > 12 || day < 1 || day > daysIn(year, month)) continue;
     if (year < 1900 || year > 2100) continue;
-    if (
-      reportYear !== null &&
-      ((month === 12 && day === 31 && (year === reportYear || year === reportYear - 1)) ||
-        (month === 1 && day === 1 && (year === reportYear || year === reportYear - 1)))
-    ) {
-      continue;
-    }
     const raw = match[0];
     found.push({
       start: match.index,
@@ -93,18 +82,17 @@ export function recognizeDates(
 export type DocumentDate = RecognizedDate & { blockId: string };
 
 /**
- * Die Datumsangaben eines Berichts in Blockfolge. Übersprungen werden technische
- * Blöcke, Tabellenköpfe (Spalten „31.12.2021“) und Inhaltsverzeichnisse.
+ * Die Datumsangaben eines Berichts in Blockfolge, Tabellenköpfe eingeschlossen.
+ * Übersprungen werden technische Blöcke und Inhaltsverzeichnisse.
  */
 export function recognizeDocumentDates(
-  blocks: ReadonlyArray<ContextInputBlock & { technical?: boolean; header?: boolean }>,
-  reportYear: number | null,
+  blocks: ReadonlyArray<ContextInputBlock & { technical?: boolean }>,
 ): DocumentDate[] {
   const toc = tableOfContentsBlockIds(blocks);
   return blocks.flatMap((block) =>
-    block.technical || block.header || toc.has(block.id)
+    block.technical || toc.has(block.id)
       ? []
-      : recognizeDates(block.text, { reportYear }).map((date) => ({
+      : recognizeDates(block.text).map((date) => ({
           ...date,
           blockId: block.id,
         })),

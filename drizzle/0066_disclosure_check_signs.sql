@@ -1,0 +1,1 @@
+ALTER TABLE "disclosure_checks" ADD COLUMN "source_signs" smallint[];

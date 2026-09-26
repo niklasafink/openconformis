@@ -456,6 +456,20 @@
       "when": 1790419462061,
       "tag": "0064_disclosure_prior_report",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1790427647448,
+      "tag": "0065_disclosure_checked_figures",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1790428362053,
+      "tag": "0066_disclosure_check_signs",
+      "breakpoints": true
     }
   ]
 }

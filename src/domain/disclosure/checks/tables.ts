@@ -347,6 +347,7 @@ function sumDraft(
     rounded: comparison.rounded,
     sourceKind: "table",
     sourceFigureIds: components.map((item) => item.figure.id),
+    sourceSigns: signs.map((sign) => (sign < 0n ? -1 : 1)),
     sourceBlockIds: [],
     sourceLabel: sourceLabel(table, total.row),
     comment:
@@ -878,6 +879,7 @@ export function horizontalChecks(table: TableModel): CheckDraft[] {
         rounded: comparison.rounded,
         sourceKind: "table",
         sourceFigureIds: components.map((item) => item.figure.id),
+        sourceSigns: components.map(() => 1),
         sourceBlockIds: [],
         sourceLabel: sourceLabel(table, row, total.label),
         comment:
@@ -966,6 +968,7 @@ export function changeColumnChecks(table: TableModel): CheckDraft[] {
         rounded: comparison.rounded,
         sourceKind: "table",
         sourceFigureIds: [c.id, p.id],
+        sourceSigns: [1, -1],
         sourceBlockIds: [],
         sourceLabel: sourceLabel(table, row, change.label),
         comment:
@@ -1043,6 +1046,7 @@ export function balanceChecks(tables: readonly TableModel[]): CheckDraft[] {
       rounded: comparison.rounded,
       sourceKind: "table",
       sourceFigureIds: [assets.figure.id],
+      sourceSigns: [1],
       sourceBlockIds: [],
       sourceLabel: sourceLabel(assets.table, assets.row),
       comment:

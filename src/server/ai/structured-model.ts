@@ -328,7 +328,10 @@ export async function fetchProviderJson(
 
 export function parseStructuredOutput<T>(rawOutput: string, outputSchema: z.ZodType<T>): T {
   try {
-    return outputSchema.parse(JSON.parse(rawOutput));
+    // Router ohne `response_format`-Zusage (Jev Router, D-036) umschließen JSON gelegentlich
+    // mit einem Code-Fence; der Inhalt wird trotzdem streng gegen das Schema geprüft.
+    const fenced = /^\s*```(?:json)?\s*\n?([\s\S]*?)\n?\s*```\s*$/u.exec(rawOutput);
+    return outputSchema.parse(JSON.parse(fenced ? fenced[1]! : rawOutput));
   } catch (error) {
     // Die verletzten Regeln benennen, statt sie zu verwerfen: der zweite Versuch
     // bekam bisher nur „schema validation failed" und scheiterte deshalb

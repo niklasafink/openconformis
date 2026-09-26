@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
+import { checkedFigureFrontier } from "@/domain/disclosure/assignment";
 import { renderComment, renderFindingTitle } from "@/domain/disclosure/checks/comments";
 import { deriveFindings } from "@/domain/disclosure/checks/findings";
 import { runDeterministicChecks } from "@/domain/disclosure/checks/run";
@@ -122,6 +123,10 @@ function rowOf(runId: string, draft: CheckDraft): typeof disclosureChecks.$infer
     rounded: draft.rounded,
     sourceKind: draft.sourceKind,
     sourceFigureIds: draft.sourceFigureIds,
+    sourceSigns:
+      draft.sourceSigns && draft.sourceSigns.length === draft.sourceFigureIds.length
+        ? [...draft.sourceSigns]
+        : null,
     sourceBlockIds: draft.sourceBlockIds,
     sourceAccountIds: draft.sourceAccountIds ?? [],
     sourceLabel: draft.sourceLabel.slice(0, 300),
@@ -178,10 +183,15 @@ export async function runDeterministicStage(runId: string) {
   const { drafts, pending } = runDeterministicChecks(engineDocument, evidence, prior);
   await storeChecks(runId, drafts);
   const planned = drafts.length + (run.routeProvider ? pending.length : 0);
+  // Ohne Modell steht mit den Regeln alles fest; sonst bis zur ersten offenen Fundstelle.
+  const checked = run.routeProvider
+    ? checkedFigureFrontier(engineDocument, pending, 0)
+    : engineDocument.figures.length;
   await db
     .update(disclosureRuns)
     .set({
       figureCount: engineDocument.figures.length,
+      checkedFigureCount: sql`greatest(coalesce(${disclosureRuns.checkedFigureCount}, 0), ${checked})`,
       plannedCheckCount: sql`greatest(coalesce(${disclosureRuns.plannedCheckCount}, 0), ${planned})`,
       stage: run.routeProvider && pending.length > 0 ? "assignment" : "finalize",
       updatedAt: new Date(),
@@ -345,6 +355,7 @@ export async function finalizeDisclosureRun(runId: string) {
     .set({
       status,
       stage: "done",
+      checkedFigureCount: sql`${disclosureRuns.figureCount}`,
       mismatchCount: counts.mismatch,
       uncertainCount: counts.uncertain,
       completedAt: new Date(),

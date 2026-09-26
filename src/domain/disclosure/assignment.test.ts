@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   assignmentAnswerJsonSchema,
+  assignmentChunk,
+  assignmentChunkCount,
+  assignmentChunkSize,
   buildAssignmentPrompt,
+  checkedFigureFrontier,
   planAssignmentBatches,
   readAssignments,
 } from "./assignment";
@@ -26,10 +30,10 @@ const mention = (index: number): PendingMention => ({
 const frozen = { providerModelId: "test/model", promptVersion: "disclosure-assignment-v1" };
 
 describe("assignment batches", () => {
-  it("bildet feste Batches zu zwölf Fundstellen mit stabilem Schlüssel", () => {
-    const pending = Array.from({ length: 25 }, (_, index) => mention(index + 1));
+  it("bildet feste Batches zu sechs Fundstellen mit stabilem Schlüssel", () => {
+    const pending = Array.from({ length: 13 }, (_, index) => mention(index + 1));
     const batches = planAssignmentBatches(pending, frozen);
-    expect(batches.map((batch) => batch.items.length)).toEqual([12, 12, 1]);
+    expect(batches.map((batch) => batch.items.length)).toEqual([6, 6, 1]);
     expect(batches[0]!.key).toMatch(/^[0-9a-f]{64}$/u);
     expect(planAssignmentBatches(pending, frozen)[1]!.key).toBe(batches[1]!.key);
     expect(
@@ -74,5 +78,32 @@ describe("assignment batches", () => {
         comment: "Bestand.",
       },
     ]);
+  });
+});
+
+describe("Abschnitte von oben nach unten", () => {
+  const blocks = [
+    { id: "b1", ordinal: 1 },
+    { id: "b2", ordinal: 2 },
+  ];
+  // Die Datenbank liefert Zahlen nach Block-ID, nicht nach Lage im Dokument.
+  const figures = [
+    { id: "late", blockId: "b2", start: 0 },
+    { id: "early", blockId: "b1", start: 10 },
+    { id: "first", blockId: "b1", start: 0 },
+  ];
+  const document = { blocks, figures } as unknown as Parameters<typeof checkedFigureFrontier>[0];
+
+  it("teilt die offenen Fundstellen in Abschnitte paralleler Batches", () => {
+    const pending = Array.from({ length: assignmentChunkSize + 1 }, (_, index) => index);
+    expect(assignmentChunkCount(pending.length)).toBe(2);
+    expect(assignmentChunk(pending, 1)).toEqual([assignmentChunkSize]);
+    expect(assignmentChunkCount(0)).toBe(0);
+  });
+
+  it("zählt als geprüft alle Zahlen vor der ersten offenen Fundstelle in Dokumentreihenfolge", () => {
+    expect(checkedFigureFrontier(document, [{ figureId: "early" }], 0)).toBe(1);
+    expect(checkedFigureFrontier(document, [{ figureId: "late" }], 0)).toBe(2);
+    expect(checkedFigureFrontier(document, [{ figureId: "early" }], 1)).toBe(3);
   });
 });

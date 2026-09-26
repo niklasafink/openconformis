@@ -1,9 +1,13 @@
 import "server-only";
 
-import { asc, count, desc, eq, and } from "drizzle-orm";
+import { asc, desc, eq, and } from "drizzle-orm";
 
 import { jevRouterModelId } from "@/domain/disclosure/jev-assignment";
-import { renderComment, renderFindingTitle } from "@/domain/disclosure/checks/comments";
+import {
+  renderComment,
+  renderFindingTitle,
+  renderReason,
+} from "@/domain/disclosure/checks/comments";
 import { deriveFindings, isSilent } from "@/domain/disclosure/checks/findings";
 import type { CheckComment, CheckKind, CheckStatus } from "@/domain/disclosure/checks/types";
 import { db } from "@/server/db/client";
@@ -21,8 +25,8 @@ export type ViewRun = {
   status: ViewRunStatus;
   stage: string;
   figureCount: number;
-  plannedCheckCount: number | null;
-  storedCheckCount: number;
+  /** Zahlen in Dokumentreihenfolge, die fertig geprüft sind; `null` vor den Regeln. */
+  checkedFigureCount: number | null;
   failureCode: string | null;
   modelProfileId: string | null;
   jevAssist: "on" | "off";
@@ -42,8 +46,12 @@ export type ViewCheck = {
   rounded: boolean;
   sourceLabel: string;
   sourceFigureIds: string[];
+  /** +1/−1 je Bezugszahl, wenn der Soll-Wert ihre Summe ist; sonst `null`. */
+  sourceSigns: number[] | null;
   sourceAccountIds: string[];
   comment: string;
+  /** Warum die Prüfung so ausgeht, ein Satz ohne Beträge. */
+  reason: string;
   assignment: "rule" | "jev" | "model";
   /** Ohne Feststellung und ohne Farbe (Summe nicht eindeutig, Rundung). */
   silent: boolean;
@@ -74,7 +82,7 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
     .orderBy(desc(disclosureRuns.createdAt))
     .limit(1);
   if (!run) return null;
-  const [checks, stored, [total]] = await Promise.all([
+  const [checks, stored] = await Promise.all([
     db
       .select()
       .from(disclosureChecks)
@@ -85,7 +93,6 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
       .from(disclosureFindings)
       .where(eq(disclosureFindings.runId, run.id))
       .orderBy(asc(disclosureFindings.ordinal)),
-    db.select({ value: count() }).from(disclosureChecks).where(eq(disclosureChecks.runId, run.id)),
   ]);
 
   const commentOf = (check: (typeof checks)[number]): CheckComment => ({
@@ -104,8 +111,13 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
       rounded: check.rounded,
       sourceLabel: check.sourceLabel,
       sourceFigureIds: check.sourceFigureIds,
+      sourceSigns:
+        check.sourceSigns && check.sourceSigns.length === check.sourceFigureIds.length
+          ? check.sourceSigns
+          : null,
       sourceAccountIds: check.sourceAccountIds,
       comment: locale === "de" ? check.comment : renderComment(comment, locale),
+      reason: renderReason(comment.code, locale),
       assignment: check.assignmentSource,
       silent: isSilent({ ...check, subjectStatementId: check.statementId, comment }),
     };
@@ -158,8 +170,7 @@ export async function readLatestRun(caseId: string, locale: "de" | "en") {
     status: run.status,
     stage: run.stage,
     figureCount: run.figureCount,
-    plannedCheckCount: run.plannedCheckCount,
-    storedCheckCount: total?.value ?? 0,
+    checkedFigureCount: run.checkedFigureCount,
     failureCode: run.failureCode,
     modelProfileId: run.modelProfileId,
     jevAssist: run.jevAssist,

@@ -949,7 +949,7 @@
         "starting": "Wird gestartet …",
         "restart": "Erneut prüfen",
         "preparing": "Prüfungen werden vorbereitet …",
-        "progress": "{stored} von {planned} Prüfungen",
+        "progress": "{checked} von {total} Zahlen geprüft",
         "completed": "Geprüft",
         "completedWithGaps": "Geprüft, mit Lücken",
         "failed": "Lauf fehlgeschlagen ({code}). Ein neuer Start ist möglich.",

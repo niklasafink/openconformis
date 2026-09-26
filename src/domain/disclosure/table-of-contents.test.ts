@@ -44,8 +44,8 @@ describe("tableOfContentsBlockIds", () => {
     expect(ids.has(title.id)).toBe(true);
     expect(lines.every((line) => ids.has(line.id))).toBe(true);
     expect(ids.has(body.id)).toBe(false);
-    // Die Seitenzahlen wären sonst Anzahlen.
-    expect(recognizeFigures(entries[1]!, { blockType: "paragraph" })).toHaveLength(1);
+    // Auch eine einzelne Gliederungszeile außerhalb des Verzeichnisses ergibt keine Anzahl.
+    expect(recognizeFigures(entries[1]!, { blockType: "paragraph" })).toHaveLength(0);
   });
 
   it("finds a table of contents without its title by ascending page numbers", () => {
@@ -92,10 +92,13 @@ describe("recognizeDates", () => {
     ]);
   });
 
-  it("skips the closing dates of the report and prior year and impossible dates", () => {
+  it("marks closing dates too, but no impossible dates", () => {
     const text =
       "Zum 31. Dezember 2021 (31.12.2020) und ab 1.1.2021; nicht 31.02.2021, wohl aber 31.12.2019.";
-    expect(recognizeDates(text, { reportYear: 2021 }).map(({ iso }) => iso)).toEqual([
+    expect(recognizeDates(text).map(({ iso }) => iso)).toEqual([
+      "2021-12-31",
+      "2020-12-31",
+      "2021-01-01",
       "2019-12-31",
     ]);
   });
@@ -106,13 +109,13 @@ describe("recognizeDates", () => {
     );
   });
 
-  it("skips dates in a table of contents and in column heads", () => {
+  it("skips dates in a table of contents, but marks column heads", () => {
     const title = block("Inhaltsverzeichnis");
     const lines = entries.slice(0, 4).map((text) => block(text));
     const dated = block("Bilanz zum 30. Juni 2021 5");
-    const head = { ...block("30.06.2021"), header: true };
+    const head = block("31.12.2025 (in EUR)");
     const body = block("Beschluss vom 22. April 2021");
-    const dates = recognizeDocumentDates([title, ...lines, dated, head, body], 2021);
-    expect(dates.map((date) => date.blockId)).toEqual([body.id]);
+    const dates = recognizeDocumentDates([title, ...lines, dated, head, body]);
+    expect(dates.map((date) => date.blockId)).toEqual([head.id, body.id]);
   });
 });
