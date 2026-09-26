@@ -96,13 +96,33 @@ export async function loadEngineDocument(caseDocumentId: string): Promise<Engine
       parenthesized: figure.parenthesized,
       issue: figure.parseIssue,
     })),
-    statements: statements.map((statement) => ({
-      id: statement.id,
-      blockId: statement.documentBlockId,
-      start: statement.startOffset,
-      end: statement.endOffset,
-      raw: statement.rawText,
-      direction: statement.direction,
-    })),
+    statements: statements.flatMap((statement) =>
+      statement.kind === "direction" && statement.direction
+        ? [
+            {
+              id: statement.id,
+              blockId: statement.documentBlockId,
+              start: statement.startOffset,
+              end: statement.endOffset,
+              raw: statement.rawText,
+              direction: statement.direction,
+            },
+          ]
+        : [],
+    ),
+    years: statements.flatMap((statement) =>
+      statement.kind === "year" && statement.year !== null
+        ? [
+            {
+              id: statement.id,
+              blockId: statement.documentBlockId,
+              start: statement.startOffset,
+              end: statement.endOffset,
+              raw: statement.rawText,
+              year: statement.year,
+            },
+          ]
+        : [],
+    ),
   };
 }

@@ -729,4 +729,205 @@ suite("disclosure plausibility runs against a real database", () => {
       actAs(userId, ["owner"]);
     }
   });
+  /** Eine fertig aufbereitete Word-Fassung der Organisation mit den gegebenen Blöcken. */
+  async function seedVersion(
+    name: string,
+    blocks: Array<{ text: string; cell?: [number, number] }>,
+  ) {
+    const [policy] = await db
+      .insert(documents.policies)
+      .values({ organizationId, ownerUserId: userId, displayName: name })
+      .returning({ id: documents.policies.id });
+    const [version] = await db
+      .insert(documents.policyVersions)
+      .values({
+        policyId: policy!.id,
+        organizationId,
+        versionNumber: 1,
+        source: "upload",
+        originalFilename: `${name}.docx`,
+        sha256: randomUUID().replaceAll("-", "").padEnd(64, "e"),
+        storageDriver: "vercel-blob",
+        objectKey: `test/${suffix}/${randomUUID()}`,
+        parserVersion: "test-parser",
+        parseStatus: "parsing",
+        originalDeleteAfter: new Date(Date.now() + 86_400_000),
+        parsedDeleteAfter: new Date(Date.now() + 86_400_000),
+      })
+      .returning({ id: documents.policyVersions.id });
+    const inserted = await db
+      .insert(documents.documentBlocks)
+      .values(
+        blocks.map((block, index) => ({
+          policyVersionId: version!.id,
+          blockKey: `b${index + 1}`,
+          ordinal: index + 1,
+          blockType: block.cell ? ("table_cell" as const) : ("paragraph" as const),
+          canonicalText: block.text,
+          pageNumber: 1,
+          tokenCount: 10,
+          textHash: `${index + 1}`.padEnd(64, "f"),
+        })),
+      )
+      .returning({ id: documents.documentBlocks.id, ordinal: documents.documentBlocks.ordinal });
+    await db
+      .update(documents.policyVersions)
+      .set({
+        parseStatus: "ready",
+        detectedMimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        byteSize: 1_000,
+        pageCount: 1,
+        authoritativeLanguage: "de",
+        readyAt: new Date(),
+      })
+      .where(eq(documents.policyVersions.id, version!.id));
+    return { versionId: version!.id, blocks: inserted, cells: blocks.map((block) => block.cell) };
+  }
+
+  /** Tabellenlage einer früheren Erkennung und die Erkennung selbst, wie in `seedCase`. */
+  async function recognize(
+    caseDocumentId: string,
+    seeded: Awaited<ReturnType<typeof seedVersion>>,
+  ) {
+    await db.insert(schema.disclosureBlockContext).values(
+      seeded.blocks.flatMap((block) => {
+        const cell = seeded.cells[block.ordinal - 1];
+        return cell
+          ? [
+              {
+                caseDocumentId,
+                documentBlockId: block.id,
+                tableIndex: 0,
+                rowIndex: cell[0],
+                columnIndex: cell[1],
+                isHeader: cell[0] === 0,
+              },
+            ]
+          : [];
+      }),
+    );
+    const { recognizeCaseDocument } = await import("./recognize");
+    await recognizeCaseDocument(caseDocumentId);
+  }
+
+  it("friert den Vorjahresbericht ein und prüft Vorjahreswerte und stehen gebliebene Jahre", async () => {
+    const { and, inArray } = await import("drizzle-orm");
+    const manage = await import("./manage-case");
+    const report = await seedVersion("bericht-2021", [
+      { text: "Jahresabschluss zum 31. Dezember 2021" },
+      { text: "31.12.2021 TEUR", cell: [0, 1] },
+      { text: "31.12.2020 TEUR", cell: [0, 2] },
+      { text: "Forderungen gegen Beteiligungsunternehmen", cell: [1, 0] },
+      { text: "53,6", cell: [1, 1] },
+      { text: "110,3", cell: [1, 2] },
+      { text: "Bilanzsumme", cell: [2, 0] },
+      { text: "6.828,2", cell: [2, 1] },
+      { text: "10.268,8", cell: [2, 2] },
+      { text: "Im Geschäftsjahr 2020 bestanden Eventualverbindlichkeiten von TEUR 12." },
+    ]);
+    const prior = await seedVersion("bericht-2020", [
+      { text: "Jahresabschluss zum 31. Dezember 2020" },
+      { text: "31.12.2020 TEUR", cell: [0, 1] },
+      { text: "31.12.2019 TEUR", cell: [0, 2] },
+      { text: "Forderungen gegen Beteiligungsunternehmen", cell: [1, 0] },
+      { text: "110,3", cell: [1, 1] },
+      { text: "95,0", cell: [1, 2] },
+      { text: "Bilanzsumme", cell: [2, 0] },
+      { text: "10.200,0", cell: [2, 1] },
+      { text: "9.000,0", cell: [2, 2] },
+      { text: "Im Geschäftsjahr 2020 bestanden Eventualverbindlichkeiten von TEUR 9." },
+    ]);
+    const [created] = await db
+      .insert(schema.disclosureCases)
+      .values({ organizationId, ownerUserId: userId, title: "Vortrag" })
+      .returning({ id: schema.disclosureCases.id });
+    const priorCaseId = created!.id;
+
+    // Ohne Bericht gibt es keinen Vorjahresbericht; derselbe Bericht zählt nicht als Vorjahr.
+    expect(
+      await manage.attachDisclosureReport({
+        caseId: priorCaseId,
+        policyVersionId: prior.versionId,
+        role: "prior_report",
+      }),
+    ).toEqual({ ok: false, code: "DISCLOSURE_REPORT_MISSING" });
+    const attachedReport = await manage.attachDisclosureReport({
+      caseId: priorCaseId,
+      policyVersionId: report.versionId,
+    });
+    expect(attachedReport).toMatchObject({ ok: true });
+    expect(
+      await manage.attachDisclosureReport({
+        caseId: priorCaseId,
+        policyVersionId: report.versionId,
+        role: "prior_report",
+      }),
+    ).toEqual({ ok: false, code: "DISCLOSURE_PRIOR_REPORT_SAME" });
+    const attachedPrior = await manage.attachDisclosureReport({
+      caseId: priorCaseId,
+      policyVersionId: prior.versionId,
+      role: "prior_report",
+    });
+    expect(attachedPrior).toMatchObject({ ok: true });
+    // Wiederholen ist idempotent; ein zweiter, anderer Vorjahresbericht wird abgelehnt.
+    expect(
+      await manage.attachDisclosureReport({
+        caseId: priorCaseId,
+        policyVersionId: prior.versionId,
+        role: "prior_report",
+      }),
+    ).toEqual(attachedPrior);
+    const other = await seedVersion("bericht-2020-b", [{ text: "Jahresabschluss 2020" }]);
+    expect(
+      await manage.attachDisclosureReport({
+        caseId: priorCaseId,
+        policyVersionId: other.versionId,
+        role: "prior_report",
+      }),
+    ).toEqual({ ok: false, code: "DISCLOSURE_PRIOR_REPORT_EXISTS" });
+    if (!attachedReport.ok || !attachedPrior.ok) throw new Error("not attached");
+
+    // Solange der Vorjahresbericht nicht erkannt ist, startet kein Lauf.
+    await recognize(attachedReport.caseDocumentId, report);
+    await expect(start.startDisclosureRun(priorCaseId, {})).rejects.toMatchObject({
+      code: "DISCLOSURE_DOCUMENT_NOT_READY",
+    });
+    await recognize(attachedPrior.caseDocumentId, prior);
+
+    const started = await start.startDisclosureRun(priorCaseId, {});
+    const [run] = await db
+      .select()
+      .from(schema.disclosureRuns)
+      .where(eq(schema.disclosureRuns.id, started.runId));
+    expect(run).toMatchObject({
+      priorCaseDocumentId: attachedPrior.caseDocumentId,
+      priorExtractionVersion: expect.any(String),
+      priorReportSha256: expect.any(String),
+    });
+    await execute.prepareDisclosureRun(started.runId, `wf-prior-${suffix}`);
+    await execute.runDeterministicStage(started.runId);
+    const checks = await db
+      .select({
+        kind: schema.disclosureChecks.kind,
+        status: schema.disclosureChecks.status,
+        comment: schema.disclosureChecks.comment,
+        subjectLabel: schema.disclosureChecks.subjectLabel,
+      })
+      .from(schema.disclosureChecks)
+      .where(
+        and(
+          eq(schema.disclosureChecks.runId, started.runId),
+          inArray(schema.disclosureChecks.kind, ["rollover", "prior_report"]),
+        ),
+      );
+    expect(checks.map((check) => [check.kind, check.status, check.subjectLabel]).sort()).toEqual([
+      ["prior_report", "match", "Forderungen gegen Beteiligungsunternehmen"],
+      ["prior_report", "mismatch", "Bilanzsumme"],
+      ["rollover", "mismatch", "2020"],
+    ]);
+    expect(checks.find((check) => check.kind === "rollover")!.comment).toBe(
+      "Absatz wie im Vorjahresbericht; „2020“ ist unverändert geblieben.",
+    );
+    await closeOpenRuns();
+  });
 });

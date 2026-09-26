@@ -174,7 +174,8 @@ export async function runDeterministicStage(runId: string) {
   const engineDocument = await loadEngineDocument(run.reportCaseDocumentId);
   if (!engineDocument) throw new Error("DISCLOSURE_REPORT_MISSING");
   const evidence = await loadEvidenceInputs(run.evidenceFileIds);
-  const { drafts, pending } = runDeterministicChecks(engineDocument, evidence);
+  const prior = await loadFrozenPrior(run);
+  const { drafts, pending } = runDeterministicChecks(engineDocument, evidence, prior);
   await storeChecks(runId, drafts);
   const planned = drafts.length + (run.routeProvider ? pending.length : 0);
   await db
@@ -187,6 +188,24 @@ export async function runDeterministicStage(runId: string) {
     })
     .where(eq(disclosureRuns.id, runId));
   return { state: "running" as const, pending: run.routeProvider ? pending.length : 0 };
+}
+
+/**
+ * Der eingefrorene Vorjahresbericht. Wurde er nach dem Start entfernt oder neu erkannt,
+ * endet der Lauf wie beim Bericht mit einem Fehler statt mit einem anderen Abgleich.
+ */
+async function loadFrozenPrior(run: Awaited<ReturnType<typeof loadRun>>) {
+  if (!run.priorExtractionVersion) return null;
+  if (!run.priorCaseDocumentId) throw new Error("DISCLOSURE_RECOGNITION_CHANGED");
+  const [document] = await db
+    .select({ version: disclosureCaseDocuments.recognitionVersion })
+    .from(disclosureCaseDocuments)
+    .where(eq(disclosureCaseDocuments.id, run.priorCaseDocumentId))
+    .limit(1);
+  if (document?.version !== run.priorExtractionVersion) {
+    throw new Error("DISCLOSURE_RECOGNITION_CHANGED");
+  }
+  return loadEngineDocument(run.priorCaseDocumentId);
 }
 
 /**

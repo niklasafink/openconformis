@@ -19,6 +19,8 @@ type ReportUploadProps = Readonly<{
     draftId: string;
   }) => Promise<DisclosureActionResult<{ caseDocumentId: string }>>;
   errorMessages: Readonly<Record<string, string>>;
+  /** `prior`: der Vorjahresbericht für den Abgleich mit dem Vorjahr. */
+  variant?: "report" | "prior";
 }>;
 
 type UploadState =
@@ -40,9 +42,9 @@ export function isDocxFile(name: string) {
 }
 
 /**
- * Der Prüfungsbericht als Word-Datei. Ein PDF wird schon hier abgelehnt, bevor
- * ein Upload beginnt; der Server lehnt es ein zweites Mal ab. Danach dieselbe Kette
- * wie überall: Absicht → Blob → Abschluss → Aufbereitung → Übernahme.
+ * Der Prüfungsbericht oder der Vorjahresbericht als Word-Datei. Ein PDF wird schon
+ * hier abgelehnt, bevor ein Upload beginnt; der Server lehnt es ein zweites Mal ab.
+ * Danach dieselbe Kette wie überall: Absicht → Blob → Abschluss → Aufbereitung → Übernahme.
  */
 export function ReportUpload({
   locale,
@@ -50,8 +52,9 @@ export function ReportUpload({
   prepareDraft,
   attachReport,
   errorMessages,
+  variant = "report",
 }: ReportUploadProps) {
-  const t = useTranslations("Disclosure.upload");
+  const t = useTranslations(variant === "prior" ? "Disclosure.priorUpload" : "Disclosure.upload");
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>({ phase: "idle" });
@@ -131,9 +134,12 @@ export function ReportUpload({
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-xl gap-3 pt-10" aria-labelledby="report-upload">
+    <section
+      className="mx-auto grid w-full max-w-xl gap-3 pt-10"
+      aria-labelledby={`${variant}-report-upload`}
+    >
       <div className="grid gap-1">
-        <h2 id="report-upload" className="text-section-title font-semibold">
+        <h2 id={`${variant}-report-upload`} className="text-section-title font-semibold">
           {t("title")}
         </h2>
         <p className="text-meta text-muted-foreground">{t("hint")}</p>
@@ -189,7 +195,9 @@ export function ReportUpload({
       </div>
       <input
         ref={inputRef}
-        data-testid="disclosure-report-input"
+        data-testid={
+          variant === "prior" ? "disclosure-prior-report-input" : "disclosure-report-input"
+        }
         className="visually-hidden"
         type="file"
         accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"

@@ -92,16 +92,19 @@ export async function renameDisclosureCase(input: {
 }
 
 /**
- * Hängt den Prüfungsbericht an. Er muss Word sein: der Bereich kennt genau einen
- * Parserpfad (DOCX), PDF wird vorher lokal umgewandelt. Die Prüfung steht hier ein
- * zweites Mal nach der Intent-Route, weil eine Fassung auch aus einem anderen Weg
- * der Kette stammen könnte — maßgeblich ist der erkannte, nicht der erklärte Typ.
+ * Hängt den Prüfungsbericht oder den Vorjahresbericht an. Beide müssen Word sein: der
+ * Bereich kennt genau einen Parserpfad (DOCX), PDF wird vorher lokal umgewandelt. Die
+ * Prüfung steht hier ein zweites Mal nach der Intent-Route, weil eine Fassung auch aus
+ * einem anderen Weg der Kette stammen könnte — maßgeblich ist der erkannte, nicht der
+ * erklärte Typ. Je Prüfung gibt es höchstens einen Bericht und einen Vorjahresbericht.
  */
 export async function attachDisclosureReport(input: {
   caseId: string;
   policyVersionId: string;
   draftId?: string;
+  role?: "report" | "prior_report";
 }): Promise<{ ok: true; caseDocumentId: string } | DisclosureFailure> {
+  const role = input.role ?? "report";
   try {
     const actor = requirePreparer(await resolveDisclosureActor());
     const found = await ownedCase(input.caseId, actor.organizationId);
@@ -127,33 +130,45 @@ export async function attachDisclosureReport(input: {
         if (!adopted) return { ok: false as const, code: "DISCLOSURE_DOCUMENT_NOT_FOUND" };
         effectiveVersionId = adopted;
       }
-      const [existingReport] = await transaction
+      const documents = await transaction
         .select({
           id: disclosureCaseDocuments.id,
+          role: disclosureCaseDocuments.role,
           policyVersionId: disclosureCaseDocuments.policyVersionId,
+          ordinal: disclosureCaseDocuments.ordinal,
         })
         .from(disclosureCaseDocuments)
-        .where(
-          and(
-            eq(disclosureCaseDocuments.caseId, found.id),
-            eq(disclosureCaseDocuments.role, "report"),
-          ),
-        )
-        .limit(1);
-      if (existingReport) {
-        if (existingReport.policyVersionId === effectiveVersionId) {
-          return { ok: true as const, caseDocumentId: existingReport.id };
+        .where(eq(disclosureCaseDocuments.caseId, found.id));
+      const existing = documents.find((document) => document.role === role);
+      if (existing) {
+        if (existing.policyVersionId === effectiveVersionId) {
+          return { ok: true as const, caseDocumentId: existing.id };
         }
-        return { ok: false as const, code: "DISCLOSURE_REPORT_EXISTS" };
+        return {
+          ok: false as const,
+          code: role === "report" ? "DISCLOSURE_REPORT_EXISTS" : "DISCLOSURE_PRIOR_REPORT_EXISTS",
+        };
       }
-      // Der Bericht steht immer als erster Reiter (Ordinal 0); Belege folgen ab 1.
+      if (role === "prior_report") {
+        const report = documents.find((document) => document.role === "report");
+        if (!report) return { ok: false as const, code: "DISCLOSURE_REPORT_MISSING" };
+        if (report.policyVersionId === effectiveVersionId) {
+          return { ok: false as const, code: "DISCLOSURE_PRIOR_REPORT_SAME" };
+        }
+      }
+      // Der Bericht steht immer als erster Reiter (Ordinal 0); Vorjahresbericht und
+      // Belege folgen in der Reihenfolge ihres Hinzufügens.
+      const ordinal =
+        role === "report"
+          ? 0
+          : Math.max(0, ...documents.map((document) => Number(document.ordinal))) + 1;
       const [document] = await transaction
         .insert(disclosureCaseDocuments)
         .values({
           caseId: found.id,
-          role: "report",
+          role,
           policyVersionId: effectiveVersionId,
-          ordinal: 0,
+          ordinal,
           displayName: version.originalFilename.slice(0, 255),
         })
         .returning({ id: disclosureCaseDocuments.id });
@@ -167,7 +182,7 @@ export async function attachDisclosureReport(input: {
         action: "disclosure_document.added",
         targetType: "disclosure_case_document",
         targetId: document!.id,
-        metadata: { role: "report", adoptedFromDraft: access === "adopt" },
+        metadata: { role, adoptedFromDraft: access === "adopt" },
       });
       return { ok: true as const, caseDocumentId: document!.id };
     });

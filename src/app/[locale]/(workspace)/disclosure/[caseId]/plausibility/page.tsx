@@ -25,7 +25,7 @@ import { readRecognition, type ViewFigure } from "@/server/disclosure/read-plaus
 import { readLatestRun, type ViewCheck } from "@/server/disclosure/read-run";
 import { disclosureJevAssist } from "@/server/environment";
 
-import { attachReport, prepareReportDraft } from "../actions";
+import { attachPriorReport, attachReport, prepareReportDraft } from "../actions";
 import { CaseNotFound, loadCasePage } from "../case-page";
 
 type PageProps = Readonly<{ params: Promise<{ locale: string; caseId: string }> }>;
@@ -71,19 +71,29 @@ export default async function PlausibilityPage({ params }: PageProps) {
   const plausibilityT = await getTranslations("Disclosure.plausibility");
   const resultsT = await getTranslations("ResultsPreview");
   const report = found.documents.find((document) => document.role === "report");
-  const [blocks, recognition, latest, catalogue, savedCredentials, evidenceFiles] =
-    await Promise.all([
-      readDocumentBlocks(
-        found.documents.flatMap((document) =>
-          document.policyVersionId ? [document.policyVersionId] : [],
-        ),
+  const priorReport = found.documents.find((document) => document.role === "prior_report");
+  const [
+    blocks,
+    recognition,
+    priorRecognition,
+    latest,
+    catalogue,
+    savedCredentials,
+    evidenceFiles,
+  ] = await Promise.all([
+    readDocumentBlocks(
+      found.documents.flatMap((document) =>
+        document.policyVersionId ? [document.policyVersionId] : [],
       ),
-      report ? readRecognition(report.id) : Promise.resolve(undefined),
-      report ? readLatestRun(found.id, locale) : Promise.resolve(null),
-      getAnalysisModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
-      listSavedCredentials().catch(() => []),
-      readCaseEvidence(found.id),
-    ]);
+    ),
+    report ? readRecognition(report.id) : Promise.resolve(undefined),
+    // Liest den Stand und startet eine hängengebliebene Erkennung des Vorjahresberichts neu.
+    priorReport ? readRecognition(priorReport.id) : Promise.resolve(undefined),
+    report ? readLatestRun(found.id, locale) : Promise.resolve(null),
+    getAnalysisModelCatalogue().catch(() => ({ version: "", fetchedAt: "", models: [] })),
+    listSavedCredentials().catch(() => []),
+    readCaseEvidence(found.id),
+  ]);
   const evidenceBusy = evidenceFiles.some(
     (file) => file.status === "uploaded" || file.status === "parsing",
   );
@@ -127,17 +137,20 @@ export default async function PlausibilityPage({ params }: PageProps) {
       display: describeFigure(figure),
       issue: figure.issue,
     })),
-    ...(recognition?.statements ?? []).map((statement): FigureMark => ({
-      id: statement.id,
-      blockId: statement.blockId,
-      start: statement.start,
-      end: statement.end,
-      kind: "statement",
-      raw: statement.raw,
-      status: statusOf(statement.id),
-      display: statement.raw,
-      issue: null,
-    })),
+    ...(recognition?.statements ?? [])
+      // Jahreszahlen sind keine Berichtszahlen: markiert nur, wenn eine Prüfung sie beanstandet.
+      .filter((statement) => statement.kind === "direction" || statuses.has(statement.id))
+      .map((statement): FigureMark => ({
+        id: statement.id,
+        blockId: statement.blockId,
+        start: statement.start,
+        end: statement.end,
+        kind: statement.kind === "year" ? "year" : "statement",
+        raw: statement.raw,
+        status: statusOf(statement.id),
+        display: statement.raw,
+        issue: null,
+      })),
   ];
 
   // Freigaben gibt es erst für gespeicherte Feststellungen eines beendeten Laufs.
@@ -234,6 +247,18 @@ export default async function PlausibilityPage({ params }: PageProps) {
           reviewErrors={
             (await getTranslations("Disclosure.review")).raw("errors") as Record<string, string>
           }
+          priorUpload={
+            !priorReport && found.permissions.canPrepare ? (
+              <ReportUpload
+                variant="prior"
+                locale={locale}
+                caseId={caseId}
+                prepareDraft={prepareReportDraft}
+                attachReport={attachPriorReport}
+                errorMessages={t.raw("errors") as Record<string, string>}
+              />
+            ) : undefined
+          }
           evidence={{
             caseId,
             files: evidenceFiles,
@@ -243,7 +268,10 @@ export default async function PlausibilityPage({ params }: PageProps) {
           controls={
             <RunControls
               caseId={caseId}
-              ready={recognition?.status === "ready"}
+              ready={
+                recognition?.status === "ready" &&
+                (!priorReport || priorRecognition?.status === "ready")
+              }
               canStart={found.permissions.canPrepare}
               run={{
                 status: run?.status ?? "none",

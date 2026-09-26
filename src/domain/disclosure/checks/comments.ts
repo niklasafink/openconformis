@@ -132,6 +132,22 @@ const templates: Record<CommentCode, Record<Locale, string>> = {
     de: "Weicht um {difference} von {source} ({expected}) ab.",
     en: "Differs by {difference} from {source} ({expected}).",
   },
+  year_suspect: {
+    de: "„{year}“ steht, wo der Satz das Berichtsjahr {reportYear} beschreibt.",
+    en: "“{year}” appears where the sentence describes the report year {reportYear}.",
+  },
+  year_not_rolled: {
+    de: "Absatz wie im Vorjahresbericht{source}; „{year}“ ist unverändert geblieben.",
+    en: "Paragraph as in the prior-year report{source}; “{year}” was left unchanged.",
+  },
+  prior_report_matches: {
+    de: "Vorjahr stimmt mit dem Vorjahresbericht{source} überein{rounded}.",
+    en: "Prior year agrees with the prior-year report{source}{rounded}.",
+  },
+  prior_report_differs: {
+    de: "Vorjahr weicht um {difference} vom Vorjahresbericht{source} ab: dort {expected}.",
+    en: "Prior year differs by {difference} from the prior-year report{source}: it shows {expected}.",
+  },
 };
 
 const roundedSuffix: Record<Locale, string> = { de: ", gerundet", en: ", rounded" };
@@ -170,6 +186,12 @@ const titles: Partial<Record<CommentCode, Record<Locale, string>>> = {
   sum_ambiguous: { de: "Summe nicht eindeutig", en: "Sum not conclusive" },
   model_unsure: { de: "Zuordnung unsicher", en: "Assignment uncertain" },
   evidence_differs: { de: "Abweichung zur SuSa", en: "Differs from trial balance" },
+  year_suspect: { de: "Jahr möglicherweise nicht fortgeschrieben", en: "Year possibly not rolled" },
+  year_not_rolled: { de: "Jahr nicht fortgeschrieben", en: "Year not rolled forward" },
+  prior_report_differs: {
+    de: "Abweichung zum Vorjahresbericht",
+    en: "Differs from prior-year report",
+  },
 };
 
 /** Titel einer Feststellung: Art der Abweichung und der Posten, höchstens 60 Zeichen. */

@@ -7,6 +7,7 @@ import {
   CircleAlert,
   CircleDashed,
   CircleX,
+  History,
   LoaderCircle,
   Paperclip,
 } from "lucide-react";
@@ -41,7 +42,7 @@ export type FigureMark = {
   blockId: string;
   start: number;
   end: number;
-  kind: "figure" | "statement";
+  kind: "figure" | "statement" | "year";
   raw: string;
   status: MarkStatus;
   /** „4.416,4 TEUR“ bzw. „Erhöhung“ — was die Marke erkannt hat. */
@@ -117,6 +118,8 @@ type PlausibilityWorkspaceProps = Readonly<{
   canPrepare?: boolean;
   reviewErrors?: Readonly<Record<string, string>>;
   /** Der Reiter „Belege“ mit den Belegdateien der Prüfung. */
+  /** Upload des Vorjahresberichts, solange die Prüfung keinen hat. */
+  priorUpload?: ReactNode;
   evidence?: Readonly<{
     caseId: string;
     files: readonly EvidenceFileView[];
@@ -187,6 +190,7 @@ export function PlausibilityWorkspace({
   canPrepare = false,
   reviewErrors = {},
   evidence,
+  priorUpload,
 }: PlausibilityWorkspaceProps) {
   const reviewT = useTranslations("Disclosure.review");
   const t = useTranslations("Disclosure.plausibility");
@@ -394,7 +398,7 @@ export function PlausibilityWorkspace({
   );
 
   const figures = marks.filter((mark) => mark.kind === "figure").length;
-  const statements = marks.length - figures;
+  const statements = marks.filter((mark) => mark.kind === "statement").length;
   const unreadable = marks.filter((mark) => mark.issue).length;
   const summary =
     recognition !== "ready"
@@ -585,8 +589,18 @@ export function PlausibilityWorkspace({
             documents={textDocuments}
             activeId={documentTab}
             onActiveIdChange={setDocumentTab}
-            extraTabs={
-              evidence
+            extraTabs={[
+              ...(priorUpload
+                ? [
+                    {
+                      id: "prior",
+                      label: t("priorTab"),
+                      icon: <History aria-hidden="true" className="size-3.5" />,
+                      content: <div className="min-h-0 overflow-y-auto px-4">{priorUpload}</div>,
+                    },
+                  ]
+                : []),
+              ...(evidence
                 ? [
                     {
                       id: "evidence",
@@ -604,8 +618,8 @@ export function PlausibilityWorkspace({
                       ),
                     },
                   ]
-                : []
-            }
+                : []),
+            ]}
             blocksByDocument={blocksByDocument}
             contexts={contexts}
             labels={{
@@ -653,9 +667,7 @@ export function PlausibilityWorkspace({
               </div>
               <dl className="grid gap-1.5 px-3 py-2.5 text-meta">
                 <div className="grid grid-cols-[4.5rem_1fr] gap-2">
-                  <dt className="text-muted-foreground">
-                    {activeMark.kind === "figure" ? t("popover.figure") : t("popover.statement")}
-                  </dt>
+                  <dt className="text-muted-foreground">{t(`popover.${activeMark.kind}`)}</dt>
                   <dd className="font-medium tabular-nums">{activeMark.display}</dd>
                 </div>
                 {sourceText ? (

@@ -29,7 +29,7 @@ export const disclosureCaseStatus = pgEnum("disclosure_case_status", ["active", 
 
 export const disclosureDocumentRole = pgEnum("disclosure_document_role", [
   "report",
-  /** Vorjahresbericht: die Rolle existiert, eine Prüfung dagegen noch nicht. */
+  /** Vorjahresbericht: Gegenstück der Vortragsprüfung, höchstens einer je Prüfung. */
   "prior_report",
   "evidence",
 ]);
@@ -52,6 +52,9 @@ export const disclosureFigureUnit = pgEnum("disclosure_figure_unit", [
 export const disclosurePeriodHint = pgEnum("disclosure_period_hint", ["current", "prior", "other"]);
 
 export const disclosureDirection = pgEnum("disclosure_direction", ["up", "down", "flat"]);
+
+/** Art einer Wortnennung: Richtungswort oder Jahreszahl im Fließtext. */
+export const disclosureStatementKind = pgEnum("disclosure_statement_kind", ["direction", "year"]);
 
 export const disclosureCases = pgTable(
   "disclosure_cases",
@@ -114,6 +117,9 @@ export const disclosureCaseDocuments = pgTable(
     uniqueIndex("disclosure_case_documents_one_report_uidx")
       .on(table.caseId)
       .where(sql`${table.role} = 'report'`),
+    uniqueIndex("disclosure_case_documents_one_prior_report_uidx")
+      .on(table.caseId)
+      .where(sql`${table.role} = 'prior_report'`),
     index("disclosure_case_documents_version_idx").on(table.policyVersionId),
     check(
       "disclosure_case_documents_source_check",
@@ -224,10 +230,19 @@ export const disclosureStatements = pgTable(
     startOffset: integer("start_offset").notNull(),
     endOffset: integer("end_offset").notNull(),
     rawText: text("raw_text").notNull(),
-    direction: disclosureDirection("direction").notNull(),
+    kind: disclosureStatementKind("kind").default("direction").notNull(),
+    /** Nur bei Richtungswörtern. */
+    direction: disclosureDirection("direction"),
+    /** Nur bei Jahreszahlen. */
+    year: integer("year"),
     extractionVersion: text("extraction_version").notNull(),
   },
   (table) => [
+    check(
+      "disclosure_statements_kind_check",
+      sql`(${table.kind} = 'direction' AND ${table.direction} IS NOT NULL AND ${table.year} IS NULL)
+        OR (${table.kind} = 'year' AND ${table.direction} IS NULL AND ${table.year} IS NOT NULL)`,
+    ),
     uniqueIndex("disclosure_statements_block_offset_uidx").on(
       table.caseDocumentId,
       table.documentBlockId,
@@ -350,6 +365,8 @@ export const disclosureCheckKind = pgEnum("disclosure_check_kind", [
   "derived",
   "ratio",
   "evidence",
+  "rollover",
+  "prior_report",
 ]);
 
 export const disclosureCheckStatus = pgEnum("disclosure_check_status", [
@@ -363,6 +380,7 @@ export const disclosureCheckSourceKind = pgEnum("disclosure_check_source_kind", 
   "text",
   "formula",
   "evidence",
+  "prior_report",
 ]);
 
 export const disclosureAssignmentSource = pgEnum("disclosure_assignment_source", [
@@ -428,6 +446,13 @@ export const disclosureRuns = pgTable(
       .array()
       .default(sql`'{}'::uuid[]`)
       .notNull(),
+    /** Eingefrorener Vorjahresbericht; ohne ihn gibt es keinen Abgleich mit dem Vorjahr. */
+    priorCaseDocumentId: uuid("prior_case_document_id").references(
+      () => disclosureCaseDocuments.id,
+      { onDelete: "set null" },
+    ),
+    priorReportSha256: text("prior_report_sha256"),
+    priorExtractionVersion: text("prior_extraction_version"),
     // Einordnung über das Nutzermodell (Etappe 5) und Jev (Etappe 6).
     routeProvider: text("route_provider"),
     providerModelId: text("provider_model_id"),
@@ -477,6 +502,10 @@ export const disclosureRuns = pgTable(
     check(
       "disclosure_runs_checklist_check",
       sql`${table.kind} <> 'completeness' OR ((${table.checklistTemplateReleaseId} IS NOT NULL) <> (${table.checklistId} IS NOT NULL) AND ${table.checklistHash} IS NOT NULL)`,
+    ),
+    check(
+      "disclosure_runs_prior_frozen_check",
+      sql`(${table.priorReportSha256} IS NULL) = (${table.priorExtractionVersion} IS NULL)`,
     ),
     check(
       "disclosure_runs_jev_frozen_check",

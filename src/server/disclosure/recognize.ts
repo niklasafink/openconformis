@@ -9,6 +9,7 @@ import {
 } from "@/domain/disclosure/document-context";
 import { figureExtractionVersion, recognizeFigures } from "@/domain/disclosure/figures";
 import { recognizeStatements, statementExtractionVersion } from "@/domain/disclosure/statements";
+import { recognizeYears } from "@/domain/disclosure/years";
 import { maximumPolicyBytes } from "@/domain/policies/upload";
 import { locatedBlocksFromDocumentHtml } from "@/domain/policies/document-structure";
 import { db } from "@/server/db/client";
@@ -226,7 +227,21 @@ export async function recognizeCaseDocument(caseDocumentId: string, workflowRunI
         startOffset: statement.start,
         endOffset: statement.end,
         rawText: statement.raw,
+        kind: "direction",
         direction: statement.direction,
+        extractionVersion: statementExtractionVersion,
+      });
+    }
+    // Jahreszahlen nur als Gegenstand der Vortragsprüfung; sie werden nicht markiert.
+    for (const year of recognizeYears(block.canonicalText, block.blockType)) {
+      statementRows.push({
+        caseDocumentId,
+        documentBlockId: block.id,
+        startOffset: year.start,
+        endOffset: year.end,
+        rawText: year.raw,
+        kind: "year",
+        year: year.year,
         extractionVersion: statementExtractionVersion,
       });
     }

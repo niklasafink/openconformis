@@ -7,7 +7,7 @@ import type { FigureUnit, PeriodHint } from "../figures";
  * ohne Modell. Beträge sind `bigint` in Millionstel der Grundeinheit.
  */
 
-export const checkEngineVersion = "disclosure-checks-v1";
+export const checkEngineVersion = "disclosure-checks-v2";
 
 export type EngineBlock = Readonly<{
   id: string;
@@ -53,10 +53,22 @@ export type EngineStatement = Readonly<{
   direction: Direction;
 }>;
 
+/** Eine Jahreszahl im Fließtext; Gegenstand nur der Vortragsprüfung. */
+export type EngineYear = Readonly<{
+  id: string;
+  blockId: string;
+  start: number;
+  end: number;
+  raw: string;
+  year: number;
+}>;
+
 export type EngineDocument = Readonly<{
   blocks: readonly EngineBlock[];
   figures: readonly EngineFigure[];
   statements: readonly EngineStatement[];
+  /** Fehlt bei Erkennungen vor den Jahreszahlen; dann gibt es keine Vortragsprüfung. */
+  years?: readonly EngineYear[];
   reportYear: number | null;
 }>;
 
@@ -71,7 +83,9 @@ export type CheckKind =
   | "prior_year"
   | "derived"
   | "ratio"
-  | "evidence";
+  | "evidence"
+  | "rollover"
+  | "prior_report";
 
 export const checkKinds: readonly CheckKind[] = [
   "sentence_arithmetic",
@@ -85,6 +99,8 @@ export const checkKinds: readonly CheckKind[] = [
   "derived",
   "ratio",
   "evidence",
+  "rollover",
+  "prior_report",
 ];
 
 export type CheckStatus = "match" | "mismatch" | "uncertain";
@@ -119,7 +135,11 @@ export type CommentCode =
   | "ratio_differs"
   | "model_unsure"
   | "evidence_matches"
-  | "evidence_differs";
+  | "evidence_differs"
+  | "year_suspect"
+  | "year_not_rolled"
+  | "prior_report_matches"
+  | "prior_report_differs";
 
 export type CheckComment = Readonly<{
   code: CommentCode;
@@ -136,7 +156,7 @@ export type CheckDraft = {
   expected: bigint | null;
   tolerance: bigint | null;
   rounded: boolean;
-  sourceKind: "table" | "text" | "formula" | "evidence";
+  sourceKind: "table" | "text" | "formula" | "evidence" | "prior_report";
   sourceFigureIds: string[];
   sourceBlockIds: string[];
   /** Konten einer Belegdatei (SuSa), gegen die geprüft wurde. */

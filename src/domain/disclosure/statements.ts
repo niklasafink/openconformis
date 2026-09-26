@@ -3,7 +3,8 @@
  * „unverändert“, die eine Veränderung behaupten. Die Prüfung vergleicht sie später
  * mit dem Vorzeichen der zugehörigen Zahlen; hier werden sie nur gefunden.
  */
-export const statementExtractionVersion = "disclosure-statements-v1";
+/** v2: dieselbe Tabelle trägt auch die Jahreszahlen des Fließtexts (`years.ts`). */
+export const statementExtractionVersion = "disclosure-statements-v2";
 
 export type Direction = "up" | "down" | "flat";
 

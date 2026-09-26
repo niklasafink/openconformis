@@ -17,6 +17,7 @@ import {
   tableSumChecks,
   type TableModel,
 } from "./tables";
+import { priorReportChecks, rolloverChecks } from "./prior-report";
 import { referenceCheck, textChecks, type PendingMention } from "./text";
 import { compareWithTolerance, abs } from "../arithmetic";
 import type { CheckDraft, EngineDocument } from "./types";
@@ -30,6 +31,8 @@ export function runDeterministicChecks(
   document: EngineDocument,
   /** Belegdateien des Laufs (SuSa); ohne sie gibt es keinen Beleg-Abgleich. */
   evidence: readonly EvidenceFileInput[] = [],
+  /** Vorjahresbericht des Laufs; ohne ihn gibt es nur den Jahresverdacht im Fließtext. */
+  prior: EngineDocument | null = null,
 ) {
   const tables = buildTables(document);
   const tableDrafts: CheckDraft[] = [];
@@ -57,10 +60,16 @@ export function runDeterministicChecks(
     ...tableReferenceChecks(index.byPosten),
     ...derivedRowChecks(index.facts, resolver),
     ...evidenceChecks(tables, evidence),
+    ...priorReportChecks(tables, prior, document.reportYear),
   ];
   const factLabels = uniqueLabels(index.facts);
   const text = textChecks(document, resolver, factLabels);
-  const drafts = dedupe([...tableDrafts, ...referenceDrafts, ...text.drafts]);
+  const drafts = dedupe([
+    ...tableDrafts,
+    ...referenceDrafts,
+    ...text.drafts,
+    ...rolloverChecks(document, prior),
+  ]);
   labelSubjects(drafts, document, tables);
   return { drafts, pending: text.pending, tables, resolver, factLabels };
 }

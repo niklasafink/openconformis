@@ -84,6 +84,8 @@ export function disclosureConfigurationHash(input: {
   jev?: { modelId: string; promptVersion: string } | null;
   /** Prüfsummen der eingefrorenen Belegdateien; ohne Belege bleibt der Hash unverändert. */
   evidence?: readonly string[];
+  /** Vorjahresbericht; ohne ihn bleibt der Hash unverändert. */
+  prior?: { sha256: string; parserVersion: string; extractionVersion: string } | null;
 }) {
   return createContentHash({
     reportSha256: input.reportSha256,
@@ -93,10 +95,11 @@ export function disclosureConfigurationHash(input: {
     model: input.model,
     ...(input.jev ? { jev: input.jev } : {}),
     ...(input.evidence?.length ? { evidence: input.evidence } : {}),
+    ...(input.prior ? { prior: input.prior } : {}),
   });
 }
 
-export async function loadReportInputs(caseId: string) {
+export async function loadReportInputs(caseId: string, role: "report" | "prior_report" = "report") {
   const [report] = await db
     .select({
       caseDocumentId: disclosureCaseDocuments.id,
@@ -109,9 +112,7 @@ export async function loadReportInputs(caseId: string) {
     })
     .from(disclosureCaseDocuments)
     .innerJoin(policyVersions, eq(policyVersions.id, disclosureCaseDocuments.policyVersionId))
-    .where(
-      and(eq(disclosureCaseDocuments.caseId, caseId), eq(disclosureCaseDocuments.role, "report")),
-    )
+    .where(and(eq(disclosureCaseDocuments.caseId, caseId), eq(disclosureCaseDocuments.role, role)))
     .limit(1);
   if (!report) throw new DisclosureRunError("DISCLOSURE_REPORT_MISSING");
   if (
@@ -175,6 +176,13 @@ export async function startDisclosureRun(
   if (!found) throw new DisclosureRunError("DISCLOSURE_CASE_NOT_FOUND");
   const report = await loadReportInputs(found.id);
   const evidence = await readyEvidenceOf(found.id);
+  // Ein angehängter Vorjahresbericht muss erkannt sein; er wird wie der Bericht eingefroren.
+  const prior = await loadReportInputs(found.id, "prior_report").catch((error: unknown) => {
+    if (error instanceof DisclosureRunError && error.code === "DISCLOSURE_REPORT_MISSING") {
+      return null;
+    }
+    throw error;
+  });
 
   const runId = randomUUID();
   const prepared =
@@ -200,6 +208,13 @@ export async function startDisclosureRun(
       ? { modelId: jev.modelId, promptVersion: disclosureJevPromptVersionFor(jev.modelId) }
       : null,
     evidence: evidence.map((file) => `${file.id}:${file.sha256 ?? ""}`),
+    prior: prior
+      ? {
+          sha256: prior.sha256,
+          parserVersion: prior.parserVersion,
+          extractionVersion: prior.extractionVersion,
+        }
+      : null,
   });
 
   let result: StartDisclosureRunResult;
@@ -231,6 +246,9 @@ export async function startDisclosureRun(
           checkVersion: checkEngineVersion,
           configurationHash,
           evidenceFileIds: evidence.map((file) => file.id),
+          priorCaseDocumentId: prior?.caseDocumentId ?? null,
+          priorReportSha256: prior?.sha256 ?? null,
+          priorExtractionVersion: prior?.extractionVersion ?? null,
           routeProvider: prepared?.model.routeProvider ?? null,
           providerModelId: prepared?.model.providerModelId ?? null,
           modelProfileId: prepared?.model.modelProfileId ?? null,

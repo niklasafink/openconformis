@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, or } from "drizzle-orm";
 
 import { db } from "@/server/db/client";
 import {
@@ -46,12 +46,14 @@ export type ViewStatement = {
   start: number;
   end: number;
   raw: string;
-  direction: "up" | "down" | "flat";
+  /** Jahreszahlen sind nur Gegenstand der Vortragsprüfung und werden nur beanstandet markiert. */
+  kind: "direction" | "year";
+  direction: "up" | "down" | "flat" | null;
 };
 
 /**
  * Alles, was der Plausicheck vor einem Lauf zeigt: Erkennungsstand, Blockkontext,
- * erkannte Zahlen und Richtungswörter des Berichts. Startet eine hängengebliebene
+ * erkannte Zahlen und Richtungswörter eines Berichts oder Vorjahresberichts. Startet eine hängengebliebene
  * Erkennung erneut.
  */
 export async function readRecognition(caseDocumentId: string) {
@@ -82,7 +84,12 @@ export async function readRecognition(caseDocumentId: string) {
     const [run] = await db
       .select({ id: disclosureRuns.id })
       .from(disclosureRuns)
-      .where(eq(disclosureRuns.reportCaseDocumentId, caseDocumentId))
+      .where(
+        or(
+          eq(disclosureRuns.reportCaseDocumentId, caseDocumentId),
+          eq(disclosureRuns.priorCaseDocumentId, caseDocumentId),
+        ),
+      )
       .limit(1);
     if (!run) await startRecognition(caseDocumentId);
   }
@@ -159,6 +166,7 @@ export async function readRecognition(caseDocumentId: string) {
       start: statement.startOffset,
       end: statement.endOffset,
       raw: statement.rawText,
+      kind: statement.kind,
       direction: statement.direction,
     })),
   };

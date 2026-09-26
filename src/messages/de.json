@@ -775,6 +775,19 @@
       "tooLarge": "Die Datei ist größer als 25 MB.",
       "retry": "Andere Datei wählen"
     },
+    "priorUpload": {
+      "title": "Vorjahresbericht hochladen",
+      "hint": "Optional: der Prüfungsbericht des Vorjahres als Word (.docx). Damit werden die Vorjahreswerte der Tabellen und nicht fortgeschriebene Jahreszahlen gegen den Vorjahresbericht geprüft.",
+      "dropzone": "Word-Datei hierher ziehen oder auswählen",
+      "select": "Datei auswählen",
+      "uploading": "Wird hochgeladen …",
+      "processing": "Wird aufbereitet …",
+      "failed": "Upload fehlgeschlagen.",
+      "processingFailed": "Die Datei konnte nicht gelesen werden.",
+      "docxOnly": "Nur Word-Dateien (.docx). PDF bitte vorher in Word umwandeln.",
+      "tooLarge": "Die Datei ist größer als 25 MB.",
+      "retry": "Andere Datei wählen"
+    },
     "document": {
       "processing": "Der Bericht wird aufbereitet.",
       "failed": "Der Bericht konnte nicht aufbereitet werden.",
@@ -879,7 +892,9 @@
       "DISCLOSURE_DOCUMENT_NOT_READY": "Das Dokument ist noch nicht aufbereitet.",
       "DISCLOSURE_REPORT_DOCX_ONLY": "Nur Word-Dateien (.docx). PDF bitte vorher in Word umwandeln.",
       "DISCLOSURE_REPORT_EXISTS": "Diese Prüfung hat bereits einen Bericht.",
-      "DATABASE_UNAVAILABLE": "Die Datenbank ist gerade nicht erreichbar."
+      "DATABASE_UNAVAILABLE": "Die Datenbank ist gerade nicht erreichbar.",
+      "DISCLOSURE_PRIOR_REPORT_EXISTS": "Diese Prüfung hat bereits einen Vorjahresbericht.",
+      "DISCLOSURE_PRIOR_REPORT_SAME": "Der Vorjahresbericht ist dieselbe Datei wie der Bericht."
     },
     "plausibility": {
       "documents": "Dokumente",
@@ -919,7 +934,8 @@
         "source": "Quelle",
         "notChecked": "Noch nicht geprüft.",
         "unreadable": "Zahlenformat nicht lesbar.",
-        "location": "Fundstelle"
+        "location": "Fundstelle",
+        "year": "Jahreszahl"
       },
       "source": {
         "page": "Seite {page}",
@@ -971,7 +987,9 @@
         "prior_year": "Vorjahr",
         "derived": "Formel",
         "ratio": "Quote",
-        "evidence": "Beleg"
+        "evidence": "Beleg",
+        "rollover": "Vortrag",
+        "prior_report": "Vorjahresbericht"
       },
       "check": {
         "actual": "Ist",
@@ -1021,6 +1039,7 @@
         "keyHint": "Jev ordnet Fundstellen günstiger ein. Ohne Schlüssel übernimmt das gewählte Modell.",
         "keyFailed": "Der TypeSafe-Schlüssel konnte nicht bestätigt werden."
       },
+      "priorTab": "Vorjahr",
       "evidenceTab": "Belege",
       "summaryReviewed": "{count} freigegeben",
       "export": "Excel-Export"

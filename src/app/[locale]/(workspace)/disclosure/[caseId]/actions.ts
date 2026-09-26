@@ -21,5 +21,14 @@ export async function attachReport(input: {
   policyVersionId: string;
   draftId: string;
 }): Promise<DisclosureActionResult<{ caseDocumentId: string }>> {
-  return attachDisclosureReport(input);
+  return attachDisclosureReport({ ...input, role: "report" });
+}
+
+/** Übernimmt den Vorjahresbericht; Gegenstück des Abgleichs mit dem Vorjahr. */
+export async function attachPriorReport(input: {
+  caseId: string;
+  policyVersionId: string;
+  draftId: string;
+}): Promise<DisclosureActionResult<{ caseDocumentId: string }>> {
+  return attachDisclosureReport({ ...input, role: "prior_report" });
 }

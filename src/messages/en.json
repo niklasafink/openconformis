@@ -775,6 +775,19 @@
       "tooLarge": "The file is larger than 25 MB.",
       "retry": "Choose another file"
     },
+    "priorUpload": {
+      "title": "Upload prior-year report",
+      "hint": "Optional: last year's audit report as Word (.docx). The prior-year figures in the tables and years that were not rolled forward are then checked against it.",
+      "dropzone": "Drag a Word file here or select one",
+      "select": "Select file",
+      "uploading": "Uploading …",
+      "processing": "Processing …",
+      "failed": "Upload failed.",
+      "processingFailed": "The file could not be read.",
+      "docxOnly": "Word files only (.docx). Convert a PDF to Word first.",
+      "tooLarge": "The file is larger than 25 MB.",
+      "retry": "Choose another file"
+    },
     "document": {
       "processing": "The report is being processed.",
       "failed": "The report could not be processed.",
@@ -879,7 +892,9 @@
       "DISCLOSURE_DOCUMENT_NOT_READY": "The document is not processed yet.",
       "DISCLOSURE_REPORT_DOCX_ONLY": "Word files only (.docx). Convert a PDF to Word first.",
       "DISCLOSURE_REPORT_EXISTS": "This review already has a report.",
-      "DATABASE_UNAVAILABLE": "The database is unavailable right now."
+      "DATABASE_UNAVAILABLE": "The database is unavailable right now.",
+      "DISCLOSURE_PRIOR_REPORT_EXISTS": "This review already has a prior-year report.",
+      "DISCLOSURE_PRIOR_REPORT_SAME": "The prior-year report is the same file as the report."
     },
     "plausibility": {
       "documents": "Documents",
@@ -919,7 +934,8 @@
         "source": "Source",
         "notChecked": "Not checked yet.",
         "unreadable": "Number format not readable.",
-        "location": "Location"
+        "location": "Location",
+        "year": "Year"
       },
       "source": {
         "page": "Page {page}",
@@ -971,7 +987,9 @@
         "prior_year": "Prior year",
         "derived": "Formula",
         "ratio": "Ratio",
-        "evidence": "Evidence"
+        "evidence": "Evidence",
+        "rollover": "Roll-forward",
+        "prior_report": "Prior-year report"
       },
       "check": {
         "actual": "Actual",
@@ -1021,6 +1039,7 @@
         "keyHint": "Jev classifies findings at lower cost. Without a key, the selected model does it.",
         "keyFailed": "The TypeSafe key could not be confirmed."
       },
+      "priorTab": "Prior year",
       "evidenceTab": "Evidence",
       "summaryReviewed": "{count} released",
       "export": "Excel export"
