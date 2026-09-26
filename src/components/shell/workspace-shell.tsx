@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 
 import {
@@ -31,20 +31,13 @@ type WorkspaceShellProps = Readonly<{
  * der Seite.
  */
 export async function WorkspaceShell({ children, locale }: WorkspaceShellProps) {
-  const [t, topbar, analysisRunT, cookieStore, user] = await Promise.all([
+  const [t, topbar, format, cookieStore, user] = await Promise.all([
     getTranslations("Navigation"),
     getTranslations("Topbar"),
-    getTranslations("AnalysisRun"),
+    getFormatter(),
     cookies(),
     requireAuthenticatedSessionUser().catch(() => null),
   ]);
-  const statusLabels: Record<string, string> = {
-    queued: analysisRunT("status.queued"),
-    running: analysisRunT("status.running"),
-    completed: analysisRunT("status.completed"),
-    failed: analysisRunT("status.failed"),
-    cancelled: analysisRunT("status.cancelled"),
-  };
   const [threads, projects, isAdmin] = await Promise.all([
     user
       ? listRecentChatThreads()
@@ -52,13 +45,15 @@ export async function WorkspaceShell({ children, locale }: WorkspaceShellProps) 
           .catch(() => [])
       : Promise.resolve<SidebarThread[]>([]),
     user
-      ? listRecentAnalyses()
+      ? listRecentAnalyses(locale)
           .then((rows) =>
             rows.map((row) => ({
               id: row.id,
-              title: row.policyName,
-              frameworkSlug: row.frameworkSlug,
-              statusLabel: statusLabels[row.status] ?? row.status,
+              title: row.frameworkName ?? row.frameworkSlug.toUpperCase(),
+              startedLabel: format.dateTime(row.createdAt, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }),
             })),
           )
           .catch(() => [])

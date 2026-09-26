@@ -14,15 +14,18 @@ import {
   analysisResultOverrides,
   analysisScopeItems,
 } from "@/server/db/schema/analyses";
+import {
+  regulatoryFrameworkLocalizations,
+  regulatoryFrameworks,
+} from "@/server/db/schema/catalogue";
 import { documentBlocks, policies, policyVersions } from "@/server/db/schema/documents";
 import type { AnalysisExportData } from "@/server/exports/analysis-xlsx";
 
 /**
- * Für die Sidebar: die zuletzt bearbeiteten Analysen des Nutzers, samt
- * Policy-Name und Status, damit „Zuletzt verwendet" wie im Referenzdesign
- * ohne zusätzlichen Klick erkennbar ist.
+ * Für die Sidebar: die zuletzt bearbeiteten Analysen des Nutzers mit dem
+ * Rahmenwerksnamen in der Sprache der Oberfläche und dem Startzeitpunkt.
  */
-export async function listRecentAnalyses() {
+export async function listRecentAnalyses(locale: string) {
   const [principal, user] = await Promise.all([
     requireSessionPrincipal(),
     requireAuthenticatedSessionUser(),
@@ -32,13 +35,18 @@ export async function listRecentAnalyses() {
     .select({
       id: analyses.id,
       frameworkSlug: analyses.frameworkSlug,
-      status: analyses.status,
-      policyName: policies.displayName,
-      updatedAt: analyses.updatedAt,
+      frameworkName: regulatoryFrameworkLocalizations.name,
+      createdAt: analyses.createdAt,
     })
     .from(analyses)
-    .innerJoin(policyVersions, eq(policyVersions.id, analyses.policyVersionId))
-    .innerJoin(policies, eq(policies.id, policyVersions.policyId))
+    .leftJoin(regulatoryFrameworks, eq(regulatoryFrameworks.slug, analyses.frameworkSlug))
+    .leftJoin(
+      regulatoryFrameworkLocalizations,
+      and(
+        eq(regulatoryFrameworkLocalizations.frameworkId, regulatoryFrameworks.id),
+        eq(regulatoryFrameworkLocalizations.locale, locale),
+      ),
+    )
     .where(
       and(
         eq(analyses.organizationId, principal.organizationId),

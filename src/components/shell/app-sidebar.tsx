@@ -62,8 +62,7 @@ export type SidebarThread = Readonly<{ id: string; title: string }>;
 export type SidebarProject = Readonly<{
   id: string;
   title: string;
-  frameworkSlug: string;
-  statusLabel: string;
+  startedLabel: string;
 }>;
 
 type AppSidebarProps = Readonly<{
@@ -340,7 +339,7 @@ export function AppSidebar({
                           >
                             <span className="w-full truncate">{project.title}</span>
                             <span className="w-full truncate text-xs font-normal text-muted-foreground">
-                              {project.frameworkSlug} · {project.statusLabel}
+                              {project.startedLabel}
                             </span>
                           </Link>
                         </SidebarMenuButton>
