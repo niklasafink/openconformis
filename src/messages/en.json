@@ -950,9 +950,11 @@
       "run": {
         "start": "Start check",
         "starting": "Starting …",
+        "running": "Check running …",
         "restart": "Check again",
         "preparing": "Preparing checks …",
         "progress": "{checked} of {total} figures checked",
+        "finishing": "Compiling the result …",
         "completed": "Checked",
         "completedWithGaps": "Checked, with gaps",
         "failed": "Run failed ({code}). You can start again.",

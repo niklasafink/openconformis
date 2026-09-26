@@ -3,7 +3,7 @@
 import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   postJson,
@@ -20,9 +20,11 @@ import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 import { TypesafeKeyField } from "./typesafe-key-field";
 
 export type RunControlsState = Readonly<{
+  /** Der jüngste Lauf; `null`, solange es keinen gibt. */
+  id: string | null;
   status:
     "none" | "queued" | "running" | "completed" | "completed_with_gaps" | "failed" | "cancelled";
-  /** Fertig geprüfte Zahlen von oben nach unten; `null`, solange die Regeln rechnen. */
+  /** Zahlen, deren Prüfungen feststehen; `null`, solange die Regeln rechnen. */
   checkedFigureCount: number | null;
   figureCount: number;
   failureCode: string | null;
@@ -51,7 +53,8 @@ type RunControlsProps = Readonly<{
  * Start, Modell und Fortschritt des Plausichecks oben in der linken Spalte. Start ist
  * der einzige Primärbutton. Mit gespeichertem Schlüssel ordnet das gewählte Modell
  * offene Fundstellen ein; ohne Schlüssel laufen nur die Regeln. Der Fortschritt zählt
- * die Zahlen, die von oben nach unten fertig geprüft sind, und sinkt nie.
+ * die Zahlen, deren Prüfungen feststehen, und sinkt nie. Nach dem Klick gilt der Lauf
+ * als gestartet, bis die Seite ihn vom Server zeigt — der Button springt nicht zurück.
  */
 export function RunControls({
   caseId,
@@ -82,8 +85,22 @@ export function RunControls({
     () => savedCredentials.find((entry) => entry.provider === "typesafe") ?? null,
   );
   const [pending, setPending] = useState(false);
+  /** Der gerade gestartete Lauf, bis die Seite ihn zeigt. */
+  const [startedRunId, setStartedRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const open = run.status === "queued" || run.status === "running";
+  const awaitingRun = startedRunId !== null && run.id !== startedRunId;
+  const open = awaitingRun || run.status === "queued" || run.status === "running";
+  // Vor den Regeln kennt der Lauf seinen Stand nicht; danach fehlt nur noch der Abschluss.
+  const checked = awaitingRun ? null : run.checkedFigureCount;
+  const preparing = open && (checked === null || run.figureCount === 0);
+  const finishing = open && !preparing && (checked ?? 0) >= run.figureCount;
+  // Bis die Seite den gestarteten Lauf zeigt, lädt sie hier nach; danach übernimmt der
+  // Arbeitsbereich, der bei offenem Lauf ohnehin nachlädt.
+  useEffect(() => {
+    if (!awaitingRun) return;
+    const timer = setInterval(() => router.refresh(), 3_000);
+    return () => clearInterval(timer);
+  }, [awaitingRun, router]);
   const model = catalogue.models.find((candidate) => candidate.id === modelProfileId);
   const saved = keys.savedFor(model);
 
@@ -98,7 +115,10 @@ export function RunControls({
           ? { modelProfileId: model.id, modelCatalogueVersion: catalogue.version }
           : {},
       );
-      const payload = (await response.json().catch(() => ({}))) as { code?: string };
+      const payload = (await response.json().catch(() => ({}))) as {
+        code?: string;
+        runId?: string;
+      };
       if (!response.ok) {
         if (payload.code === "DISCLOSURE_MODEL_KEY_REQUIRED" && model) {
           keys.forget(model.routeProvider);
@@ -106,6 +126,7 @@ export function RunControls({
         setError(errorMessages[payload.code ?? ""] ?? t("run.startFailed"));
         return;
       }
+      if (payload.runId) setStartedRunId(payload.runId);
       router.refresh();
     } catch {
       setError(errorMessages.NETWORK_ERROR ?? t("run.startFailed"));
@@ -115,9 +136,11 @@ export function RunControls({
   }
 
   const status = open
-    ? run.figureCount === 0
+    ? preparing
       ? t("run.preparing")
-      : t("run.progress", { checked: run.checkedFigureCount ?? 0, total: run.figureCount })
+      : finishing
+        ? t("run.finishing")
+        : t("run.progress", { checked: checked ?? 0, total: run.figureCount })
     : run.status === "completed"
       ? t("run.completed")
       : run.status === "completed_with_gaps"
@@ -215,18 +238,18 @@ export function RunControls({
           <span className="truncate">
             {pending
               ? t("run.starting")
-              : run.status === "none"
-                ? t("run.start")
-                : t("run.restart")}
+              : open
+                ? t("run.running")
+                : run.status === "none"
+                  ? t("run.start")
+                  : t("run.restart")}
           </span>
         </Button>
       </div>
       {open ? (
         <Progress
           value={
-            run.figureCount === 0
-              ? null
-              : Math.round(((run.checkedFigureCount ?? 0) / run.figureCount) * 100)
+            preparing ? null : Math.min(100, Math.round(((checked ?? 0) / run.figureCount) * 100))
           }
           aria-label={status ?? undefined}
         />

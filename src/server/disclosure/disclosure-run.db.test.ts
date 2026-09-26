@@ -373,6 +373,21 @@ suite("disclosure plausibility runs against a real database", () => {
     expect(await assign.planDisclosureChunks(run.runId)).toEqual({ chunks: 1 });
     const { batches } = await assign.planDisclosureAssignment(run.runId, 0);
     expect(batches).toBe(1);
+    // Fortschritt: nach den Regeln alles ohne offene Fundstelle, nach dem Batch alles.
+    const progressOf = async () => {
+      const [row] = await db
+        .select({
+          checked: schema.disclosureRuns.checkedFigureCount,
+          total: schema.disclosureRuns.figureCount,
+        })
+        .from(schema.disclosureRuns)
+        .where(eq(schema.disclosureRuns.id, run.runId));
+      return row!;
+    };
+    const afterRules = await progressOf();
+    expect(afterRules.total).toBeGreaterThan(0);
+    expect(afterRules.checked).toBeGreaterThanOrEqual(afterRules.total - stage.pending);
+    expect(afterRules.checked).toBeLessThan(afterRules.total);
     mocks.model.mockImplementation(async (_run: unknown, request: { user: string }) => {
       expect(request.user).toContain("⟦54⟧");
       return {
@@ -393,6 +408,7 @@ suite("disclosure plausibility runs against a real database", () => {
       };
     });
     const first = await assign.assignDisclosureBatch(run.runId, 0, 0);
+    expect((await progressOf()).checked).toBe(afterRules.total);
     const replay = await assign.assignDisclosureBatch(run.runId, 0, 0);
     expect(first.stored).toBeGreaterThan(0);
     expect(replay.stored).toBe(first.stored);
@@ -470,7 +486,7 @@ suite("disclosure plausibility runs against a real database", () => {
       for (let index = 0; index < batches; index += 1) {
         await assign.assignDisclosureBatch(run.runId, chunk, index);
       }
-      await assign.recordDisclosureProgress(run.runId, chunk);
+      await assign.recordDisclosureProgress(run.runId);
     }
     await execute.finalizeDisclosureRun(run.runId);
     const checks = await db

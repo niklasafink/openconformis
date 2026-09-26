@@ -357,6 +357,7 @@ export default async function PlausibilityPage({ params }: PageProps) {
             }
             canStart={found.permissions.canPrepare}
             run={{
+              id: run?.id ?? null,
               status: run?.status ?? "none",
               checkedFigureCount: run?.checkedFigureCount ?? null,
               // Vor den Regeln kennt der Lauf die Zahl noch nicht; die Erkennung schon.

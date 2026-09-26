@@ -9,9 +9,9 @@ import {
   assignmentChunkCount,
   assignmentConfidenceThresholdBp,
   buildAssignmentPrompt,
-  checkedFigureFrontier,
   planAssignmentBatches,
   readAssignments,
+  settledFigureCount,
   type AssignmentAnswer,
   type AssignmentBatch,
 } from "@/domain/disclosure/assignment";
@@ -112,7 +112,7 @@ async function planFor(run: Run, chunk: number, stage: "jev" | "model" = "model"
   const { document, result } = await checkedDocument(run);
   const mentions = assignmentChunk(result.pending, chunk);
   const jevBatches = jevBatchesFor(run, mentions);
-  if (stage === "jev") return { document, result, batches: jevBatches };
+  if (stage === "jev") return { document, result, batches: jevBatches, resolved: new Set<string>() };
   const resolved = new Set<string>();
   if (jevBatches.length > 0) {
     const answers = await storedJevAnswers(run.id);
@@ -128,7 +128,7 @@ async function planFor(run: Run, chunk: number, stage: "jev" | "model" = "model"
           { providerModelId: run.providerModelId, promptVersion: run.promptVersion },
         )
       : [];
-  return { document, result, batches };
+  return { document, result, batches, resolved };
 }
 
 /**
@@ -168,19 +168,59 @@ export async function planDisclosureAssignment(runId: string, chunk: number) {
   return { batches: batches.length };
 }
 
-/** Nach einem Abschnitt: alle Zahlen bis zum nächsten Abschnitt sind fertig geprüft. */
-export async function recordDisclosureProgress(runId: string, chunk: number) {
-  const run = await loadRun(runId);
-  if (run.status !== "running") return;
+/**
+ * Offene Fundstellen, die schon eingeordnet sind: sicher durch Jev oder in einem
+ * beantworteten Modell-Batch. Gescheiterte Batches zählen erst im Abschluss.
+ */
+async function settledFigureIds(run: Run) {
   const { document, result } = await checkedDocument(run);
-  const checked = checkedFigureFrontier(document, result.pending, chunk + 1);
+  const settled = new Set<string>();
+  const chunks = assignmentChunkCount(result.pending.length);
+  if (chunks === 0) return { document, result, settled };
+  const answered = await db
+    .select({ batchKey: disclosureModelInvocations.batchKey })
+    .from(disclosureModelInvocations)
+    .where(
+      and(
+        eq(disclosureModelInvocations.runId, run.id),
+        eq(disclosureModelInvocations.provider, "model"),
+        eq(disclosureModelInvocations.status, "succeeded"),
+      ),
+    );
+  const answeredKeys = new Set(answered.map((row) => row.batchKey));
+  for (let chunk = 0; chunk < chunks; chunk += 1) {
+    const { batches, resolved } = await planFor(run, chunk);
+    for (const id of resolved) settled.add(id);
+    for (const batch of batches) {
+      if (!answeredKeys.has(batch.key)) continue;
+      for (const item of batch.items) settled.add(item.figureId);
+    }
+  }
+  return { document, result, settled };
+}
+
+/**
+ * Fortschritt nach jedem gespeicherten Batch: fertig geprüft sind alle Zahlen ohne
+ * offene Fundstelle und die schon eingeordneten. Parallele Batches schreiben nur nach
+ * oben; ein gestoppter Lauf bleibt stehen.
+ */
+async function recordProgress(run: Run) {
+  const { document, result, settled } = await settledFigureIds(run);
+  const checked = settledFigureCount(document, result.pending, settled);
   await db
     .update(disclosureRuns)
     .set({
       checkedFigureCount: sql`greatest(coalesce(${disclosureRuns.checkedFigureCount}, 0), ${checked})`,
       updatedAt: new Date(),
     })
-    .where(eq(disclosureRuns.id, runId));
+    .where(and(eq(disclosureRuns.id, run.id), eq(disclosureRuns.status, "running")));
+}
+
+/** Nach einem Abschnitt: Sicherheitsnetz, falls ein Batch seinen Fortschritt nicht schrieb. */
+export async function recordDisclosureProgress(runId: string) {
+  const run = await loadRun(runId);
+  if (run.status !== "running") return;
+  await recordProgress(run);
 }
 
 /**
@@ -293,6 +333,7 @@ export async function assignDisclosureJevBatch(runId: string, chunk: number, ind
     "jev",
   );
   const stored = await storeChecks(runId, drafts);
+  await recordProgress(run);
   return { state: "running" as const, stored };
 }
 
@@ -398,6 +439,7 @@ export async function assignDisclosureBatch(runId: string, chunk: number, index:
     assignmentConfidenceThresholdBp,
   );
   const stored = await storeChecks(runId, drafts);
+  await recordProgress(run);
   return { state: "running" as const, stored };
 }
 

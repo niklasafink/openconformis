@@ -70,9 +70,9 @@ async function assignStep(runId: string, chunk: number, index: number) {
 }
 assignStep.maxRetries = 3;
 
-async function progressStep(runId: string, chunk: number) {
+async function progressStep(runId: string) {
   "use step";
-  return recordDisclosureProgress(runId, chunk);
+  return recordDisclosureProgress(runId);
 }
 progressStep.maxRetries = 3;
 
@@ -141,7 +141,7 @@ export async function disclosurePlausibilityWorkflow(runId: string) {
           (result) => result.status === "fulfilled" && result.value.state === "ended",
         );
         if (ended) return { status: "ended" };
-        await progressStep(runId, chunk);
+        await progressStep(runId);
       }
     }
     return await finalizeStep(runId);

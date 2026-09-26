@@ -87,30 +87,20 @@ export function assignmentChunk<T>(pending: readonly T[], chunk: number): T[] {
 }
 
 /**
- * Fortschritt von oben nach unten: die Zahl der erkannten Zahlen in Dokumentreihenfolge
- * vor der ersten Fundstelle des Abschnitts `nextChunk`. Alles davor ist fertig geprüft;
- * gibt es keinen solchen Abschnitt mehr, sind es alle Zahlen.
+ * Fortschritt: die Zahl der erkannten Zahlen, deren Prüfungen feststehen. Das sind alle
+ * Zahlen ohne offene Fundstelle sowie die offenen, die Jev oder das Modell schon
+ * eingeordnet hat (`settled`). Er wächst mit jedem gespeicherten Batch und sinkt nie.
  */
-export function checkedFigureFrontier(
-  document: Pick<EngineDocument, "blocks" | "figures">,
+export function settledFigureCount(
+  document: Pick<EngineDocument, "figures">,
   pending: readonly Pick<PendingMention, "figureId">[],
-  nextChunk: number,
+  settled: ReadonlySet<string>,
 ) {
-  const next = pending[nextChunk * assignmentChunkSize];
-  if (!next) return document.figures.length;
-  const ordinal = new Map(document.blocks.map((block) => [block.id, block.ordinal]));
-  const position = (figure: EngineDocument["figures"][number]) =>
-    [ordinal.get(figure.blockId) ?? 0, figure.start] as const;
-  const target = document.figures.find((figure) => figure.id === next.figureId);
-  if (!target) return 0;
-  const [targetOrdinal, targetStart] = position(target);
-  return document.figures.filter((figure) => {
-    const [figureOrdinal, figureStart] = position(figure);
-    return (
-      figureOrdinal < targetOrdinal ||
-      (figureOrdinal === targetOrdinal && figureStart < targetStart)
-    );
-  }).length;
+  const open = new Set<string>();
+  for (const mention of pending) {
+    if (!settled.has(mention.figureId)) open.add(mention.figureId);
+  }
+  return document.figures.length - open.size;
 }
 
 export const assignmentAnswerSchema = z.object({

@@ -6,7 +6,7 @@ import {
   assignmentChunkCount,
   assignmentChunkSize,
   buildAssignmentPrompt,
-  checkedFigureFrontier,
+  settledFigureCount,
   planAssignmentBatches,
   readAssignments,
 } from "./assignment";
@@ -82,17 +82,8 @@ describe("assignment batches", () => {
 });
 
 describe("Abschnitte von oben nach unten", () => {
-  const blocks = [
-    { id: "b1", ordinal: 1 },
-    { id: "b2", ordinal: 2 },
-  ];
-  // Die Datenbank liefert Zahlen nach Block-ID, nicht nach Lage im Dokument.
-  const figures = [
-    { id: "late", blockId: "b2", start: 0 },
-    { id: "early", blockId: "b1", start: 10 },
-    { id: "first", blockId: "b1", start: 0 },
-  ];
-  const document = { blocks, figures } as unknown as Parameters<typeof checkedFigureFrontier>[0];
+  const figures = [{ id: "late" }, { id: "early" }, { id: "first" }];
+  const document = { figures } as unknown as Parameters<typeof settledFigureCount>[0];
 
   it("teilt die offenen Fundstellen in Abschnitte paralleler Batches", () => {
     const pending = Array.from({ length: assignmentChunkSize + 1 }, (_, index) => index);
@@ -101,9 +92,11 @@ describe("Abschnitte von oben nach unten", () => {
     expect(assignmentChunkCount(0)).toBe(0);
   });
 
-  it("zählt als geprüft alle Zahlen vor der ersten offenen Fundstelle in Dokumentreihenfolge", () => {
-    expect(checkedFigureFrontier(document, [{ figureId: "early" }], 0)).toBe(1);
-    expect(checkedFigureFrontier(document, [{ figureId: "late" }], 0)).toBe(2);
-    expect(checkedFigureFrontier(document, [{ figureId: "early" }], 1)).toBe(3);
+  it("zählt als geprüft alle Zahlen ohne offene Fundstelle und die schon eingeordneten", () => {
+    const pending = [{ figureId: "early" }, { figureId: "late" }, { figureId: "late" }];
+    expect(settledFigureCount(document, pending, new Set())).toBe(1);
+    expect(settledFigureCount(document, pending, new Set(["late"]))).toBe(2);
+    expect(settledFigureCount(document, pending, new Set(["early", "late"]))).toBe(3);
+    expect(settledFigureCount(document, [], new Set())).toBe(3);
   });
 });

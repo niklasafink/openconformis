@@ -950,9 +950,11 @@
       "run": {
         "start": "Prüfung starten",
         "starting": "Wird gestartet …",
+        "running": "Prüfung läuft …",
         "restart": "Erneut prüfen",
         "preparing": "Prüfungen werden vorbereitet …",
         "progress": "{checked} von {total} Zahlen geprüft",
+        "finishing": "Ergebnis wird zusammengestellt …",
         "completed": "Geprüft",
         "completedWithGaps": "Geprüft, mit Lücken",
         "failed": "Lauf fehlgeschlagen ({code}). Ein neuer Start ist möglich.",

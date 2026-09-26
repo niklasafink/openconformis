@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
-import { checkedFigureFrontier } from "@/domain/disclosure/assignment";
+import { settledFigureCount } from "@/domain/disclosure/assignment";
 import { renderComment, renderFindingTitle } from "@/domain/disclosure/checks/comments";
 import { deriveFindings } from "@/domain/disclosure/checks/findings";
 import { runDeterministicChecks } from "@/domain/disclosure/checks/run";
@@ -183,10 +183,12 @@ export async function runDeterministicStage(runId: string) {
   const { drafts, pending } = runDeterministicChecks(engineDocument, evidence, prior);
   await storeChecks(runId, drafts);
   const planned = drafts.length + (run.routeProvider ? pending.length : 0);
-  // Ohne Modell steht mit den Regeln alles fest; sonst bis zur ersten offenen Fundstelle.
-  const checked = run.routeProvider
-    ? checkedFigureFrontier(engineDocument, pending, 0)
-    : engineDocument.figures.length;
+  // Ohne Modell steht mit den Regeln alles fest; sonst alles ohne offene Fundstelle.
+  const checked = settledFigureCount(
+    engineDocument,
+    run.routeProvider ? pending : [],
+    new Set<string>(),
+  );
   await db
     .update(disclosureRuns)
     .set({
