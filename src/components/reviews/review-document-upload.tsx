@@ -7,6 +7,7 @@ import { useRef, useState, type RefObject } from "react";
 
 import type { ReviewActionResult } from "@/app/[locale]/(workspace)/reviews/[reviewId]/actions";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { docxMimeType, maximumPolicyBytes, pdfMimeType } from "@/domain/policies/upload";
 
 type ReviewDocumentUploadProps = Readonly<{
@@ -37,7 +38,26 @@ type QueueItem = {
   name: string;
   status: "queued" | "uploading" | "processing" | "failed";
   error?: string;
+  /** Hochgeladene Bytes in Prozent, solange die Datei hochgeladen wird. */
+  percent?: number;
 };
+
+/** Fortschritt einer Warteschlange: fertige (übernommen oder gescheitert) von allen Dateien. */
+type Batch = { done: number; total: number };
+
+/**
+ * Anteil der Warteschlange in Prozent. Die laufende Datei zählt zur Hälfte für den
+ * Upload ihrer Bytes und zur Hälfte für die Aufbereitung.
+ */
+function batchPercent(batch: Batch, active: QueueItem | undefined) {
+  const current =
+    active?.status === "uploading"
+      ? (active.percent ?? 0) / 200
+      : active?.status === "processing"
+        ? 0.5
+        : 0;
+  return Math.round(((batch.done + current) / batch.total) * 100);
+}
 
 function normalizedMimeType(file: File) {
   if (file.name.toLowerCase().endsWith(".pdf")) return pdfMimeType;
@@ -72,6 +92,7 @@ export function ReviewDocumentUpload({
   const [items, setItems] = useState<QueueItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const [addingSample, setAddingSample] = useState(false);
+  const [batch, setBatch] = useState<Batch | null>(null);
   const pending = useRef<Array<{ id: number; file: File }>>([]);
   const draining = useRef(false);
   const nextId = useRef(1);
@@ -100,6 +121,12 @@ export function ReviewDocumentUpload({
       pending.current.push({ id, file });
     }
     setItems((current) => [...current, ...accepted]);
+    const queued = accepted.filter((entry) => entry.status === "queued").length;
+    if (queued > 0) {
+      setBatch((current) =>
+        current ? { ...current, total: current.total + queued } : { done: 0, total: queued },
+      );
+    }
     if (inputRef.current) inputRef.current.value = "";
     void drain();
   }
@@ -113,10 +140,12 @@ export function ReviewDocumentUpload({
       let next = pending.current.shift();
       while (next) {
         await uploadFile(next.id, next.file);
+        setBatch((current) => current && { ...current, done: current.done + 1 });
         next = pending.current.shift();
       }
     } finally {
       draining.current = false;
+      setBatch(null);
     }
   }
 
@@ -144,6 +173,7 @@ export function ReviewDocumentUpload({
         handleUploadUrl: intent.upload.handleUploadUrl,
         clientPayload: JSON.stringify({ intentId: intent.intentId, draftId: draft.draftId }),
         multipart: true,
+        onUploadProgress: ({ percentage }) => patch(id, { percent: Math.round(percentage) }),
       });
       const completeResponse = await fetch(`/api/uploads/policy/${intent.intentId}/complete`, {
         method: "POST",
@@ -152,7 +182,7 @@ export function ReviewDocumentUpload({
       });
       if (!completeResponse.ok) throw new Error("UPLOAD_COMPLETE");
 
-      patch(id, { status: "processing" });
+      patch(id, { status: "processing", percent: undefined });
       for (let attempt = 0; attempt < 150; attempt += 1) {
         const stateResponse = await fetch(
           `/api/policies/${intent.policyVersionId}/status?draft=${encodeURIComponent(draft.draftId)}`,
@@ -179,6 +209,7 @@ export function ReviewDocumentUpload({
       const code = caught instanceof Error ? caught.message : "";
       patch(id, {
         status: "failed",
+        percent: undefined,
         error:
           code === "PROCESSING_FAILED"
             ? t("processingFailed")
@@ -193,6 +224,9 @@ export function ReviewDocumentUpload({
     processing: t("processing"),
     failed: t("failed"),
   };
+  const active = items.find(
+    (entry) => entry.status === "uploading" || entry.status === "processing",
+  );
 
   return (
     <div className="grid content-start gap-3">
@@ -238,6 +272,22 @@ export function ReviewDocumentUpload({
         accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         onChange={(event) => addFiles(event.target.files)}
       />
+      {batch ? (
+        <div className="flex items-center gap-3" role="status">
+          <Progress
+            value={batchPercent(batch, active)}
+            aria-label={t("batchProgress", { done: batch.done, total: batch.total })}
+          />
+          {batch.total > 1 ? (
+            <span
+              className="shrink-0 text-xs text-muted-foreground tabular-nums"
+              title={t("batchProgress", { done: batch.done, total: batch.total })}
+            >
+              {batch.done}/{batch.total}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {items.length > 0 ? (
         <ul className="grid gap-1.5">
           {items.map((item) => (
@@ -252,6 +302,9 @@ export function ReviewDocumentUpload({
                   role={item.status === "failed" ? "alert" : undefined}
                 >
                   {item.error ?? statusText[item.status]}
+                  {item.status === "uploading" && item.percent !== undefined ? (
+                    <span className="tabular-nums"> {item.percent} %</span>
+                  ) : null}
                 </span>
               </div>
               {item.status === "failed" ? (

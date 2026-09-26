@@ -1,12 +1,13 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { FileText, LoaderCircle, Upload } from "lucide-react";
+import { FileText, Upload } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import type { DisclosureActionResult } from "@/app/[locale]/(workspace)/disclosure/[caseId]/actions";
+import { Progress } from "@/components/ui/progress";
 import { docxMimeType, maximumPolicyBytes } from "@/domain/policies/upload";
 
 type ReportUploadProps = Readonly<{
@@ -24,7 +25,10 @@ type ReportUploadProps = Readonly<{
 }>;
 
 type UploadState =
-  { phase: "idle"; error?: string } | { phase: "uploading" | "processing"; name: string };
+  | { phase: "idle"; error?: string }
+  /** `percent`: hochgeladene Bytes; null, solange der Anteil noch unbekannt ist. */
+  | { phase: "uploading"; name: string; percent: number | null }
+  | { phase: "processing"; name: string };
 
 type IntentResponse = {
   intentId: string;
@@ -66,7 +70,7 @@ export function ReportUpload({
     if (inputRef.current) inputRef.current.value = "";
     if (!isDocxFile(file.name)) return setState({ phase: "idle", error: t("docxOnly") });
     if (file.size > maximumPolicyBytes) return setState({ phase: "idle", error: t("tooLarge") });
-    setState({ phase: "uploading", name: file.name });
+    setState({ phase: "uploading", name: file.name, percent: null });
     try {
       const draft = await prepareDraft({ locale });
       if (!draft.ok) throw new Error(draft.code);
@@ -91,6 +95,8 @@ export function ReportUpload({
         handleUploadUrl: intent.upload.handleUploadUrl,
         clientPayload: JSON.stringify({ intentId: intent.intentId, draftId: draft.draftId }),
         multipart: true,
+        onUploadProgress: ({ percentage }) =>
+          setState({ phase: "uploading", name: file.name, percent: Math.round(percentage) }),
       });
       const completeResponse = await fetch(`/api/uploads/policy/${intent.intentId}/complete`, {
         method: "POST",
@@ -170,13 +176,25 @@ export function ReportUpload({
           {busy ? <FileText size={18} /> : <Upload size={18} />}
         </span>
         {busy ? (
-          <p className="flex items-center gap-2 text-body" role="status">
-            <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-            <span className="max-w-72 truncate font-medium">{state.name}</span>
-            <span className="text-muted-foreground">
-              {state.phase === "uploading" ? t("uploading") : t("processing")}
-            </span>
-          </p>
+          <div className="grid w-72 max-w-full gap-2" role="status">
+            <p className="flex items-center justify-center gap-2 text-body">
+              <span className="min-w-0 truncate font-medium">{state.name}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {state.phase === "uploading" ? t("uploading") : t("processing")}
+              </span>
+            </p>
+            <div className="flex items-center gap-3">
+              <Progress
+                value={state.phase === "uploading" ? state.percent : null}
+                aria-label={state.phase === "uploading" ? t("uploading") : t("processing")}
+              />
+              {state.phase === "uploading" && state.percent !== null ? (
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {state.percent} %
+                </span>
+              ) : null}
+            </div>
+          </div>
         ) : (
           <>
             <button

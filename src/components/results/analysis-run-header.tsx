@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 
 import {
@@ -200,6 +201,7 @@ export function AnalysisRunHeaderStatus({
   const assessedTitle = labels.assessedCount
     .replace("{assessed}", String(assessed))
     .replace("{total}", String(total));
+  const working = state.status === "queued" || state.status === "running";
 
   return (
     <div className="flex min-w-0 items-center gap-3" aria-live="polite">
@@ -215,6 +217,14 @@ export function AnalysisRunHeaderStatus({
           {assessed}/{total}
         </span>
       </span>
+
+      {working ? (
+        <Progress
+          className="w-20 shrink-0"
+          value={state.status === "queued" ? null : state.progressPercent}
+          aria-label={labels.progressLabel}
+        />
+      ) : null}
 
       {notice ? (
         <div

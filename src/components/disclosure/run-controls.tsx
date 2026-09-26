@@ -13,6 +13,7 @@ import {
 } from "@/components/results/model-access-panel";
 import { ModelKeyForm } from "@/components/results/model-key-form";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AnalysisModelCatalogue } from "@/domain/ai/model-catalogue";
 
@@ -219,8 +220,22 @@ export function RunControls({
           </span>
         </Button>
       </div>
+      {open ? (
+        <Progress
+          value={
+            run.plannedCheckCount === null || run.plannedCheckCount === 0
+              ? null
+              : Math.round((run.storedCheckCount / run.plannedCheckCount) * 100)
+          }
+          aria-label={status ?? undefined}
+        />
+      ) : null}
       {status ? (
-        <p className="text-meta text-muted-foreground" role="status" aria-live="polite">
+        <p
+          className="text-meta text-muted-foreground tabular-nums"
+          role="status"
+          aria-live="polite"
+        >
           {status}
         </p>
       ) : null}

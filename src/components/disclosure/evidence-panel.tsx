@@ -1,11 +1,12 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { CircleAlert, CircleCheck, CircleX, LoaderCircle, Upload } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleX, Upload } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { Progress } from "@/components/ui/progress";
 import { formatMicro } from "@/domain/disclosure/arithmetic";
 import { postenByKey } from "@/domain/disclosure/checks/posten";
 import {
@@ -66,7 +67,8 @@ export function EvidencePanel({
   const statusT = useTranslations("Disclosure.plausibility.status");
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  // Datei im Upload; `percent` null, solange der Anteil der Bytes noch unbekannt ist.
+  const [busy, setBusy] = useState<{ name: string; percent: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,7 +85,7 @@ export function EvidencePanel({
     if (!isXlsxFile(file.name)) return setError(t("xlsxOnly"));
     if (file.size > maximumEvidenceBytes) return setError(t("tooLarge"));
     setError(null);
-    setBusy(file.name);
+    setBusy({ name: file.name, percent: null });
     try {
       const intentResponse = await fetch(`/api/disclosure/cases/${caseId}/evidence`, {
         method: "POST",
@@ -104,7 +106,10 @@ export function EvidencePanel({
         contentType: xlsxMimeType,
         handleUploadUrl: intent.upload.handleUploadUrl,
         clientPayload: JSON.stringify({ evidenceFileId: intent.evidenceFileId }),
+        onUploadProgress: ({ percentage }) =>
+          setBusy({ name: file.name, percent: Math.round(percentage) }),
       });
+      setBusy({ name: file.name, percent: null });
       const complete = await fetch(`/api/disclosure/evidence/${intent.evidenceFileId}/complete`, {
         method: "POST",
         credentials: "same-origin",
@@ -139,6 +144,9 @@ export function EvidencePanel({
                   : t("parsing")}
             </span>
           </div>
+          {file.status === "uploaded" || file.status === "parsing" ? (
+            <Progress value={null} aria-label={t("parsing")} />
+          ) : null}
           {file.status === "ready" ? (
             <div className="overflow-x-auto rounded-md border border-border bg-card">
               <table className="w-full text-control">
@@ -191,31 +199,42 @@ export function EvidencePanel({
       ))}
       {canUpload ? (
         <div className="grid gap-2">
-          <button
-            type="button"
-            className="flex min-h-20 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 text-body transition-colors hover:bg-muted disabled:cursor-default"
-            disabled={busy !== null}
-            onClick={() => inputRef.current?.click()}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              void start(event.dataTransfer.files[0]);
-            }}
-          >
-            {busy ? (
-              <>
-                <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-                <span className="max-w-72 truncate font-medium">{busy}</span>
-                <span className="text-muted-foreground">{t("uploading")}</span>
-              </>
-            ) : (
-              <>
-                <Upload aria-hidden="true" className="size-4 text-muted-foreground" />
-                <span className="font-medium">{t("dropzone")}</span>
-                <span className="text-meta text-muted-foreground">.xlsx</span>
-              </>
-            )}
-          </button>
+          {busy ? (
+            <div
+              className="flex min-h-20 items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 px-4 text-body"
+              role="status"
+            >
+              <div className="grid w-72 max-w-full gap-2">
+                <p className="flex items-center justify-center gap-2">
+                  <span className="min-w-0 truncate font-medium">{busy.name}</span>
+                  <span className="shrink-0 text-muted-foreground">{t("uploading")}</span>
+                </p>
+                <div className="flex items-center gap-3">
+                  <Progress value={busy.percent} aria-label={t("uploading")} />
+                  {busy.percent !== null ? (
+                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                      {busy.percent} %
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="flex min-h-20 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 text-body transition-colors hover:bg-muted"
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                void start(event.dataTransfer.files[0]);
+              }}
+            >
+              <Upload aria-hidden="true" className="size-4 text-muted-foreground" />
+              <span className="font-medium">{t("dropzone")}</span>
+              <span className="text-meta text-muted-foreground">.xlsx</span>
+            </button>
+          )}
           <p className="text-meta text-muted-foreground">{t("hint")}</p>
           <input
             ref={inputRef}

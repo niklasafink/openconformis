@@ -479,7 +479,8 @@
       "tooLarge": "The file must not exceed 25 MB.",
       "failed": "The upload could not be completed. Please try again.",
       "processingFailed": "The document could not be processed.",
-      "queued": "Waiting"
+      "queued": "Waiting",
+      "batchProgress": "{done} of {total} files processed"
     },
     "editor": {
       "newTitle": "New column",
@@ -903,6 +904,7 @@
       "summary": {
         "figures": "{count, plural, one {# figure recognized} other {# figures recognized}}",
         "statements": "{count, plural, one {# change word} other {# change words}}",
+        "dates": "{count, plural, one {# date} other {# dates}}",
         "unreadable": "{count} unreadable"
       },
       "status": {
@@ -935,7 +937,9 @@
         "notChecked": "Not checked yet.",
         "unreadable": "Number format not readable.",
         "location": "Location",
-        "year": "Year"
+        "year": "Year",
+        "date": "Date",
+        "dateHint": "Not checked automatically. Reconcile with the uploaded documents."
       },
       "source": {
         "page": "Page {page}",

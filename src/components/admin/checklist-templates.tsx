@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -86,6 +87,8 @@ export function ChecklistTemplateAdmin({
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  // Fortschritt des Imports: Bytes in Prozent, null solange unbekannt oder beim Einlesen.
+  const [importing, setImporting] = useState<{ percent: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<readonly Issue[]>([]);
   const [draft, setDraft] = useState<{
@@ -106,6 +109,7 @@ export function ChecklistTemplateAdmin({
       return;
     }
     setBusy(true);
+    setImporting({ percent: null });
     setError(null);
     setIssues([]);
     setDraft(null);
@@ -120,7 +124,9 @@ export function ChecklistTemplateAdmin({
         access: "private",
         contentType: xlsxMimeType,
         handleUploadUrl: upload_.handleUploadUrl,
+        onUploadProgress: ({ percentage }) => setImporting({ percent: Math.round(percentage) }),
       });
+      setImporting({ percent: null });
       const imported = await json("/api/admin/checklist-templates/imports", {
         method: "POST",
         body: JSON.stringify({
@@ -147,6 +153,7 @@ export function ChecklistTemplateAdmin({
       setError(t("failed"));
     } finally {
       setBusy(false);
+      setImporting(null);
     }
   }
 
@@ -225,7 +232,7 @@ export function ChecklistTemplateAdmin({
             />
           </div>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
           <Button
             type="button"
             size="sm"
@@ -240,6 +247,16 @@ export function ChecklistTemplateAdmin({
             )}
             {busy ? t("uploading") : t("upload")}
           </Button>
+          {importing ? (
+            <div className="flex w-48 items-center gap-3" role="status">
+              <Progress value={importing.percent} aria-label={t("uploading")} />
+              {importing.percent !== null ? (
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {importing.percent} %
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         {error ? (
           <p role="alert" className="text-meta text-destructive">

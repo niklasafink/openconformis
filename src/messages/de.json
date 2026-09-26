@@ -479,7 +479,8 @@
       "tooLarge": "Die Datei darf maximal 25 MB groß sein.",
       "failed": "Der Upload konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
       "processingFailed": "Das Dokument konnte nicht aufbereitet werden.",
-      "queued": "Wartet"
+      "queued": "Wartet",
+      "batchProgress": "{done} von {total} Dateien verarbeitet"
     },
     "editor": {
       "newTitle": "Neue Spalte",
@@ -903,6 +904,7 @@
       "summary": {
         "figures": "{count, plural, one {# Zahl erkannt} other {# Zahlen erkannt}}",
         "statements": "{count, plural, one {# Richtungswort} other {# Richtungswörter}}",
+        "dates": "{count, plural, one {# Datum} other {# Datumsangaben}}",
         "unreadable": "{count} nicht lesbar"
       },
       "status": {
@@ -935,7 +937,9 @@
         "notChecked": "Noch nicht geprüft.",
         "unreadable": "Zahlenformat nicht lesbar.",
         "location": "Fundstelle",
-        "year": "Jahreszahl"
+        "year": "Jahreszahl",
+        "date": "Datum",
+        "dateHint": "Nicht automatisch geprüft. Mit den hochgeladenen Unterlagen abstimmen."
       },
       "source": {
         "page": "Seite {page}",

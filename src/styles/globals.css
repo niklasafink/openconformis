@@ -1326,6 +1326,29 @@
   }
 }
 
+/* Unbestimmter Fortschritt: ein Segment läuft von links nach rechts durch die Spur. */
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.progress-indeterminate {
+  animation: progress-indeterminate 1.4s ease-in-out infinite;
+}
+
+/* Ohne Bewegung steht ein ruhiges, volles Segment statt eines springenden. */
+@media (prefers-reduced-motion: reduce) {
+  .progress-indeterminate {
+    width: 100%;
+    animation: none !important;
+    opacity: 0.4;
+  }
+}
+
 .analysis-run-page {
   width: min(100% - 64px, 1120px);
   margin: 0 auto;
@@ -2309,6 +2332,12 @@ i[data-result-pending="true"] {
   cursor: pointer;
   text-decoration: none;
   transition: background-color 120ms ease;
+}
+
+/* Datumsangaben: nicht geprüft, nur zum Abstimmen mit den Unterlagen gerahmt. */
+.disclosure-document .disclosure-mark[data-kind="date"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #c9ccd2;
 }
 
 .disclosure-document .disclosure-mark[data-kind="statement"] {

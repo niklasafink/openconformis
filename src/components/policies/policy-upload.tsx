@@ -7,6 +7,7 @@ import { upload } from "@vercel/blob/client";
 
 import { DocumentChip } from "@/components/policies/document-chip";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { docxMimeType, maximumPolicyBytes, pdfMimeType } from "@/domain/policies/upload";
 
 type PolicyUploadProps = Readonly<{
@@ -50,6 +51,8 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
+  // Hochgeladene Bytes in Prozent; null, solange der Anteil noch unbekannt ist.
+  const [percent, setPercent] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
   function chooseFile(candidate?: File) {
@@ -76,6 +79,7 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
     if (!file || !draftId || status === "uploading") return;
 
     setStatus("uploading");
+    setPercent(null);
     setError(null);
 
     try {
@@ -99,7 +103,9 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
         handleUploadUrl: intent.upload.handleUploadUrl,
         clientPayload: JSON.stringify({ intentId: intent.intentId, draftId }),
         multipart: true,
+        onUploadProgress: ({ percentage }) => setPercent(Math.round(percentage)),
       });
+      setPercent(null);
 
       const completeResponse = await fetch(`/api/uploads/policy/${intent.intentId}/complete`, {
         method: "POST",
@@ -187,6 +193,17 @@ export function PolicyUpload({ continueHref, draftId, labels }: PolicyUploadProp
         onChange={(event) => chooseFile(event.target.files?.[0])}
       />
 
+      {status !== "idle" ? (
+        <div className="flex items-center gap-3" role="status">
+          <Progress
+            value={status === "uploading" ? percent : null}
+            aria-label={status === "uploading" ? labels.uploading : labels.uploaded}
+          />
+          {status === "uploading" && percent !== null ? (
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{percent} %</span>
+          ) : null}
+        </div>
+      ) : null}
       {error ? <p className="field-error">{error}</p> : null}
       {file ? (
         <Button

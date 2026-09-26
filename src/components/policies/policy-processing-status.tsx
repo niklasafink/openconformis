@@ -1,9 +1,9 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { Progress } from "@/components/ui/progress";
 import { nextProcessingPollDelay } from "@/domain/policies/processing-poll";
 import { Link } from "@/i18n/navigation";
 
@@ -76,9 +76,9 @@ export function PolicyProcessingStatus({
   }
 
   return (
-    <p className="policy-processing-status" role="status">
-      <LoaderCircle size={15} aria-hidden="true" className="animate-spin" />
+    <div className="policy-processing-status" role="status">
       {labels.processing}
-    </p>
+      <Progress value={null} aria-label={labels.processing} className="w-24" />
+    </div>
   );
 }

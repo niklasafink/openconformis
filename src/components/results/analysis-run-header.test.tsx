@@ -294,6 +294,10 @@ describe("analysis run header", () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: "cancelled", changed: true }));
     renderHeader({ status: "running", stage: "assessment", progressPercent: 50 });
 
+    expect(screen.getByRole("progressbar", { name: labels.progressLabel })).toHaveAttribute(
+      "aria-valuenow",
+      "50",
+    );
     expect(screen.queryByRole("button", { name: "Neue Analyse" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Analyse abbrechen" }));
 
@@ -303,6 +307,7 @@ describe("analysis run header", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(screen.queryByRole("button", { name: "Analyse abbrechen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("moves a dismissed error into the notifications and keeps it dismissed after a reload", async () => {

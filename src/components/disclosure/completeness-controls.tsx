@@ -13,6 +13,7 @@ import {
 import { ModelKeyForm } from "@/components/results/model-key-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -352,7 +353,15 @@ export function CompletenessControls({
           </span>
         </Button>
       </div>
-      <p className="text-meta text-muted-foreground" role="status" aria-live="polite">
+      {open ? (
+        <Progress
+          value={
+            run.plannedCount === 0 ? null : Math.round((run.storedCount / run.plannedCount) * 100)
+          }
+          aria-label={status ?? undefined}
+        />
+      ) : null}
+      <p className="text-meta text-muted-foreground tabular-nums" role="status" aria-live="polite">
         {status}
       </p>
       {error ? (
