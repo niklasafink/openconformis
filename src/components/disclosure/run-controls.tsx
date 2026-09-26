@@ -127,7 +127,7 @@ export function RunControls({
             : !ready
               ? t("run.notReady")
               : model && saved
-                ? t("model.withModel", { model: model.name })
+                ? null
                 : t("model.withoutKey");
   // Wer einordnet: nach dem Start der eingefrorene Wert, davor die Vorschau.
   const routing =
@@ -219,9 +219,11 @@ export function RunControls({
           </span>
         </Button>
       </div>
-      <p className="text-meta text-muted-foreground" role="status" aria-live="polite">
-        {status}
-      </p>
+      {status ? (
+        <p className="text-meta text-muted-foreground" role="status" aria-live="polite">
+          {status}
+        </p>
+      ) : null}
       {routing ? (
         <p className="text-meta text-muted-foreground" data-testid="disclosure-jev-routing">
           {routing}

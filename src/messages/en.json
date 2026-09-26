@@ -1022,7 +1022,6 @@
         "addKey": "Add",
         "addingKey": "Adding …",
         "keyFailed": "The key could not be confirmed.",
-        "withModel": "Assignment by {model}; all arithmetic runs in code.",
         "withoutKey": "Without a key: rules only, no assignment by the model."
       },
       "jev": {

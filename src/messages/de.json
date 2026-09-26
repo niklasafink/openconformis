@@ -1022,7 +1022,6 @@
         "addKey": "Hinzufügen",
         "addingKey": "Wird hinzugefügt …",
         "keyFailed": "Der Schlüssel konnte nicht bestätigt werden.",
-        "withModel": "Einordnung über {model}; gerechnet wird im Code.",
         "withoutKey": "Ohne Schlüssel: nur Regeln, keine Einordnung über das Modell."
       },
       "jev": {
