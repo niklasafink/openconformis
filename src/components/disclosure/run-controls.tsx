@@ -143,7 +143,7 @@ export function RunControls({
         ? typesafe
           ? t("jev.ready")
           : model.routeProvider === "openrouter"
-            ? t("jev.readyRouter")
+            ? null
             : t("jev.notUsed")
         : null;
 
