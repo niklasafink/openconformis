@@ -4,16 +4,17 @@ import { deriveDocumentContext, type ContextInputBlock } from "../document-conte
 import { recognizeFigures } from "../figures";
 import { recognizeStatements } from "../statements";
 
-import { renderComment, renderFindingTitle } from "./comments";
+import { renderComment, renderFindingTitle, renderReason } from "./comments";
 import { deriveFindings, markStatuses } from "./findings";
 import { runDeterministicChecks } from "./run";
 import { sentencesOf } from "./text";
-import type {
-  CheckDraft,
-  EngineBlock,
-  EngineDocument,
-  EngineFigure,
-  EngineStatement,
+import {
+  type CheckDraft,
+  type CommentCode,
+  type EngineBlock,
+  type EngineDocument,
+  type EngineFigure,
+  type EngineStatement,
 } from "./types";
 
 /**
@@ -780,5 +781,97 @@ describe("Beleg-Abgleich mit der SuSa", () => {
   it("ohne Belegdatei gibt es keinen Abgleich", () => {
     const { drafts } = runDeterministicChecks(buildDocument([balance]));
     expect(drafts.some((draft) => draft.kind === "evidence")).toBe(false);
+  });
+});
+
+describe("reasons and calculation signs", () => {
+  const codes: CommentCode[] = [
+    "sum_matches",
+    "sum_differs",
+    "sum_ambiguous",
+    "balance_matches",
+    "balance_differs",
+    "horizontal_matches",
+    "horizontal_differs",
+    "horizontal_incomplete",
+    "change_matches",
+    "change_differs",
+    "arithmetic_matches",
+    "arithmetic_differs",
+    "direction_matches",
+    "direction_contradicts",
+    "direction_unclear",
+    "reference_matches",
+    "reference_differs",
+    "reference_sign",
+    "reference_candidates",
+    "reference_structure",
+    "prior_matches",
+    "prior_differs",
+    "prior_ambiguous",
+    "derived_matches",
+    "derived_differs",
+    "ratio_matches",
+    "ratio_differs",
+    "model_unsure",
+    "evidence_matches",
+    "evidence_differs",
+    "year_suspect",
+    "year_not_rolled",
+    "prior_report_matches",
+    "prior_report_differs",
+  ];
+
+  it("gives every comment code a short reason in both languages, without amounts", () => {
+    for (const code of codes) {
+      for (const locale of ["de", "en"] as const) {
+        const reason = renderReason(code, locale);
+        expect(reason.length, `${code} ${locale}`).toBeGreaterThan(8);
+        expect(reason.length, `${code} ${locale}`).toBeLessThanOrEqual(80);
+        expect(reason, `${code} ${locale}`).not.toMatch(/\d/u);
+      }
+    }
+    expect(renderReason("sum_differs")).toBe("Summe aus der Tabelle stimmt nicht.");
+    expect(renderReason("reference_differs")).toBe(
+      "Zahl steht an anderer Stelle im Bericht und ist dort anders.",
+    );
+  });
+
+  it("stores one sign per addend so the calculation can be reproduced", () => {
+    const checks = checksOf(
+      buildDocument([
+        {
+          table: 1,
+          header: 1,
+          cells: [
+            [null, "31.12.2021", "31.12.2020", "Veränderung"],
+            ["1. Zinserträge", "1.000,00", "800,00", "200,00"],
+            ["2. Zinsaufwendungen", "-300,00", "-250,00", "-50,00"],
+            ["Summe", "700,00", "550,00", "150,00"],
+          ],
+        },
+      ]),
+    );
+    const sum = find(checks, "700,00", "table_sum")[0]!;
+    expect(sum.status).toBe("match");
+    expect(sum.sourceSigns).toHaveLength(sum.sourceFigureIds.length);
+    expect(sum.sourceSigns!.every((sign) => sign === 1 || sign === -1)).toBe(true);
+    const change = find(checks, "200,00", "change_column")[0]!;
+    expect(change.sourceSigns).toEqual([1, -1]);
+    expect(change.sourceFigureIds).toHaveLength(2);
+  });
+
+  it("computes a sentence change as current minus prior with matching signs", () => {
+    const checks = checksOf(
+      buildDocument([
+        {
+          text: "Die Zinserträge sind um 200,00 EUR von 800,00 EUR auf 1.000,00 EUR gestiegen.",
+        },
+      ]),
+    );
+    const arithmetic = find(checks, "200,00", "sentence_arithmetic")[0];
+    if (!arithmetic) return;
+    expect(arithmetic.status).toBe("match");
+    expect(arithmetic.sourceSigns).toEqual([-1, 1]);
   });
 });

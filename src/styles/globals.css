@@ -2377,6 +2377,12 @@ i[data-result-pending="true"] {
   outline-offset: 1px;
 }
 
+/* Bezugszahl einer Berechnung, zu der das Popover gerade gesprungen ist. */
+.disclosure-document .disclosure-mark[data-anchor] {
+  outline: 2px dashed var(--ring);
+  outline-offset: 1px;
+}
+
 /* Vollständigkeitsprüfung: belegte Zitate wie in der Gap-Analyse, mit Belegnummer. Ein
    widersprechendes Zitat trägt zusätzlich eine gepunktete Unterkante. */
 .disclosure-document .completeness-quote {

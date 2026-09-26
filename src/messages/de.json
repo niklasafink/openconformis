@@ -938,7 +938,10 @@
         "location": "Fundstelle",
         "year": "Jahreszahl",
         "date": "Datum",
-        "dateHint": "Nicht automatisch geprüft. Mit den hochgeladenen Unterlagen abstimmen."
+        "dateHint": "Nicht automatisch geprüft. Mit den hochgeladenen Unterlagen abstimmen.",
+        "close": "Schließen",
+        "subject": "Zur geprüften Zahl springen",
+        "aiFinding": "KI-Befund"
       },
       "source": {
         "page": "Seite {page}",
@@ -999,7 +1002,10 @@
         "expected": "Soll",
         "source": "Quelle",
         "model": "Zuordnung über das Modell",
-        "showEvidence": "In Belegen zeigen"
+        "showEvidence": "In Belegen zeigen",
+        "calculation": "Berechnung",
+        "otherChecks": "Weitere Prüfungen",
+        "jumpTo": "Im Bericht zeigen: {value}"
       },
       "noRelation": "Keine Prüfbeziehung gefunden.",
       "errors": {

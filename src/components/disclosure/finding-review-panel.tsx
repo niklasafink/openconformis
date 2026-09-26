@@ -69,6 +69,8 @@ type ReviewPanelProps = Readonly<{
   history: readonly ReviewHistoryEntry[];
   /** Der KI-Befund, erster Eintrag des Verlaufs. */
   aiEntry: ReactNode;
+  /** Zeile „Verlauf · Status“ über der Liste; entfällt, wenn der Rahmen sie schon zeigt. */
+  heading?: boolean;
   preparer: PreparerChoice;
   canPrepare: boolean;
   members: readonly ReviewMember[];
@@ -77,8 +79,8 @@ type ReviewPanelProps = Readonly<{
 
 type FindingReviewPanelProps = Readonly<{
   review: FindingReview;
-  /** Der KI-Befund, erster Eintrag des Verlaufs. */
-  aiFinding: Readonly<{ comment: string; actual: string | null; expected: string | null }>;
+  /** Der KI-Befund mit Begründung und Berechnung, erster Eintrag des Verlaufs. */
+  aiEntry: ReactNode;
   /** Soll-Wert als Eingabe vorbelegt („933.929,51“); ohne Wert nur „Bestätigen“. */
   proposal: string | null;
   canPrepare: boolean;
@@ -119,38 +121,20 @@ function withMentions(body: string, mentions: ReviewHistoryEntry["mentions"]): R
  */
 export function FindingReviewPanel({
   review,
-  aiFinding,
+  aiEntry,
   proposal,
   canPrepare,
   members,
   errorMessages,
 }: FindingReviewPanelProps) {
-  const t = useTranslations("Disclosure.review");
   return (
     <ReviewPanel
       endpoint={`/api/disclosure/findings/${review.findingId}/review`}
       status={review.status}
       release={review.release}
       history={review.history}
-      aiEntry={
-        <>
-          <span className="text-muted-foreground">{aiFinding.comment}</span>
-          {aiFinding.actual || aiFinding.expected ? (
-            <span className="tabular-nums">
-              {aiFinding.actual ? (
-                <span className="rounded-sm bg-[var(--status-not-met-bg)] px-1">
-                  {t("actual")} {aiFinding.actual}
-                </span>
-              ) : null}{" "}
-              {aiFinding.expected ? (
-                <span className="rounded-sm bg-[var(--status-met-bg)] px-1">
-                  {t("expected")} {aiFinding.expected}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-        </>
-      }
+      aiEntry={aiEntry}
+      heading={false}
       preparer={{ kind: "figure", proposal }}
       canPrepare={canPrepare}
       members={members}
@@ -171,6 +155,7 @@ export function ReviewPanel({
   release,
   history,
   aiEntry,
+  heading = true,
   preparer,
   canPrepare,
   members,
@@ -267,14 +252,16 @@ export function ReviewPanel({
 
   return (
     <div className="grid gap-2 border-t border-border px-3 py-2.5 text-meta">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">{t("history")}</span>
-        <span className="text-muted-foreground" data-testid="disclosure-review-status">
-          {t(`status.${status}`)}
-        </span>
-      </div>
-      <ol className="grid gap-2 border-l border-border pl-3">
-        <li className="relative grid gap-0.5">
+      {heading ? (
+        <div className="flex items-center justify-between">
+          <span className="font-medium">{t("history")}</span>
+          <span className="text-muted-foreground" data-testid="disclosure-review-status">
+            {t(`status.${status}`)}
+          </span>
+        </div>
+      ) : null}
+      <ol className="grid gap-2.5 border-l border-border pl-3">
+        <li className="relative grid gap-1">
           <Bot aria-hidden="true" className="absolute top-0.5 -left-[19px] size-3.5 bg-popover" />
           <span className="font-medium">{t("aiFinding")}</span>
           {aiEntry}

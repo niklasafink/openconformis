@@ -66,7 +66,10 @@ function formatCheck(check: ViewCheck, figure: ViewFigure | undefined): MarkChec
     expected: format(check.expectedMicro),
     source: check.sourceLabel,
     comment: check.comment,
+    reason: check.reason,
     model: check.assignment !== "rule",
+    sourceFigureIds: check.sourceFigureIds,
+    sourceSigns: check.sourceSigns,
     accountIds: check.sourceAccountIds,
   };
 }
@@ -152,7 +155,23 @@ export default async function PlausibilityPage({ params }: PageProps) {
     );
   }
 
+  // Bezugszahlen im Vorjahresbericht werden Marken, damit die Berechnung dorthin springt.
+  const sourceIds = new Set(checks.flatMap((check) => check.sourceFigureIds));
   const marks: FigureMark[] = [
+    ...(priorRecognition?.figures ?? [])
+      .filter((figure) => sourceIds.has(figure.id) && !figure.issue)
+      .map((figure): FigureMark => ({
+        id: figure.id,
+        blockId: figure.blockId,
+        start: figure.start,
+        end: figure.end,
+        kind: "figure",
+        raw: figure.raw,
+        status: "pending",
+        display: describeFigure(figure),
+        issue: null,
+        reference: true,
+      })),
     ...(recognition?.figures ?? []).map((figure): FigureMark => ({
       id: figure.id,
       blockId: figure.blockId,
@@ -234,18 +253,12 @@ export default async function PlausibilityPage({ params }: PageProps) {
     const check = checkById.get(finding.checkId);
     if (!review || !check) continue;
     const figure = figureById.get(check.subjectId);
-    const formatted = formatCheck(check, figure);
     reviews[finding.subjectId] = {
       review,
       proposal:
         figure && check.expectedMicro !== null && check.kind !== "direction"
           ? editableValue(BigInt(check.expectedMicro), figure)
           : null,
-      aiFinding: {
-        comment: check.comment,
-        actual: formatted.actual,
-        expected: formatted.expected,
-      },
     };
   }
 
@@ -300,7 +313,7 @@ export default async function PlausibilityPage({ params }: PageProps) {
             blocks.get(document.policyVersionId ?? "") ?? [],
           ]),
         )}
-        contexts={recognition?.contexts ?? {}}
+        contexts={{ ...(priorRecognition?.contexts ?? {}), ...(recognition?.contexts ?? {}) }}
         marks={marks}
         recognition={recognition?.status ?? "pending"}
         checksBySubject={checksBySubject}

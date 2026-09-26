@@ -938,7 +938,10 @@
         "location": "Location",
         "year": "Year",
         "date": "Date",
-        "dateHint": "Not checked automatically. Reconcile with the uploaded documents."
+        "dateHint": "Not checked automatically. Reconcile with the uploaded documents.",
+        "close": "Close",
+        "subject": "Jump to the checked figure",
+        "aiFinding": "AI finding"
       },
       "source": {
         "page": "Page {page}",
@@ -999,7 +1002,10 @@
         "expected": "Expected",
         "source": "Source",
         "model": "Assigned by the model",
-        "showEvidence": "Show in evidence"
+        "showEvidence": "Show in evidence",
+        "calculation": "Calculation",
+        "otherChecks": "Further checks",
+        "jumpTo": "Show in report: {value}"
       },
       "noRelation": "No check relation found.",
       "errors": {
